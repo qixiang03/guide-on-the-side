@@ -29,6 +29,13 @@ The Guide on the Side Interactive Tutorial System allows librarians to create se
 | Daniel McGrath | Developer |
 | Caleb Jones | Developer |
 
+### Past Contributors
+
+| Name | Role | Contribution |
+|------|------|--------------|
+| Tanguy Merrien | Team Lead (Fall 2024) | Project coordination, Jira board setup, initial architecture |
+
+
 **Project Advisor**: Dr. David LeBlanc
 
 ## Getting Started
