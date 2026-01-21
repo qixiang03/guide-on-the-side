@@ -23,11 +23,11 @@ Create the following columns (in order):
 
 | Column | Purpose | Card Behavior |
 |--------|---------|---------------|
-| **📋 Backlog** | All tasks not yet scheduled | Items move here when created |
-| **🎯 Sprint Backlog** | Tasks planned for current sprint | Move from Backlog during sprint planning |
-| **🔄 In Progress** | Tasks actively being worked on | Move when developer starts work |
-| **👀 In Review** | Tasks awaiting code review | Move when PR is opened |
-| **✅ Done** | Completed tasks | Move when PR is merged |
+| **Backlog** | All tasks not yet scheduled | Items move here when created |
+| **Sprint Backlog** | Tasks planned for current sprint | Move from Backlog during sprint planning |
+| **In Progress** | Tasks actively being worked on | Move when developer starts work |
+| **In Review** | Tasks awaiting code review | Move when PR is opened |
+| **Done** | Completed tasks | Move when PR is merged |
 
 ### Step 3: Create Labels
 
