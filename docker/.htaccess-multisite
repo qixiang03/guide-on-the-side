@@ -1,0 +1,106 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# WordPress Multisite .htaccess (Sub-directory Mode)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# This file REPLACES the default WordPress .htaccess when you convert to
+# Multisite. Without these rules, sub-sites (i.e., Pressbooks books) will
+# return 404 errors.
+#
+# ─── How This File Is Used ──────────────────────────────────────────────────
+#
+# Option A (automated):
+#   The setup.sh script writes these rules into the container's .htaccess
+#   automatically. You don't need to do anything manually.
+#
+# Option B (manual):
+#   Copy the contents below into /var/www/html/.htaccess inside the
+#   WordPress container, or into your WordPress root if not using Docker.
+#   This REPLACES the existing .htaccess — don't append, replace entirely.
+#
+#     docker exec -it pressbooks_wp bash
+#     cat > /var/www/html/.htaccess << 'EOF'
+#     (paste rules below)
+#     EOF
+#
+# ─── Why This Matters ──────────────────────────────────────────────────────
+#
+# Standard WordPress .htaccess only handles single-site URL rewriting.
+# Multisite needs additional rules to:
+#
+#   1. Route sub-site paths (e.g., /my-book/chapter-1/) to WordPress
+#   2. Forward wp-admin, wp-content, and wp-includes requests correctly
+#      across sub-sites
+#   3. Pass HTTP Authorization headers through (needed for REST API and
+#      application passwords)
+#   4. Redirect /wp-admin without trailing slash to /wp-admin/ to prevent
+#      broken admin pages on sub-sites
+#
+# ─── Sub-directory vs Sub-domain ───────────────────────────────────────────
+#
+# We use sub-directory mode (localhost/my-book/) rather than sub-domain
+# mode (my-book.localhost) because:
+#
+#   - No wildcard DNS or hosts file editing needed for local dev
+#   - Works out of the box with Docker's port mapping
+#   - Simpler for the team to onboard
+#
+# Production deployments may use sub-domains instead. If switching, you
+# need different .htaccess rules AND must set SUBDOMAIN_INSTALL to true
+# in wp-config.php. This is a one-time decision — WordPress does not
+# support switching modes after content has been created.
+#
+# ─── Debugging ──────────────────────────────────────────────────────────────
+#
+# If sub-sites return 404:
+#   1. Verify mod_rewrite is enabled:
+#        docker exec pressbooks_wp a2enmod rewrite
+#        docker exec pressbooks_wp service apache2 reload
+#
+#   2. Verify AllowOverride is set to All in Apache config:
+#        docker exec pressbooks_wp cat /etc/apache2/sites-enabled/000-default.conf
+#      Should contain:  <Directory /var/www/html> AllowOverride All </Directory>
+#      (The official WordPress Docker image sets this by default.)
+#
+#   3. Verify .htaccess exists and has correct ownership:
+#        docker exec pressbooks_wp ls -la /var/www/html/.htaccess
+#      Should be owned by www-data.
+#
+#   4. Flush rewrite rules:
+#        docker exec pressbooks_wp wp rewrite flush --allow-root
+#
+# @see https://developer.wordpress.org/advanced-administration/multisite/create-network/
+# ─────────────────────────────────────────────────────────────────────────────
+
+RewriteEngine On
+
+# Pass HTTP Authorization headers through to PHP.
+# Required for the WordPress REST API, application passwords, and
+# any plugin that uses Bearer tokens or Basic auth.
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+
+# Redirect /sub-site/wp-admin to /sub-site/wp-admin/ (with trailing slash).
+# Without this, accessing wp-admin on a sub-site breaks because Apache
+# tries directory listing instead of routing through WordPress.
+RewriteRule ^([_0-9a-zA-Z-]+/)?wp-admin$ $1wp-admin/ [R=301,L]
+
+# If the requested file or directory actually exists on disk, serve it
+# directly. This handles static assets (images, CSS, JS) without going
+# through WordPress.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Route wp-content, wp-admin, and wp-includes requests from sub-sites
+# back to the root WordPress installation. A request to
+# /my-book/wp-content/plugins/foo.js becomes /wp-content/plugins/foo.js.
+RewriteRule ^([_0-9a-zA-Z-]+/)?(wp-(content|admin|includes).*) $2 [L]
+
+# Route PHP file requests from sub-sites back to root.
+# /my-book/xmlrpc.php becomes /xmlrpc.php.
+RewriteRule ^([_0-9a-zA-Z-]+/)?(.*\.php)$ $2 [L]
+
+# Everything else goes through index.php (WordPress front controller).
+RewriteRule . index.php [L]

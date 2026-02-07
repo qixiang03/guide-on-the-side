@@ -1,157 +1,109 @@
-# Guide on the Side - Interactive Tutorial System
+# Guide on the Side — Interactive Tutorial System
 
-A web-based interactive tutorial system for UPEI Library that enables librarians to create split-screen tutorials with instructional content on the left and embedded library resources on the right.
+A WordPress/Pressbooks plugin for UPEI Library that enables librarians to create split-screen tutorials with instructional content and quizzes on the left pane and embedded library resources on the right.
 
-## Project Overview
-
-The Guide on the Side Interactive Tutorial System allows librarians to create self-paced learning modules that guide students through using library databases, catalogues, and research tools. The system features:
-
-- **Split-screen interface**: Instructions and quizzes on the left, live library resources on the right
-- **WYSIWYG editor**: Task-relevant design interface for librarians
-- **Quiz functionality**: Multiple choice, checkbox, yes/no, and open-ended questions with immediate feedback
-- **Template system**: Consistent look and feel with customizable overrides
-- **Accessibility compliance**: WCAG 2.1 AA standards
-
-## Technology Stack
-
-- **CMS**: Pressbooks or Drupal 10 (under evaluation)
-- **Backend**: PHP
-- **Frontend**: HTML, CSS, JavaScript
-- **Version Control**: Git/GitHub
-
-## Team Members
-
-| Name | Role |
-|------|------|
-| Yang Guo | Developer |
-| Qi Xiang Phang | Developer |
-| Xiaohan Yu | Developer |
-| Daniel McGrath | Developer |
-| Caleb Jones | Developer |
-
-### Past Contributors
-
-| Name | Role | Contribution |
-|------|------|--------------|
-| Tanguy Merrien | Team Lead (Fall 2024) | Project coordination, Jira board setup, initial architecture |
-
-
-**Project Advisor**: Dr. David LeBlanc
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- PHP 8.1 or higher
-- MySQL/MariaDB 8.0+
-- Composer
-- Node.js 18+ (for frontend tooling)
-- Local server environment (XAMPP, MAMP, or Docker)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Git
 
-### Installation
+### Setup (5 minutes)
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/qixiang03/guide-on-the-side/
-   cd guide-on-the-side
-   ```
+```bash
+# 1. Clone the repo
+git clone https://github.com/qixiang03/guide-on-the-side.git
+cd guide-on-the-side
 
-2. **Install dependencies**
-   ```bash
-   composer install
-   npm install
-   ```
+# 2. Start Docker containers
+cd docker
+docker compose up -d
 
-3. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your local database credentials
-   ```
+# 3. Run the automated setup (installs Multisite + Pressbooks + plugin)
+chmod +x setup.sh
+./setup.sh
+```
 
-4. **Set up the database**
-   ```bash
-   # Import the database schema
-   mysql -u [username] -p [database_name] < database/schema.sql
-   ```
+### Access
 
-5. **Start the development server**
-   ```bash
-   # For XAMPP/MAMP: Place project in htdocs/www folder
-   # For Docker: docker-compose up -d
-   ```
+| Service     | URL                          | Credentials          |
+|-------------|------------------------------|----------------------|
+| WordPress   | http://localhost:8080        | admin / admin_password |
+| Network Admin | http://localhost:8080/wp-admin/network/ | same |
+| phpMyAdmin  | http://localhost:8081        | pressbooks / pressbooks_pw |
 
-6. **Access the application**
-   - Development: `http://localhost/guide-on-the-side`
-   - Admin panel: `http://localhost/guide-on-the-side/admin`
+### Development Workflow
 
-## Project Structure
+Your plugin code is **bind-mounted** — edit files in `plugin/pb-split-guide/` and changes appear immediately in the running container. No rebuild needed.
+
+```bash
+# Stop containers
+cd docker && docker compose down
+
+# Start containers
+cd docker && docker compose up -d
+
+# Reset everything (nuclear option)
+cd docker && docker compose down -v && docker compose up -d && ./setup.sh
+```
+
+## Repository Structure
 
 ```
 guide-on-the-side/
-├── docs/                    # Documentation
-│   ├── api/                 # API documentation
-│   ├── user-guide/          # User manual
-│   └── technical/           # Technical documentation
-├── src/                     # Source code
-│   ├── backend/             # PHP backend code
-│   ├── frontend/            # Frontend assets
-│   └── modules/             # CMS modules/plugins
-├── tests/                   # Test suites
-│   ├── unit/                # Unit tests
-│   ├── integration/         # Integration tests
-│   └── e2e/                 # End-to-end tests
-├── database/                # Database migrations and seeds
-├── config/                  # Configuration files
-└── public/                  # Public web root
+├── docker/                    # Docker infrastructure
+│   ├── docker-compose.yml     # WP Multisite + MariaDB + phpMyAdmin
+│   └── setup.sh               # Automated Pressbooks setup
+├── plugin/                    # Plugin source code (the product)
+│   └── pb-split-guide/
+│       ├── pb-split-guide.php # Main plugin file
+│       ├── includes/          # PHP classes
+│       ├── assets/            # CSS + JS
+│       ├── blocks/            # Gutenberg blocks
+│       └── templates/         # Template overrides
+├── docs/                      # Project documentation
+├── .github/                   # PR template
+├── CONTRIBUTING.md            # Git workflow + coding standards
+└── README.md                  # This file
 ```
 
-## Development Workflow
+## Technology Stack
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+| Layer       | Technology                        |
+|-------------|-----------------------------------|
+| CMS         | WordPress Multisite + Pressbooks  |
+| Plugin      | PHP 8.2, Gutenberg Blocks (React) |
+| Frontend    | HTML, CSS (Flexbox), JavaScript   |
+| Database    | MariaDB 10.6                      |
+| Dev Environment | Docker                        |
+| Version Control | Git / GitHub (Gitflow)        |
 
-### Quick Reference
+## Key Features
 
-- **Main branch**: `main` - Production-ready code
-- **Development branch**: `develop` - Integration branch for features
-- **Feature branches**: `feature/[feature-name]` - New features
-- **Bugfix branches**: `bugfix/[issue-number]-[description]` - Bug fixes
-- **Hotfix branches**: `hotfix/[issue-number]-[description]` - Urgent production fixes
+- **Split-screen interface** — Instructions/quizzes on the left, live library resources on the right
+- **Gutenberg block editor** — Librarians use the standard WordPress editor
+- **Quiz system** — Multiple choice, checkbox, yes/no with immediate feedback
+- **Pressbooks integration** — Works within the Pressbooks publishing environment
+- **WCAG 2.1 AA accessible** — Keyboard navigation, screen reader support, color contrast
 
-## Documentation
+## Team
 
-- [Project Plan](docs/project-plan.md)
-- [Feature List](docs/features.md)
-- [API Documentation](docs/api/README.md)
-- [User Guide](docs/user-guide/README.md)
-- [Deployment Guide](docs/deployment.md)
+| Name           | Role        |
+|----------------|-------------|
+| Yang Guo       | Developer   |
+| Qi Xiang Phang | Developer   |
+| Xiaohan Yu     | Developer   |
+| Daniel McGrath | Developer   |
+| Caleb Jones    | Developer   |
 
-## Testing
+**Project Advisor**: Dr. David LeBlanc  
+**Client**: Melissa Belvadi, UPEI Library
 
-```bash
-# Run all tests
-npm test
+## Contributing
 
-# Run unit tests only
-npm run test:unit
-
-# Run with coverage
-npm run test:coverage
-```
-
-## Deployment
-
-See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming conventions, commit format, and PR process.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- UPEI Library for project requirements and guidance
-- University of Arizona for the original Guide on the Side concept
-- Dr. David LeBlanc for project supervision
-
-## Contact
-
-For questions about this project, please contact through Prof. LeBlanc at UPEI.
+MIT — see [LICENSE](LICENSE).

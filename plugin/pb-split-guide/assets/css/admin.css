@@ -1,0 +1,317 @@
+/**
+ * Guide on the Side - Admin Styles
+ */
+
+/* Blocks Container */
+.gots-blocks-container {
+    padding: 15px 0;
+}
+
+/* Block List */
+.gots-block-list {
+    margin-bottom: 30px;
+}
+
+.gots-no-blocks {
+    color: #666;
+    font-style: italic;
+    padding: 20px;
+    background: #f9f9f9;
+    border: 1px dashed #ddd;
+    text-align: center;
+}
+
+/* Block Item */
+.gots-block-item {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    transition: box-shadow 0.2s;
+}
+
+.gots-block-item:hover {
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.gots-block-header {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    background: #f7f7f7;
+    border-bottom: 1px solid #eee;
+    cursor: move;
+}
+
+.gots-block-handle {
+    color: #999;
+    margin-right: 10px;
+}
+
+.gots-block-type {
+    background: #0073aa;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    text-transform: uppercase;
+    margin-right: 10px;
+}
+
+.gots-block-item[data-block-type="text"] .gots-block-type {
+    background: #46b450;
+}
+
+.gots-block-title {
+    flex: 1;
+    font-weight: 500;
+}
+
+.gots-delete-block {
+    color: #a00 !important;
+}
+
+.gots-delete-block:hover {
+    color: #dc3232 !important;
+}
+
+.gots-block-details {
+    padding: 12px 15px;
+    font-size: 13px;
+    color: #666;
+}
+
+.gots-block-details p {
+    margin: 5px 0;
+}
+
+/* Add Block Section */
+.gots-add-block-section {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.gots-add-block-section h4 {
+    margin: 0 0 20px 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+/* Form Styles */
+.gots-form-row {
+    margin-bottom: 15px;
+}
+
+.gots-form-row label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.gots-form-row input[type="text"],
+.gots-form-row input[type="url"],
+.gots-form-row input[type="number"],
+.gots-form-row textarea,
+.gots-form-row select {
+    width: 100%;
+    max-width: 600px;
+}
+
+.gots-form-row textarea {
+    min-height: 80px;
+}
+
+.gots-form-row .description {
+    color: #666;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+/* Quiz/Text Fields Toggle */
+.gots-quiz-fields,
+.gots-text-fields {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #ddd;
+}
+
+/* Settings Meta Box */
+.gots-settings p {
+    margin: 10px 0;
+}
+
+.gots-settings code {
+    display: block;
+    padding: 8px;
+    background: #f1f1f1;
+    margin-top: 5px;
+    word-break: break-all;
+}
+
+/* Drag & Drop Placeholder */
+.gots-block-item.ui-sortable-placeholder {
+    background: #e0f0ff;
+    border: 2px dashed #0073aa;
+    visibility: visible !important;
+    height: 60px;
+}
+
+/* Loading State */
+.gots-loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Success/Error Messages */
+.gots-message {
+    padding: 10px 15px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+}
+
+.gots-message-success {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.gots-message-error {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+/* Block Actions */
+.gots-block-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.gots-edit-block {
+    color: #0073aa !important;
+}
+
+.gots-edit-block:hover {
+    color: #005a87 !important;
+}
+
+/* Modal Styles */
+.gots-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.gots-modal {
+    background: #fff;
+    border-radius: 8px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 90vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+}
+
+.gots-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 15px 20px;
+    border-bottom: 1px solid #ddd;
+    background: #f7f7f7;
+}
+
+.gots-modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+}
+
+.gots-modal-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #666;
+    line-height: 1;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.gots-modal-close:hover {
+    color: #000;
+}
+
+.gots-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.gots-modal-body .gots-form-row {
+    margin-bottom: 18px;
+}
+
+.gots-modal-body label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #333;
+}
+
+.gots-modal-body input[type="text"],
+.gots-modal-body input[type="url"],
+.gots-modal-body input[type="number"],
+.gots-modal-body textarea,
+.gots-modal-body select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.gots-modal-body textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+.gots-modal-body .description {
+    color: #666;
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.gots-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px 20px;
+    border-top: 1px solid #ddd;
+    background: #f7f7f7;
+}
+
+/* Edit modal field sections */
+.gots-edit-quiz-fields,
+.gots-edit-text-fields {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+/* Prevent body scroll when modal open */
+body.gots-modal-open {
+    overflow: hidden;
+}

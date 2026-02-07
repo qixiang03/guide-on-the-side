@@ -1,0 +1,46 @@
+# ─── WordPress Core (never commit) ───────────────────────────────────────────
+wp-content/uploads/
+wp-content/upgrade/
+wp-content/cache/
+wp-content/backup-db/
+wp-content/blogs.dir/
+
+# ─── Docker Volumes ──────────────────────────────────────────────────────────
+docker/db_data/
+docker/wp_data/
+
+# ─── Environment / Secrets ───────────────────────────────────────────────────
+.env
+.env.local
+.env.production
+wp-config-local.php
+
+# ─── Dependencies ────────────────────────────────────────────────────────────
+node_modules/
+vendor/
+composer.lock
+
+# ─── Build Artifacts ─────────────────────────────────────────────────────────
+plugin/pb-split-guide/build/
+plugin/pb-split-guide/dist/
+*.zip
+
+# ─── IDE / Editor ────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ─── OS ──────────────────────────────────────────────────────────────────────
+.DS_Store
+Desktop.ini
+._*
+
+# ─── Debug / Logs ────────────────────────────────────────────────────────────
+debug.log
+error.log
+*.log
+npm-debug.log*
