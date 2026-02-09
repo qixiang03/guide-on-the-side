@@ -9,6 +9,7 @@ vendor/
 web/app/languages/*
 web/app/plugins/*
 !web/app/plugins/guide-on-the-side/
+!web/app/plugins/pb-split-guide/
 web/app/mu-plugins/*
 web/app/themes/*
 web/app/uploads/*
