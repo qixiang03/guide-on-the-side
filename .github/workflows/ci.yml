@@ -1,0 +1,47 @@
+name: UPEI Guide-on-the-Side CI
+
+# Trigger the workflow on push or pull request events for the main branch
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  continuous-integration:
+    # Use the latest Ubuntu runner provided by GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1: Check out the repository code so the workflow can access it
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2: Set up the PHP environment matching your local dev (PHP 8.2)
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, xml, ctype, iconv, mysql, dom
+          coverage: none # Coverage is disabled for a lightweight setup
+
+      # 3: Install project dependencies using Composer
+      - name: Install Composer Dependencies
+        run: composer install --no-progress --prefer-dist
+
+      # 4: Execute Unit Tests and generate execution logs (Task 3)
+      # --log-junit creates a machine-readable XML log for monitoring
+      # --testdox provides a human-readable summary in the console
+      - name: Run Tests and Generate Logs
+        run: |
+          mkdir -p build/logs
+          ./vendor/bin/phpunit --configuration phpunit.xml --log-junit build/logs/junit.xml --testdox
+
+      # 5: Upload the test log as a build artifact (Task 3: Automated Reporting)
+      # This ensures a persistent "Test Log" is available for the Review Process
+      - name: Archive Test Logs
+        if: always() # Ensure logs are uploaded even if tests fail
+        uses: actions/upload-artifact@v4
+        with:
+          name: phpunit-test-log
+          path: build/logs/junit.xml
