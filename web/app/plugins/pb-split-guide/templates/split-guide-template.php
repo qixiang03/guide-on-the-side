@@ -3,6 +3,21 @@ if (!defined('ABSPATH')) exit;
 
 get_header();
 
+// Enqueue assets directly in template — ensures they load on Multisite subsites
+wp_enqueue_style(
+    'pbsg_split_guide_css',
+    plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.css',
+    array(),
+    '0.4.0'
+);
+wp_enqueue_script(
+    'pbsg-tracker',
+    plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
+    array(),
+    '1.0.0',
+    true
+);
+
 $page_id = get_the_ID();
 
 $steps_json = get_post_meta($page_id, '_pbsg_steps_json', true);
@@ -13,6 +28,13 @@ $note  = get_post_meta($page_id, '_pbsg_header_note', true);
 $title = get_the_title($page_id);
 
 $ajax_url = admin_url('admin-ajax.php');
+
+// Localize tracker data
+wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
+    'ajaxUrl'        => $ajax_url,
+    'tutorialPageId' => $page_id,
+    'totalSteps'     => count( $steps ),
+) );
 ?>
 
 <div class="pbsg-wrap">
@@ -21,7 +43,7 @@ $ajax_url = admin_url('admin-ajax.php');
   </div>
 
   <?php if (empty($steps)): ?>
-    <p>No steps configured. Edit this page and add steps in “Split Guide Settings”.</p>
+    <p>No steps configured. Edit this page and add steps in "Split Guide Settings".</p>
   <?php else: ?>
     <div class="pbsg-container" role="main">
 
@@ -98,12 +120,12 @@ $ajax_url = admin_url('admin-ajax.php');
 
           if (u.hostname.includes('youtube.com') && u.pathname === '/watch' && u.searchParams.get('v')) {
             const id = u.searchParams.get('v');
-            return `https://www.youtube-nocookie.com/embed/${id}`;
+            return 'https://www.youtube-nocookie.com/embed/' + id;
           }
 
           if (u.hostname === 'youtu.be') {
             const id = u.pathname.replace('/', '');
-            return `https://www.youtube-nocookie.com/embed/${id}`;
+            return 'https://www.youtube-nocookie.com/embed/' + id;
           }
         } catch (e) {}
         return url;
@@ -139,13 +161,13 @@ $ajax_url = admin_url('admin-ajax.php');
           urlText.textContent = '';
         }
 
-        titleEl.textContent = step.title ? step.title : `Step ${i + 1}`;
-        progressEl.textContent = `${i + 1} / ${steps.length}`;
+        titleEl.textContent = step.title ? step.title : 'Step ' + (i + 1);
+        progressEl.textContent = (i + 1) + ' / ' + steps.length;
 
         prevBtn.disabled = (i === 0);
         nextBtn.disabled = (i === steps.length - 1);
 
-        location.hash = `step=${i + 1}`;
+        location.hash = 'step=' + (i + 1);
       }
 
       prevBtn.addEventListener('click', function () {
