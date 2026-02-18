@@ -1,0 +1,792 @@
+<?php
+/**
+ * PBSG Analytics — Core analytics engine for Guide on the Side.
+ *
+ * Handles:
+ *  - Database schema creation (3 custom tables)
+ *  - AJAX endpoints for event ingestion (nopriv — students aren't logged in)
+ *  - AJAX endpoints for dashboard data retrieval (admin-only)
+ *  - CSV export
+ *  - Rate limiting via transients
+ *
+ * Privacy: All data is aggregate-only. No PII, no cookies, no localStorage,
+ *          no persistent identifiers. PIPEDA / UPEI compliant.
+ *
+ * @package    PB_Split_Guide
+ * @subpackage Analytics
+ * @since      1.0.0
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+class PBSG_Analytics {
+
+    /**
+     * WordPress database prefix for our custom tables.
+     */
+    const TABLE_TUTORIAL_STATS  = 'pbsg_tutorial_stats';
+    const TABLE_QUESTION_STATS  = 'pbsg_question_stats';
+    const TABLE_DAILY_STATS     = 'pbsg_daily_stats';
+
+    /**
+     * Valid event types accepted by the tracking endpoint.
+     */
+    const VALID_EVENTS = array(
+        'tutorial_view',
+        'tutorial_complete',
+        'slide_view',
+        'quiz_attempt',
+        'quiz_giveup',
+        'session_flush',
+    );
+
+    /**
+     * Device categories derived from user-agent parsing.
+     */
+    const DEVICE_DESKTOP = 'desktop';
+    const DEVICE_TABLET  = 'tablet';
+    const DEVICE_MOBILE  = 'mobile';
+
+    /**
+     * Rate limit: max events per IP per minute (prevents bot hammering).
+     * Uses WordPress transients — no PII stored (transient key is hashed).
+     */
+    const RATE_LIMIT_PER_MINUTE = 60;
+
+    /**
+     * Initialize hooks.
+     */
+    public static function init() {
+        // Public AJAX endpoints (students aren't logged in)
+        add_action( 'wp_ajax_nopriv_pbsg_track_event', array( __CLASS__, 'handle_track_event' ) );
+        add_action( 'wp_ajax_pbsg_track_event', array( __CLASS__, 'handle_track_event' ) );
+
+        // Admin-only AJAX endpoints
+        add_action( 'wp_ajax_pbsg_get_analytics', array( __CLASS__, 'handle_get_analytics' ) );
+        add_action( 'wp_ajax_pbsg_export_csv', array( __CLASS__, 'handle_export_csv' ) );
+    }
+
+    /* =========================================================================
+       DATABASE SCHEMA
+       ========================================================================= */
+
+    /**
+     * Create custom analytics tables on plugin activation.
+     * Called from the main plugin file's register_activation_hook.
+     */
+    public static function create_tables() {
+        global $wpdb;
+        $charset_collate = $wpdb->get_charset_collate();
+
+        $tutorial_table  = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
+        $question_table  = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+        $daily_table     = $wpdb->prefix . self::TABLE_DAILY_STATS;
+
+        /**
+         * Table 1: Tutorial-level aggregate counters.
+         * One row per tutorial page. Atomic increments only.
+         */
+        $sql_tutorial = "CREATE TABLE {$tutorial_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            tutorial_page_id BIGINT(20) UNSIGNED NOT NULL,
+            view_count BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            completion_count BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            total_time_seconds BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            total_sessions BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY tutorial_page_id (tutorial_page_id)
+        ) {$charset_collate};";
+
+        /**
+         * Table 2: Per-question aggregate counters.
+         * One row per (tutorial, h5p_content_id, question_index) combination.
+         */
+        $sql_question = "CREATE TABLE {$question_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            tutorial_page_id BIGINT(20) UNSIGNED NOT NULL,
+            h5p_content_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            question_index INT UNSIGNED NOT NULL DEFAULT 0,
+            question_text VARCHAR(500) NOT NULL DEFAULT '',
+            total_attempts BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            correct_count BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            incorrect_count BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            giveup_count BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            first_attempt_correct BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            second_attempt_correct BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            total_time_seconds BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            total_answered BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY tutorial_question (tutorial_page_id, h5p_content_id, question_index)
+        ) {$charset_collate};";
+
+        /**
+         * Table 3: Daily rollup for trend charts.
+         * One row per (date, tutorial, device_type). Powers the overview chart.
+         */
+        $sql_daily = "CREATE TABLE {$daily_table} (
+            id BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT,
+            stat_date DATE NOT NULL,
+            tutorial_page_id BIGINT(20) UNSIGNED NOT NULL,
+            device_type VARCHAR(10) NOT NULL DEFAULT 'desktop',
+            view_count INT UNSIGNED NOT NULL DEFAULT 0,
+            completion_count INT UNSIGNED NOT NULL DEFAULT 0,
+            total_time_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+            step_views TEXT DEFAULT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY daily_tutorial_device (stat_date, tutorial_page_id, device_type),
+            KEY idx_date (stat_date),
+            KEY idx_tutorial (tutorial_page_id)
+        ) {$charset_collate};";
+
+        require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+        dbDelta( $sql_tutorial );
+        dbDelta( $sql_question );
+        dbDelta( $sql_daily );
+
+        // Store schema version for future migrations
+        update_option( 'pbsg_analytics_db_version', '1.0.0' );
+    }
+
+    /* =========================================================================
+       EVENT TRACKING ENDPOINT (Public — wp_ajax_nopriv)
+       ========================================================================= */
+
+    /**
+     * Handle incoming analytics events from split-guide-tracker.js.
+     * Accepts JSON POST body with event_type and associated data.
+     * All storage is aggregate — no session IDs are persisted.
+     */
+    public static function handle_track_event() {
+        // Verify this is a POST request
+        if ( 'POST' !== $_SERVER['REQUEST_METHOD'] ) {
+            wp_send_json_error( 'Invalid method', 405 );
+        }
+
+        // Rate limiting (hashed IP — no PII stored)
+        if ( ! self::check_rate_limit() ) {
+            wp_send_json_error( 'Rate limited', 429 );
+        }
+
+        // Parse JSON body
+        $raw  = file_get_contents( 'php://input' );
+        $data = json_decode( $raw, true );
+
+        if ( ! $data || ! isset( $data['event_type'] ) ) {
+            wp_send_json_error( 'Invalid payload', 400 );
+        }
+
+        $event_type = sanitize_text_field( $data['event_type'] );
+
+        if ( ! in_array( $event_type, self::VALID_EVENTS, true ) ) {
+            wp_send_json_error( 'Unknown event type', 400 );
+        }
+
+        // Validate tutorial_page_id exists and uses our template
+        $tutorial_id = isset( $data['tutorial_page_id'] ) ? absint( $data['tutorial_page_id'] ) : 0;
+        if ( ! $tutorial_id || ! self::is_valid_tutorial( $tutorial_id ) ) {
+            wp_send_json_error( 'Invalid tutorial', 400 );
+        }
+
+        // Parse device type from user-agent (no fingerprinting)
+        $device = self::detect_device();
+
+        // Route to handler
+        switch ( $event_type ) {
+            case 'tutorial_view':
+                self::record_tutorial_view( $tutorial_id, $device );
+                break;
+
+            case 'tutorial_complete':
+                $total_time = isset( $data['total_time_seconds'] ) ? absint( $data['total_time_seconds'] ) : 0;
+                self::record_tutorial_complete( $tutorial_id, $device, $total_time );
+                break;
+
+            case 'slide_view':
+                $step_index = isset( $data['step_index'] ) ? absint( $data['step_index'] ) : 0;
+                $dwell_time = isset( $data['dwell_time_seconds'] ) ? absint( $data['dwell_time_seconds'] ) : 0;
+                self::record_slide_view( $tutorial_id, $step_index, $dwell_time );
+                break;
+
+            case 'quiz_attempt':
+                self::record_quiz_attempt( $tutorial_id, $data );
+                break;
+
+            case 'quiz_giveup':
+                self::record_quiz_giveup( $tutorial_id, $data );
+                break;
+
+            case 'session_flush':
+                self::record_session_flush( $tutorial_id, $data, $device );
+                break;
+        }
+
+        wp_send_json_success( array( 'recorded' => $event_type ) );
+    }
+
+    /* =========================================================================
+       EVENT RECORDERS (private — atomic increments)
+       ========================================================================= */
+
+    private static function record_tutorial_view( $tutorial_id, $device ) {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
+        $daily = $wpdb->prefix . self::TABLE_DAILY_STATS;
+        $today = current_time( 'Y-m-d' );
+
+        // Upsert tutorial stats
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$table} (tutorial_page_id, view_count) VALUES (%d, 1)
+             ON DUPLICATE KEY UPDATE view_count = view_count + 1",
+            $tutorial_id
+        ) );
+
+        // Upsert daily stats
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$daily} (stat_date, tutorial_page_id, device_type, view_count)
+             VALUES (%s, %d, %s, 1)
+             ON DUPLICATE KEY UPDATE view_count = view_count + 1",
+            $today, $tutorial_id, $device
+        ) );
+    }
+
+    private static function record_tutorial_complete( $tutorial_id, $device, $total_time ) {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
+        $daily = $wpdb->prefix . self::TABLE_DAILY_STATS;
+        $today = current_time( 'Y-m-d' );
+
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$table} (tutorial_page_id, completion_count, total_time_seconds, total_sessions)
+             VALUES (%d, 1, %d, 1)
+             ON DUPLICATE KEY UPDATE
+                completion_count = completion_count + 1,
+                total_time_seconds = total_time_seconds + %d,
+                total_sessions = total_sessions + 1",
+            $tutorial_id, $total_time, $total_time
+        ) );
+
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$daily} (stat_date, tutorial_page_id, device_type, completion_count, total_time_seconds)
+             VALUES (%s, %d, %s, 1, %d)
+             ON DUPLICATE KEY UPDATE
+                completion_count = completion_count + 1,
+                total_time_seconds = total_time_seconds + %d",
+            $today, $tutorial_id, $device, $total_time, $total_time
+        ) );
+    }
+
+    private static function record_slide_view( $tutorial_id, $step_index, $dwell_time ) {
+        global $wpdb;
+        $daily = $wpdb->prefix . self::TABLE_DAILY_STATS;
+        $today = current_time( 'Y-m-d' );
+
+        // Get existing step_views JSON and merge
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT id, step_views FROM {$daily}
+             WHERE stat_date = %s AND tutorial_page_id = %d AND device_type = 'desktop'",
+            $today, $tutorial_id
+        ) );
+
+        $step_views = array();
+        if ( $row && $row->step_views ) {
+            $step_views = json_decode( $row->step_views, true ) ?: array();
+        }
+
+        $key = 'step_' . $step_index;
+        if ( ! isset( $step_views[ $key ] ) ) {
+            $step_views[ $key ] = array( 'views' => 0, 'total_dwell' => 0 );
+        }
+        $step_views[ $key ]['views']++;
+        $step_views[ $key ]['total_dwell'] += $dwell_time;
+
+        if ( $row ) {
+            $wpdb->update(
+                $daily,
+                array( 'step_views' => wp_json_encode( $step_views ) ),
+                array( 'id' => $row->id ),
+                array( '%s' ),
+                array( '%d' )
+            );
+        }
+    }
+
+    private static function record_quiz_attempt( $tutorial_id, $data ) {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+
+        $h5p_id    = isset( $data['h5p_content_id'] ) ? absint( $data['h5p_content_id'] ) : 0;
+        $q_index   = isset( $data['question_index'] ) ? absint( $data['question_index'] ) : 0;
+        $q_text    = isset( $data['question_text'] ) ? sanitize_text_field( substr( $data['question_text'], 0, 500 ) ) : '';
+        $correct   = ! empty( $data['is_correct'] ) ? 1 : 0;
+        $attempt   = isset( $data['attempt_number'] ) ? absint( $data['attempt_number'] ) : 1;
+        $time_spent = isset( $data['time_seconds'] ) ? absint( $data['time_seconds'] ) : 0;
+
+        // Base upsert
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$table}
+                (tutorial_page_id, h5p_content_id, question_index, question_text,
+                 total_attempts, correct_count, incorrect_count, total_time_seconds, total_answered,
+                 first_attempt_correct, second_attempt_correct)
+             VALUES (%d, %d, %d, %s, 1, %d, %d, %d, 0, %d, %d)
+             ON DUPLICATE KEY UPDATE
+                total_attempts = total_attempts + 1,
+                correct_count = correct_count + %d,
+                incorrect_count = incorrect_count + %d,
+                total_time_seconds = total_time_seconds + %d,
+                question_text = IF(question_text = '', %s, question_text),
+                first_attempt_correct = first_attempt_correct + %d,
+                second_attempt_correct = second_attempt_correct + %d",
+            $tutorial_id, $h5p_id, $q_index, $q_text,
+            $correct, ( 1 - $correct ), $time_spent,
+            ( $attempt === 1 && $correct ? 1 : 0 ),
+            ( $attempt === 2 && $correct ? 1 : 0 ),
+            $correct, ( 1 - $correct ), $time_spent, $q_text,
+            ( $attempt === 1 && $correct ? 1 : 0 ),
+            ( $attempt === 2 && $correct ? 1 : 0 )
+        ) );
+
+        // If correct, also increment total_answered (unique answer — correct eventually)
+        if ( $correct ) {
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$table}
+                 SET total_answered = total_answered + 1
+                 WHERE tutorial_page_id = %d AND h5p_content_id = %d AND question_index = %d",
+                $tutorial_id, $h5p_id, $q_index
+            ) );
+        }
+    }
+
+    private static function record_quiz_giveup( $tutorial_id, $data ) {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+
+        $h5p_id  = isset( $data['h5p_content_id'] ) ? absint( $data['h5p_content_id'] ) : 0;
+        $q_index = isset( $data['question_index'] ) ? absint( $data['question_index'] ) : 0;
+
+        $wpdb->query( $wpdb->prepare(
+            "INSERT INTO {$table}
+                (tutorial_page_id, h5p_content_id, question_index, giveup_count)
+             VALUES (%d, %d, %d, 1)
+             ON DUPLICATE KEY UPDATE giveup_count = giveup_count + 1",
+            $tutorial_id, $h5p_id, $q_index
+        ) );
+    }
+
+    private static function record_session_flush( $tutorial_id, $data, $device ) {
+        // Session flush sends accumulated dwell times for all steps visited
+        if ( isset( $data['step_dwell_times'] ) && is_array( $data['step_dwell_times'] ) ) {
+            foreach ( $data['step_dwell_times'] as $step_index => $dwell_seconds ) {
+                self::record_slide_view( $tutorial_id, absint( $step_index ), absint( $dwell_seconds ) );
+            }
+        }
+
+        // If total time is included, record it
+        if ( isset( $data['total_time_seconds'] ) && absint( $data['total_time_seconds'] ) > 0 ) {
+            global $wpdb;
+            $table = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
+            $wpdb->query( $wpdb->prepare(
+                "UPDATE {$table}
+                 SET total_time_seconds = total_time_seconds + %d,
+                     total_sessions = total_sessions + 1
+                 WHERE tutorial_page_id = %d",
+                absint( $data['total_time_seconds'] ), $tutorial_id
+            ) );
+        }
+    }
+
+    /* =========================================================================
+       ANALYTICS DATA RETRIEVAL (Admin-only)
+       ========================================================================= */
+
+    /**
+     * AJAX handler for dashboard data requests.
+     * Returns JSON with computed metrics for the requested view.
+     */
+    public static function handle_get_analytics() {
+        if ( ! current_user_can( 'edit_pages' ) ) {
+            wp_send_json_error( 'Unauthorized', 403 );
+        }
+
+        $view = isset( $_GET['view'] ) ? sanitize_text_field( $_GET['view'] ) : 'overview';
+
+        switch ( $view ) {
+            case 'overview':
+                wp_send_json_success( self::get_overview_data() );
+                break;
+
+            case 'tutorial':
+                $tutorial_id = isset( $_GET['tutorial_id'] ) ? absint( $_GET['tutorial_id'] ) : 0;
+                wp_send_json_success( self::get_tutorial_detail( $tutorial_id ) );
+                break;
+
+            case 'question':
+                $tutorial_id = isset( $_GET['tutorial_id'] ) ? absint( $_GET['tutorial_id'] ) : 0;
+                $h5p_id      = isset( $_GET['h5p_id'] ) ? absint( $_GET['h5p_id'] ) : 0;
+                $q_index     = isset( $_GET['q_index'] ) ? absint( $_GET['q_index'] ) : 0;
+                wp_send_json_success( self::get_question_detail( $tutorial_id, $h5p_id, $q_index ) );
+                break;
+
+            default:
+                wp_send_json_error( 'Unknown view', 400 );
+        }
+    }
+
+    /**
+     * Get overview dashboard data — all tutorials summary.
+     */
+    public static function get_overview_data() {
+        global $wpdb;
+        $table = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
+        $daily = $wpdb->prefix . self::TABLE_DAILY_STATS;
+
+        $date_from = isset( $_GET['date_from'] ) ? sanitize_text_field( $_GET['date_from'] ) : date( 'Y-m-d', strtotime( '-30 days' ) );
+        $date_to   = isset( $_GET['date_to'] ) ? sanitize_text_field( $_GET['date_to'] ) : date( 'Y-m-d' );
+        $device    = isset( $_GET['device'] ) ? sanitize_text_field( $_GET['device'] ) : '';
+
+        // Tutorial summaries
+        $tutorials = $wpdb->get_results( $wpdb->prepare(
+            "SELECT
+                ts.tutorial_page_id,
+                p.post_title AS tutorial_name,
+                ts.view_count,
+                ts.completion_count,
+                CASE WHEN ts.view_count > 0
+                    THEN ROUND(ts.completion_count / ts.view_count * 100, 1)
+                    ELSE 0 END AS completion_rate,
+                CASE WHEN ts.total_sessions > 0
+                    THEN ROUND(ts.total_time_seconds / ts.total_sessions)
+                    ELSE 0 END AS avg_time_seconds
+             FROM {$table} ts
+             JOIN {$wpdb->posts} p ON p.ID = ts.tutorial_page_id
+             WHERE p.post_status = 'publish'
+             ORDER BY ts.view_count DESC",
+            array()
+        ), ARRAY_A ) ?: array();
+
+        // Add question stats (avg score) per tutorial
+        $q_table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+        foreach ( $tutorials as &$t ) {
+            $tid = $t['tutorial_page_id'];
+            $q_stats = $wpdb->get_row( $wpdb->prepare(
+                "SELECT
+                    SUM(total_attempts) AS total_attempts,
+                    SUM(correct_count) AS correct_count
+                 FROM {$q_table} WHERE tutorial_page_id = %d",
+                $tid
+            ) );
+            $t['avg_score'] = ( $q_stats && $q_stats->total_attempts > 0 )
+                ? round( $q_stats->correct_count / $q_stats->total_attempts * 100, 1 )
+                : 0;
+        }
+        unset( $t );
+
+        // Daily trend data (filtered by date range)
+        $device_where = $device ? $wpdb->prepare( " AND device_type = %s", $device ) : '';
+        $daily_trend = $wpdb->get_results( $wpdb->prepare(
+            "SELECT stat_date,
+                    SUM(view_count) AS views,
+                    SUM(completion_count) AS completions
+             FROM {$daily}
+             WHERE stat_date BETWEEN %s AND %s {$device_where}
+             GROUP BY stat_date
+             ORDER BY stat_date ASC",
+            $date_from, $date_to
+        ), ARRAY_A ) ?: array();
+
+        // Device breakdown
+        $device_breakdown = $wpdb->get_results( $wpdb->prepare(
+            "SELECT device_type, SUM(view_count) AS views
+             FROM {$daily}
+             WHERE stat_date BETWEEN %s AND %s
+             GROUP BY device_type
+             ORDER BY views DESC",
+            $date_from, $date_to
+        ), ARRAY_A ) ?: array();
+
+        // Aggregate KPIs
+        $totals = array(
+            'total_views'       => array_sum( array_column( $tutorials, 'view_count' ) ),
+            'total_completions' => array_sum( array_column( $tutorials, 'completion_count' ) ),
+            'avg_completion'    => 0,
+            'avg_score'         => 0,
+        );
+        if ( $totals['total_views'] > 0 ) {
+            $totals['avg_completion'] = round( $totals['total_completions'] / $totals['total_views'] * 100, 1 );
+        }
+        if ( count( $tutorials ) > 0 ) {
+            $totals['avg_score'] = round( array_sum( array_column( $tutorials, 'avg_score' ) ) / count( $tutorials ), 1 );
+        }
+
+        return array(
+            'totals'           => $totals,
+            'tutorials'        => $tutorials,
+            'daily_trend'      => $daily_trend,
+            'device_breakdown' => $device_breakdown,
+        );
+    }
+
+    /**
+     * Get tutorial detail data — per-step funnel, dwell times, questions.
+     */
+    public static function get_tutorial_detail( $tutorial_id ) {
+        global $wpdb;
+        $table   = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
+        $daily   = $wpdb->prefix . self::TABLE_DAILY_STATS;
+        $q_table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+
+        // Tutorial aggregate stats
+        $stats = $wpdb->get_row( $wpdb->prepare(
+            "SELECT ts.*, p.post_title AS tutorial_name
+             FROM {$table} ts
+             JOIN {$wpdb->posts} p ON p.ID = ts.tutorial_page_id
+             WHERE ts.tutorial_page_id = %d",
+            $tutorial_id
+        ), ARRAY_A );
+
+        if ( ! $stats ) {
+            return array( 'error' => 'Tutorial not found or has no data' );
+        }
+
+        $stats['completion_rate'] = $stats['view_count'] > 0
+            ? round( $stats['completion_count'] / $stats['view_count'] * 100, 1 )
+            : 0;
+        $stats['avg_time_seconds'] = $stats['total_sessions'] > 0
+            ? round( $stats['total_time_seconds'] / $stats['total_sessions'] )
+            : 0;
+
+        // Daily views for this tutorial (last 14 days)
+        $daily_views = $wpdb->get_results( $wpdb->prepare(
+            "SELECT stat_date, SUM(view_count) AS views, SUM(completion_count) AS completions
+             FROM {$daily}
+             WHERE tutorial_page_id = %d AND stat_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+             GROUP BY stat_date ORDER BY stat_date ASC",
+            $tutorial_id
+        ), ARRAY_A ) ?: array();
+
+        // Step dwell times (aggregated from daily stats)
+        $step_data = $wpdb->get_results( $wpdb->prepare(
+            "SELECT step_views FROM {$daily}
+             WHERE tutorial_page_id = %d AND step_views IS NOT NULL",
+            $tutorial_id
+        ), ARRAY_A ) ?: array();
+
+        $step_aggregates = array();
+        foreach ( $step_data as $row ) {
+            $steps = json_decode( $row['step_views'], true ) ?: array();
+            foreach ( $steps as $key => $vals ) {
+                if ( ! isset( $step_aggregates[ $key ] ) ) {
+                    $step_aggregates[ $key ] = array( 'views' => 0, 'total_dwell' => 0 );
+                }
+                $step_aggregates[ $key ]['views']      += $vals['views'];
+                $step_aggregates[ $key ]['total_dwell'] += $vals['total_dwell'];
+            }
+        }
+
+        // Calculate avg dwell per step
+        $step_dwell = array();
+        foreach ( $step_aggregates as $key => $agg ) {
+            $step_dwell[ $key ] = array(
+                'views'          => $agg['views'],
+                'avg_dwell_secs' => $agg['views'] > 0 ? round( $agg['total_dwell'] / $agg['views'] ) : 0,
+            );
+        }
+
+        // Question stats for this tutorial
+        $questions = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM {$q_table} WHERE tutorial_page_id = %d ORDER BY question_index ASC",
+            $tutorial_id
+        ), ARRAY_A ) ?: array();
+
+        foreach ( $questions as &$q ) {
+            $q['correct_rate'] = $q['total_attempts'] > 0
+                ? round( $q['correct_count'] / $q['total_attempts'] * 100, 1 )
+                : 0;
+            $q['avg_attempts'] = $q['total_answered'] > 0
+                ? round( $q['total_attempts'] / $q['total_answered'], 1 )
+                : 0;
+        }
+        unset( $q );
+
+        // Give-up rate
+        $total_giveups     = array_sum( array_column( $questions, 'giveup_count' ) );
+        $total_completions = (int) $stats['completion_count'];
+        $giveup_rate       = $total_completions > 0
+            ? round( $total_giveups / $total_completions * 100, 1 )
+            : 0;
+
+        return array(
+            'stats'       => $stats,
+            'daily_views' => $daily_views,
+            'step_dwell'  => $step_dwell,
+            'questions'   => $questions,
+            'giveup_rate' => $giveup_rate,
+        );
+    }
+
+    /**
+     * Get question drill-down data.
+     */
+    public static function get_question_detail( $tutorial_id, $h5p_id, $q_index ) {
+        global $wpdb;
+        $q_table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+
+        $question = $wpdb->get_row( $wpdb->prepare(
+            "SELECT * FROM {$q_table}
+             WHERE tutorial_page_id = %d AND h5p_content_id = %d AND question_index = %d",
+            $tutorial_id, $h5p_id, $q_index
+        ), ARRAY_A );
+
+        if ( ! $question ) {
+            return array( 'error' => 'Question not found or has no data' );
+        }
+
+        $question['correct_rate'] = $question['total_attempts'] > 0
+            ? round( $question['correct_count'] / $question['total_attempts'] * 100, 1 )
+            : 0;
+
+        // Attempt distribution (estimated from stored aggregates)
+        $total_correct = (int) $question['correct_count'];
+        $first_correct = (int) $question['first_attempt_correct'];
+        $second_correct = (int) $question['second_attempt_correct'];
+        $third_plus    = max( 0, $total_correct - $first_correct - $second_correct );
+
+        $question['attempt_distribution'] = array(
+            'first_attempt_correct'  => $first_correct,
+            'second_attempt_correct' => $second_correct,
+            'third_plus_correct'     => $third_plus,
+            'giveups'                => (int) $question['giveup_count'],
+        );
+
+        $question['avg_time_seconds'] = $question['total_answered'] > 0
+            ? round( $question['total_time_seconds'] / $question['total_answered'] )
+            : 0;
+
+        return $question;
+    }
+
+    /* =========================================================================
+       CSV EXPORT
+       ========================================================================= */
+
+    public static function handle_export_csv() {
+        if ( ! current_user_can( 'edit_pages' ) ) {
+            wp_die( 'Unauthorized' );
+        }
+
+        $export_type = isset( $_GET['type'] ) ? sanitize_text_field( $_GET['type'] ) : 'overview';
+
+        // Set CSV headers
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename=tutorial-analytics-' . $export_type . '-' . date( 'Y-m-d' ) . '.csv' );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+
+        $output = fopen( 'php://output', 'w' );
+
+        if ( 'overview' === $export_type ) {
+            fputcsv( $output, array( 'Tutorial', 'Views', 'Completions', 'Completion Rate (%)', 'Avg Score (%)', 'Avg Time (s)' ) );
+            $data = self::get_overview_data();
+            foreach ( $data['tutorials'] as $t ) {
+                fputcsv( $output, array(
+                    $t['tutorial_name'],
+                    $t['view_count'],
+                    $t['completion_count'],
+                    $t['completion_rate'],
+                    $t['avg_score'],
+                    $t['avg_time_seconds'],
+                ) );
+            }
+        } elseif ( 'questions' === $export_type ) {
+            $tutorial_id = isset( $_GET['tutorial_id'] ) ? absint( $_GET['tutorial_id'] ) : 0;
+            fputcsv( $output, array( 'Question', 'H5P ID', 'Attempts', 'Correct', 'Incorrect', 'Give-ups', 'Correct Rate (%)', 'Avg Attempts' ) );
+
+            global $wpdb;
+            $q_table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+            $questions = $wpdb->get_results( $wpdb->prepare(
+                "SELECT * FROM {$q_table} WHERE tutorial_page_id = %d ORDER BY question_index",
+                $tutorial_id
+            ), ARRAY_A ) ?: array();
+
+            foreach ( $questions as $q ) {
+                $rate = $q['total_attempts'] > 0 ? round( $q['correct_count'] / $q['total_attempts'] * 100, 1 ) : 0;
+                $avg  = $q['total_answered'] > 0 ? round( $q['total_attempts'] / $q['total_answered'], 1 ) : 0;
+                fputcsv( $output, array(
+                    $q['question_text'] ?: 'Q' . ( $q['question_index'] + 1 ),
+                    $q['h5p_content_id'],
+                    $q['total_attempts'],
+                    $q['correct_count'],
+                    $q['incorrect_count'],
+                    $q['giveup_count'],
+                    $rate,
+                    $avg,
+                ) );
+            }
+        }
+
+        fclose( $output );
+        exit;
+    }
+
+    /* =========================================================================
+       UTILITY METHODS
+       ========================================================================= */
+
+    /**
+     * Check if a page ID is a valid split-guide tutorial.
+     */
+    private static function is_valid_tutorial( $page_id ) {
+        $template = get_page_template_slug( $page_id );
+        return ( 'split-guide-template.php' === $template || 'templates/split-guide-template.php' === $template );
+    }
+
+    /**
+     * Simple device detection from user-agent (no fingerprinting).
+     */
+    private static function detect_device() {
+        $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( $_SERVER['HTTP_USER_AGENT'] ) : '';
+
+        if ( preg_match( '/tablet|ipad|playbook|silk/i', $ua ) ) {
+            return self::DEVICE_TABLET;
+        }
+        if ( preg_match( '/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/i', $ua ) ) {
+            return self::DEVICE_MOBILE;
+        }
+        return self::DEVICE_DESKTOP;
+    }
+
+    /**
+     * Rate limiter using hashed transient keys (no PII stored).
+     */
+    private static function check_rate_limit() {
+        $ip_hash = md5( $_SERVER['REMOTE_ADDR'] ?? 'unknown' );
+        $key     = 'pbsg_rl_' . substr( $ip_hash, 0, 12 );
+        $count   = (int) get_transient( $key );
+
+        if ( $count >= self::RATE_LIMIT_PER_MINUTE ) {
+            return false;
+        }
+
+        set_transient( $key, $count + 1, 60 );
+        return true;
+    }
+
+    /**
+     * Format seconds into human-readable time string.
+     */
+    public static function format_time( $seconds ) {
+        $seconds = absint( $seconds );
+        if ( $seconds < 60 ) {
+            return $seconds . 's';
+        }
+        $minutes = floor( $seconds / 60 );
+        $secs    = $seconds % 60;
+        return $minutes . 'm ' . str_pad( $secs, 2, '0', STR_PAD_LEFT ) . 's';
+    }
+}

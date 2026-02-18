@@ -1,0 +1,76 @@
+name: oss-pb-local
+recipe: wordpress
+config:
+  webroot: web
+  via: nginx
+  config:
+    php: config_services/php.ini
+    database: config_services/my.cnf
+    vhosts: config_services/nginx.conf
+proxy:
+  appserver_nginx:
+    - pressbooks.test
+env_file:
+  - config_services/.env
+services:
+  database:
+    type: mariadb:10.5.23
+    portforward: 32778
+    creds:
+      user: pressbooks_oss_user
+      password: secretpassword
+      database: pressbooks_oss
+  redis:
+    type: redis:5.0
+    portforward: 6380
+  node:
+    type: node
+  appserver:
+    type: php:8.3
+    xdebug: true
+    environment:
+      PHP_IDE_CONFIG: "serverName=appserver"
+      XDEBUG_SESSION_START: lando
+    build_as_root:
+      - scripts/pressbooks_required_libraries.sh
+    run:
+      - composer install
+  mailhog:
+    hogfrom:
+      - appserver
+    type: mailhog
+    overrides:
+      image: anatomicjc/mailhog:1.0.1
+    portforward: 8026
+tooling:
+  php:
+    service: appserver
+  composer:
+    service: appserver
+  npm:
+    service: node
+  node:
+    service: node
+  install-tests:
+    description: Install test requirements
+    cmd:
+      - appserver: scripts/prepare_test_environment.sh
+  test:
+    description: Run all Unit Tests
+    cmd:
+      - appserver: composer test
+  install-acceptance-tests:
+    description: Install acceptance test requirements
+    cmd:
+      - appserver: scripts/prepare_acceptance_tests_environment.sh
+  db-import-custom:
+    description: Import a SQL dump into the database defined in .env
+    cmd:
+      - appserver: scripts/import_db.sh
+    user: root
+events:
+  pre-start:
+    - '[ -f .env ] || cp .env.example .env'
+    - '[ -f config_services/.env ] || cp config_services/.env.example config_services/.env'
+  post-start:
+    - database: bash /app/scripts/import_db.sh /app/pb_local_db.sql
