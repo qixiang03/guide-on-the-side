@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: PB Split Guide (Multi-step H5P + Tutorial)
- * Description: Adds a Tutorial Page with a split-screen Template. Supports multiple steps (each step = H5P quiz + tutorial URL) with Prev/Next navigation on the same page.
- * Version: 0.4.0
+ * Description: Adds a Tutorial Page with a split-screen Template. Supports multiple steps (each step = H5P quiz + tutorial source) with Prev/Next navigation on the same page.
+ * Version: 0.5.0
  * Author: Team 8
  */
 
@@ -72,14 +72,14 @@ class PB_Split_Guide_Plugin {
     $note = get_post_meta($post->ID, self::META_NOTE, true);
     ?>
     <div class="pbsg-metabox">
-      <p><strong>Steps</strong> (each step = one H5P quiz + one tutorial URL)</p>
+      <p><strong>Steps</strong> (each step = one H5P quiz + one tutorial source)</p>
 
       <table class="widefat striped" id="pbsg-steps-table" style="margin-top:8px;">
         <thead>
           <tr>
             <th style="width: 25%;">Step title (optional)</th>
             <th style="width: 22%;">H5P</th>
-            <th>Tutorial URL</th>
+            <th>Tutorial Source</th>
             <th style="width: 10%;">Actions</th>
           </tr>
         </thead>
@@ -109,7 +109,7 @@ class PB_Split_Guide_Plugin {
         />
       </p>
 
-      <p><em>Tip: Click “Add H5P” in a row to pick an existing quiz.</em></p>
+      <p><em>Tip: Click “Add H5P” to pick a quiz. Click “Set Tutorial” to choose URL or upload PDF/slides.</em></p>
     </div>
     <?php
   }
@@ -126,15 +126,59 @@ class PB_Split_Guide_Plugin {
     $clean = [];
     foreach ($steps as $s) {
       $h5p_id = isset($s['h5p_id']) ? (int)$s['h5p_id'] : 0;
-      $url    = isset($s['url']) ? esc_url_raw($s['url']) : '';
       $title  = isset($s['title']) ? sanitize_text_field($s['title']) : '';
 
-      if ($h5p_id <= 0 && $url === '' && $title === '') continue;
+      // Backward compatible: older data used "url"
+      $legacy_url = isset($s['url']) ? esc_url_raw($s['url']) : '';
+
+      $tutorial_type = isset($s['tutorial_type']) ? sanitize_key($s['tutorial_type']) : '';
+      $tutorial_url  = isset($s['tutorial_url']) ? esc_url_raw($s['tutorial_url']) : '';
+      $tutorial_attachment_id = isset($s['tutorial_attachment_id']) ? absint($s['tutorial_attachment_id']) : 0;
+
+      // If old "url" exists and new fields empty, migrate it
+      if (!$tutorial_type && !$tutorial_url && $legacy_url) {
+        $tutorial_type = 'url';
+        $tutorial_url  = $legacy_url;
+      }
+
+      // Normalize type
+      if (!in_array($tutorial_type, ['url', 'file'], true)) {
+        $tutorial_type = ($tutorial_attachment_id > 0) ? 'file' : (($tutorial_url || $legacy_url) ? 'url' : '');
+      }
+
+      // If file type, keep only attachment_id (url will be derived on frontend)
+      if ($tutorial_type === 'file') {
+        if ($tutorial_attachment_id <= 0) {
+          // If the attachment id is missing, fallback to url (if present)
+          if ($tutorial_url) {
+            $tutorial_type = 'url';
+          } else {
+            $tutorial_type = '';
+          }
+        }
+      }
+
+      // If url type, ensure we store url
+      if ($tutorial_type === 'url') {
+        if (!$tutorial_url && $legacy_url) $tutorial_url = $legacy_url;
+        if (!$tutorial_url) $tutorial_type = '';
+      }
+
+      // Skip empty rows
+      $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '');
+      if (!$has_any) continue;
 
       $clean[] = [
-        'title'  => $title,
+        'title' => $title,
         'h5p_id' => $h5p_id,
-        'url'    => $url,
+
+        // New fields
+        'tutorial_type' => $tutorial_type,
+        'tutorial_url'  => $tutorial_type === 'url' ? $tutorial_url : '',
+        'tutorial_attachment_id' => $tutorial_type === 'file' ? $tutorial_attachment_id : 0,
+
+        // Keep legacy key for older JS/frontends (optional)
+        'url' => $tutorial_type === 'url' ? $tutorial_url : '',
       ];
     }
 
@@ -155,7 +199,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_split_guide_css',
       plugin_dir_url(__FILE__) . 'assets/split-guide.css',
       [],
-      '0.4.0'
+      '0.5.0'
     );
   }
 
@@ -167,12 +211,23 @@ class PB_Split_Guide_Plugin {
 
     add_thickbox();
 
+    // IMPORTANT: enable WP Media Library uploader
+    wp_enqueue_media();
+
     wp_enqueue_script(
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'thickbox'],
-      '0.4.0',
+      '0.5.0',
       true
+    );
+
+    // Load admin CSS (and JS if needed)
+    wp_enqueue_style(
+        'pbsg-admin',
+        plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
+        [],
+        '1.0.1' // bump version to bust cache
     );
 
     wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
