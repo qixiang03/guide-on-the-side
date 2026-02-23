@@ -49,6 +49,9 @@ tooling:
     service: appserver
   npm:
     service: node
+  phpunit:
+    service: appserver
+    cmd: /app/vendor/bin/phpunit
   node:
     service: node
   install-tests:
@@ -70,7 +73,7 @@ tooling:
     user: root
 events:
   pre-start:
-    - '[ -f .env ] || cp .env.example .env'
-    - '[ -f config_services/.env ] || cp config_services/.env.example config_services/.env'
+    - "[ -f .env ] || cp .env.example .env"
+    - "[ -f config_services/.env ] || cp config_services/.env.example config_services/.env"
   post-start:
     - database: bash /app/scripts/import_db.sh /app/pb_local_db.sql
