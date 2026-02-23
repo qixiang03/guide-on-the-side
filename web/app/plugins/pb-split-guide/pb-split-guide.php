@@ -5,6 +5,7 @@
  * Version: 0.5.0
  * Author: Team 8
  */
+require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
 
 if (!defined('ABSPATH')) exit;
 
@@ -118,7 +119,16 @@ class PB_Split_Guide_Plugin {
     if (!isset($_POST['pbsg_nonce']) || !wp_verify_nonce($_POST['pbsg_nonce'], 'pbsg_save_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
     if (!current_user_can('edit_post', $post_id)) return;
+    //Update 
+    $steps_json = isset($_POST['pbsg_steps_json']) ? wp_unslash($_POST['pbsg_steps_json']) : '[]';
+    $steps = json_decode($steps_json, true);
 
+    // Delegate normalization to a pure, unit-testable function
+    $clean = PBSG_Steps_Normalizer::normalize($steps);
+
+    update_post_meta($post_id, self::META_STEPS, wp_json_encode($clean));
+
+/*
     $steps_json = isset($_POST['pbsg_steps_json']) ? wp_unslash($_POST['pbsg_steps_json']) : '[]';
     $steps = json_decode($steps_json, true);
     if (!is_array($steps)) $steps = [];
@@ -183,6 +193,8 @@ class PB_Split_Guide_Plugin {
     }
 
     update_post_meta($post_id, self::META_STEPS, wp_json_encode($clean));
+*/
+
 
     $note = isset($_POST['pbsg_header_note']) ? sanitize_text_field($_POST['pbsg_header_note']) : '';
     update_post_meta($post_id, self::META_NOTE, $note);
