@@ -117,17 +117,17 @@ _(Functional verification from a user/system perspective. No internal implementa
 
 ### **2. Black-Box Tests Performed**
 
-1. Input: Legacy step with "url" only.
-   Expected: Automatically migrated to tutorial_type = "url".
-   Result: PASS
+-1. Input: Legacy step with "url" only.
+-   Expected: Automatically migrated to tutorial_type = "url".
+-   Result: PASS
 
-2. Input: Invalid tutorial_type value.
-   Expected: Normalized to "file" if attachment_id present.
-   Result: PASS
+-2. Input: Invalid tutorial_type value.
+-   Expected: Normalized to "file" if attachment_id present.
+-   Result: PASS
 
-3. Input: Completely empty step row.
-   Expected: Skipped during normalization.
-   Result: PASS
+-3. Input: Completely empty step row.
+-   Expected: Skipped during normalization.
+-   Result: PASS
 
 ### **3. Verification Evidence**
 
