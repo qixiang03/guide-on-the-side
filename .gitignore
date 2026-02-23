@@ -20,3 +20,6 @@ web/app/object-cache.php
 web/app/debug.log
 web/app/error.log
 node_modules/
+.phpunit.result.cache
+build/
+.history/

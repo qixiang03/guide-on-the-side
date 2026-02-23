@@ -173,5 +173,141 @@
   }
 
 
+.pbsg-banner-actions{
+  display:flex;
+  gap:10px;
+  align-items:center;
+}
+
+.pbsg-focus-btn{
+  border:1px solid #cfcfcf;
+  background:#fff;
+  padding:8px 12px;
+  border-radius:6px;
+  cursor:pointer;
+}
+
+.pbsg-focus-btn:hover{
+  background:#f6f6f6;
+}
+
+/* ===== Focus Modes (works with your JS class names) ===== */
+body.pbsg-focus-tutorial,
+body.pbsg-focus-quiz{
+  overflow: hidden !important;
+}
+
+/* IMPORTANT: your .pbsg-wrap uses transform; disable it during focus
+   otherwise "fixed" positioning behaves wrong */
+body.pbsg-focus-tutorial .pbsg-wrap,
+body.pbsg-focus-quiz .pbsg-wrap{
+  left: 0 !important;
+  transform: none !important;
+  width: 100vw !important;
+  max-width: 100vw !important;
+}
+
+/* Dim the background side */
+body.pbsg-focus-tutorial .pbsg-left,
+body.pbsg-focus-quiz .pbsg-right{
+  opacity: .12 !important;
+  pointer-events: none !important;
+}
+
+/* Bring tutorial to front */
+body.pbsg-focus-tutorial .pbsg-right{
+  position: fixed !important;
+  inset: 16px !important;
+  z-index: 999999 !important;
+  background: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+body.pbsg-focus-tutorial .pbsg-right .pbsg-iframe-wrap{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+}
+
+/* Bring quiz to front */
+body.pbsg-focus-quiz .pbsg-left{
+  position: fixed !important;
+  inset: 16px !important;
+  z-index: 999999 !important;
+  background: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.25) !important;
+}
+
+body.pbsg-focus-quiz .pbsg-left-inner{
+  height: 100% !important;
+}
+
+/* Header rows for title + buttons */
+.pbsg-quiz-header{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:12px !important;
+}
+
+.pbsg-step-title{
+  font-size:16px !important;
+  font-weight:600 !important;
+  line-height:1.2 !important;
+}
+
+/* Tutorial banner layout */
+.pbsg-banner{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:12px !important;
+  padding: 12px 14px !important;
+  border-bottom: 1px solid rgba(0,0,0,.08) !important;
+}
+
+.pbsg-banner-text{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  font-size:14px !important;
+  opacity:.85 !important;
+}
+
+.pbsg-banner-actions{
+  display:flex !important;
+  align-items:center !important;
+  gap:10px !important;
+  flex:0 0 auto !important;
+}
+
+/* Make buttons look like buttons (not tiny input boxes) */
+.pbsg-focus-btn{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:8px 12px !important;
+  border:1px solid rgba(0,0,0,.18) !important;
+  background:#fff !important;
+  color:#222 !important;
+  border-radius:8px !important;
+  cursor:pointer !important;
+  font-size:14px !important;
+  font-weight:600 !important;
+  white-space:nowrap !important;
+}
+
+.pbsg-focus-btn:hover{
+  background:#f6f6f6 !important;
+}
+
+
+
+
+
+
+
  
 
