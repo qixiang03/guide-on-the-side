@@ -1,8 +1,6 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
-get_header();
-
 // Enqueue assets directly in template — ensures they load on Multisite subsites
 wp_enqueue_style(
     'pbsg_split_guide_css',
@@ -17,6 +15,8 @@ wp_enqueue_script(
     '1.0.0',
     true
 );
+
+get_header();
 
 $page_id = get_the_ID();
 

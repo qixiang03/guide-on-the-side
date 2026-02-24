@@ -5,15 +5,12 @@
  * Version: 0.5.0
  * Author: Team 8
  */
-require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
 
 if (!defined('ABSPATH')) exit;
 
+require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics-dashboard.php';
-
-PBSG_Analytics::init();
-PBSG_Analytics_Dashboard::init();
 
 class PB_Split_Guide_Plugin {
   const TEMPLATE_SLUG = 'split-guide-template.php';
