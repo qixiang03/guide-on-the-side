@@ -29,12 +29,35 @@ $title = get_the_title($page_id);
 
 $ajax_url = admin_url('admin-ajax.php');
 
-// Localize tracker data
-wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
-    'ajaxUrl'        => $ajax_url,
-    'tutorialPageId' => $page_id,
-    'totalSteps'     => count( $steps ),
-) );
+// Enrich tutorial data
+$steps_enriched = [];
+foreach ($steps as $s) {
+  $s = is_array($s) ? $s : [];
+
+  $tutorial_type = isset($s['tutorial_type']) ? $s['tutorial_type'] : '';
+  $tutorial_url  = isset($s['tutorial_url']) ? $s['tutorial_url'] : '';
+  $tutorial_attachment_id = isset($s['tutorial_attachment_id']) ? absint($s['tutorial_attachment_id']) : 0;
+
+  if (!$tutorial_type && !empty($s['url'])) {
+    $tutorial_type = 'url';
+    $tutorial_url = $s['url'];
+  }
+
+  $tutorial = [
+    'type' => $tutorial_type,
+    'url'  => $tutorial_url,
+    'file_url' => '',
+    'mime' => ''
+  ];
+
+  if ($tutorial_type === 'file' && $tutorial_attachment_id > 0) {
+    $tutorial['file_url'] = wp_get_attachment_url($tutorial_attachment_id);
+    $tutorial['mime'] = get_post_mime_type($tutorial_attachment_id);
+  }
+
+  $s['tutorial'] = $tutorial;
+  $steps_enriched[] = $s;
+}
 ?>
 
 <div class="pbsg-wrap">
@@ -42,146 +65,210 @@ wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
     <h1 class="pbsg-title"><?php echo esc_html($title); ?></h1>
   </div>
 
-  <?php if (empty($steps)): ?>
-    <p>No steps configured. Edit this page and add steps in "Split Guide Settings".</p>
-  <?php else: ?>
-    <div class="pbsg-container" role="main">
+<?php if (empty($steps_enriched)): ?>
+  <p>No steps configured.</p>
+<?php else: ?>
 
-      <aside class="pbsg-left" aria-label="Quiz panel">
-        <div class="pbsg-left-inner">
-          <div class="pbsg-step-title" id="pbsgStepTitle"></div>
+<div class="pbsg-container">
 
-          <div class="pbsg-iframe-wrap">
-            <iframe id="pbsgH5PFrame" class="pbsg-iframe" title="Quiz"></iframe>
-          </div>
+  <!-- LEFT: QUIZ -->
+  <aside class="pbsg-left">
+    <div class="pbsg-left-inner">
 
-          <div class="pbsg-nav">
-            <button type="button" class="button" id="pbsgPrev">Prev</button>
-            <span id="pbsgProgress" class="pbsg-progress"></span>
-            <button type="button" class="button button-primary" id="pbsgNext">Next</button>
-          </div>
-        </div>
-      </aside>
+      <div class="pbsg-quiz-header">
+        <div id="pbsgStepTitle" class="pbsg-step-title"></div>
+        <button type="button" class="pbsg-focus-btn" id="pbsgFocusQuiz">Focus Quiz</button>
+      </div>
 
-      <section class="pbsg-right" aria-label="Tutorial panel">
-        <div class="pbsg-banner">
-          <div class="pbsg-banner-text">
-            <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
-            <br/>
-            <a id="pbsgUrlText" class="pbsg-url" href="#" target="_blank" rel="noopener noreferrer"></a>
-          </div>
+      <div class="pbsg-iframe-wrap">
+        <iframe id="pbsgH5PFrame" class="pbsg-iframe"></iframe>
+      </div>
 
-          <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank" rel="noopener noreferrer">
-            Open in a new window ↗
-          </a>
-        </div>
-
-        <div class="pbsg-iframe-wrap">
-          <iframe id="pbsgTutorialFrame" class="pbsg-iframe" title="Tutorial content"></iframe>
-        </div>
-      </section>
+      <div class="pbsg-nav">
+        <button type="button" class="button" id="pbsgPrev">Prev</button>
+        <span id="pbsgProgress"></span>
+        <button type="button" class="button button-primary" id="pbsgNext">Next</button>
+      </div>
 
     </div>
+  </aside>
 
-    <script>
-      window.PBSG_STEPS = <?php echo wp_json_encode($steps); ?>;
-      window.PBSG_AJAX_URL = <?php echo wp_json_encode($ajax_url); ?>;
-    </script>
+  <!-- RIGHT: TUTORIAL -->
+  <section class="pbsg-right">
 
-    <script src="<?php echo esc_url( site_url('/app/plugins/h5p/h5p-php-library/js/h5p-resizer.js') ); ?>" charset="UTF-8"></script>
+    <div class="pbsg-banner">
+      <div class="pbsg-banner-text">
+        <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
+        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window ↗</a>
+      </div>
+      <div class="pbsg-banner-actions">
+        <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>
+      </div>
+    </div>
 
-    <script>
-    (function () {
-      const steps = window.PBSG_STEPS || [];
-      const ajaxUrl = window.PBSG_AJAX_URL || '';
+    <div class="pbsg-iframe-wrap">
+      <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen></iframe>
+    </div>
+    <div id="pbsgTutorialFallback" class="pbsg-fallback">
+      <a id="pbsgFallbackLink" href="#" target="_blank">Open file in new tab</a>
+    </div>
 
-      const h5pFrame = document.getElementById('pbsgH5PFrame');
-      const tutFrame = document.getElementById('pbsgTutorialFrame');
-      const openLink = document.getElementById('pbsgOpenLink');
-      const urlText  = document.getElementById('pbsgUrlText');
-      const prevBtn = document.getElementById('pbsgPrev');
-      const nextBtn = document.getElementById('pbsgNext');
-      const titleEl = document.getElementById('pbsgStepTitle');
-      const progressEl = document.getElementById('pbsgProgress');
+  </section>
 
-      if (!h5pFrame || !tutFrame || steps.length === 0) return;
+</div>
 
-      let i = 0;
-      const m = (location.hash || '').match(/step=(\d+)/);
-      if (m) {
-        const idx = parseInt(m[1], 10) - 1;
-        if (!isNaN(idx) && idx >= 0 && idx < steps.length) i = idx;
-      }
+<script>
+(function () {
 
-      function toYouTubeEmbed(url) {
-        if (!url) return url;
-        try {
-          const u = new URL(url);
+const steps = <?php echo wp_json_encode($steps_enriched); ?>;
+const ajaxUrl = <?php echo wp_json_encode($ajax_url); ?>;
 
-          if (u.hostname.includes('youtube.com') && u.pathname === '/watch' && u.searchParams.get('v')) {
-            const id = u.searchParams.get('v');
-            return 'https://www.youtube-nocookie.com/embed/' + id;
-          }
+const h5pFrame = document.getElementById('pbsgH5PFrame');
+const tutFrame = document.getElementById('pbsgTutorialFrame');
+const openLink = document.getElementById('pbsgOpenLink');
+const fallback = document.getElementById('pbsgTutorialFallback');
+const fallbackLink = document.getElementById('pbsgFallbackLink');
 
-          if (u.hostname === 'youtu.be') {
-            const id = u.pathname.replace('/', '');
-            return 'https://www.youtube-nocookie.com/embed/' + id;
-          }
-        } catch (e) {}
-        return url;
-      }
+const prevBtn = document.getElementById('pbsgPrev');
+const nextBtn = document.getElementById('pbsgNext');
+const titleEl = document.getElementById('pbsgStepTitle');
+const progressEl = document.getElementById('pbsgProgress');
 
-      function h5pEmbedUrl(h5pId) {
-        const url = new URL(ajaxUrl, window.location.origin);
-        url.searchParams.set('action', 'h5p_embed');
-        url.searchParams.set('id', String(h5pId));
-        return url.toString();
-      }
+let i = 0;
 
-      function render() {
-        const step = steps[i];
-        if (!step) return;
+function h5pUrl(id){
+  const u = new URL(ajaxUrl, location.origin);
+  u.searchParams.set('action','h5p_embed');
+  u.searchParams.set('id',id);
+  return u.toString();
+}
 
-        if (step.h5p_id && step.h5p_id > 0) {
-          h5pFrame.src = h5pEmbedUrl(step.h5p_id);
-        } else {
-          h5pFrame.removeAttribute('src');
-        }
+function toEmbeddableUrl(rawUrl){
+  if (!rawUrl) return '';
 
-        const tutUrl = toYouTubeEmbed(step.url || '');
-        if (tutUrl) {
-          tutFrame.src = tutUrl;
-          openLink.href = tutUrl;
-          urlText.href = tutUrl;
-          urlText.textContent = tutUrl;
-        } else {
-          tutFrame.removeAttribute('src');
-          openLink.href = '#';
-          urlText.href = '#';
-          urlText.textContent = '';
-        }
+  let u;
+  try { u = new URL(rawUrl); } catch (e) { return rawUrl; }
 
-        titleEl.textContent = step.title ? step.title : 'Step ' + (i + 1);
-        progressEl.textContent = (i + 1) + ' / ' + steps.length;
+  const host = (u.hostname || '').replace(/^www\./, '').toLowerCase();
 
-        prevBtn.disabled = (i === 0);
-        nextBtn.disabled = (i === steps.length - 1);
+  // youtu.be/<id>
+  if (host === 'youtu.be') {
+    const id = u.pathname.replace(/^\//, '').split('/')[0];
+    if (!id) return rawUrl;
+    const embed = new URL(`https://www.youtube.com/embed/${id}`);
+    const t = u.searchParams.get('t') || u.searchParams.get('start');
+    if (t) embed.searchParams.set('start', String(t).replace(/s$/, ''));
+    return embed.toString();
+  }
 
-        location.hash = 'step=' + (i + 1);
-      }
+  // youtube.com/watch?v=<id>
+  if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
+    const isWatch = u.pathname === '/watch';
+    const isEmbed = u.pathname.startsWith('/embed/');
+    const isShorts = u.pathname.startsWith('/shorts/');
 
-      prevBtn.addEventListener('click', function () {
-        if (i > 0) { i--; render(); }
-      });
+    if (isEmbed) return rawUrl;
 
-      nextBtn.addEventListener('click', function () {
-        if (i < steps.length - 1) { i++; render(); }
-      });
+    let id = '';
+    if (isWatch) id = u.searchParams.get('v') || '';
+    if (isShorts) id = u.pathname.split('/')[2] || '';
+    if (!id) return rawUrl;
 
-      render();
-    })();
-    </script>
-  <?php endif; ?>
+    const embed = new URL(`https://www.youtube.com/embed/${id}`);
+
+    const t = u.searchParams.get('t') || u.searchParams.get('start');
+    if (t) embed.searchParams.set('start', String(t).replace(/s$/, ''));
+
+    const list = u.searchParams.get('list');
+    if (list) embed.searchParams.set('list', list);
+
+    return embed.toString();
+  }
+
+  return rawUrl;
+}
+
+function renderTutorial(step){
+  const t = step.tutorial;
+
+  if (t.type === 'file' && t.file_url){
+    if ((t.mime || '').includes('pdf')){
+      tutFrame.src = t.file_url;
+      fallback.style.display='none';
+    } else {
+      fallback.style.display='block';
+      fallbackLink.href = t.file_url;
+      tutFrame.src='';
+    }
+    openLink.href = t.file_url;
+    return;
+  }
+
+  if (t.url){
+    tutFrame.src = toEmbeddableUrl(t.url); 
+    openLink.href = t.url;
+    fallback.style.display='none';
+  } else {
+    tutFrame.src='';
+  }
+}
+
+function render(){
+  const step = steps[i];
+  if (!step) return;
+
+  if (step.h5p_id) h5pFrame.src = h5pUrl(step.h5p_id);
+  else h5pFrame.src='';
+
+  renderTutorial(step);
+
+  titleEl.textContent = step.title || `Step ${i+1}`;
+  progressEl.textContent = `${i+1} / ${steps.length}`;
+
+  prevBtn.disabled = i===0;
+  nextBtn.disabled = i===steps.length-1;
+}
+
+prevBtn.onclick = ()=>{ if(i>0){i--;render();} };
+nextBtn.onclick = ()=>{ if(i<steps.length-1){i++;render();} };
+
+
+// ===== Focus System =====
+const focusTutBtn = document.getElementById('pbsgFocusTutorial');
+const focusQuizBtn = document.getElementById('pbsgFocusQuiz');
+
+function clearFocus(){
+  document.body.classList.remove('pbsg-focus-tutorial','pbsg-focus-quiz');
+  focusTutBtn.textContent='Focus Tutorial';
+  focusQuizBtn.textContent='Focus Quiz';
+}
+
+function toggleFocus(mode){
+  const cls = mode==='tutorial'?'pbsg-focus-tutorial':'pbsg-focus-quiz';
+  if(document.body.classList.contains(cls)){ clearFocus(); }
+  else{
+    clearFocus();
+    document.body.classList.add(cls);
+    if(mode==='tutorial') focusTutBtn.textContent='Exit Focus';
+    else focusQuizBtn.textContent='Exit Focus';
+  }
+}
+
+focusTutBtn.onclick = ()=>toggleFocus('tutorial');
+focusQuizBtn.onclick = ()=>toggleFocus('quiz');
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape') clearFocus();
+});
+
+render();
+
+})();
+</script>
+
+<?php endif; ?>
 </div>
 
 <?php get_footer(); ?>

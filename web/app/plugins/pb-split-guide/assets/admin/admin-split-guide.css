@@ -1,0 +1,32 @@
+/* Keep the steps table columns stable */
+#pbsg-steps-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+/* Optional: give the Tutorial Source column a predictable width */
+#pbsg-steps-table th:nth-child(3),
+
+/* Truncate the URL/file summary text */
+#pbsg-steps-table .pbsg-tutorial-summary {
+  min-width: 0; /* important inside flex */
+}
+
+#pbsg-steps-table .pbsg-tutorial-summary span {
+  display: block;
+  max-width: 360px; /* adjust (this is the “fixed length”) */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Keep table stable */
+#pbsg-steps-table { table-layout: fixed; width: 100%; }
+
+/* Column widths (1=title, 2=H5P, 3=tutorial, 4=remove) */
+#pbsg-steps-table th:nth-child(2),
+#pbsg-steps-table td:nth-child(2) { width: 240px; }  /* H5P column */
+#pbsg-steps-table th:nth-child(4),
+#pbsg-steps-table td:nth-child(4) { width: 120px; }  /* Remove column */
+
+
