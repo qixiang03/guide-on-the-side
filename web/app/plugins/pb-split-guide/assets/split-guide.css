@@ -165,13 +165,11 @@
     padding-top: 0 !important;
   }
 
-  /* Optional: hide page title area if you don’t want “FINAL EXAM GUIDE” centered above */
   body.page-template-split-guide-template header.entry-header,
   body.page-template-split-guide-template .post-thumbnail,
   body.page-template-split-guide-template figure.wp-block-post-featured-image {
     display: none !important;
   }
-
 
 .pbsg-banner-actions{
   display:flex;
@@ -191,14 +189,11 @@
   background:#f6f6f6;
 }
 
-/* ===== Focus Modes (works with your JS class names) ===== */
 body.pbsg-focus-tutorial,
 body.pbsg-focus-quiz{
   overflow: hidden !important;
 }
 
-/* IMPORTANT: your .pbsg-wrap uses transform; disable it during focus
-   otherwise "fixed" positioning behaves wrong */
 body.pbsg-focus-tutorial .pbsg-wrap,
 body.pbsg-focus-quiz .pbsg-wrap{
   left: 0 !important;
