@@ -129,49 +129,32 @@
 /* ===========================
    5) Mobile stacking
    =========================== */
-
-  @media (max-width: 980px){
+@media (max-width: 980px) {
   body.page-template-split-guide-template header.header {
     display: none !important;
-    }
   }
 
-  .pbsg-left, .pbsg-right{
+  .pbsg-left, .pbsg-right {
     width: 100% !important;
     min-width: 0 !important;
   }
-  .pbsg-right{
+
+  .pbsg-right {
     height: 70vh !important;
   }
 
-  html, body { height: 100%; }
-
-  /* Keep the top nav, remove ONLY the big banner image on split-guide pages */
-  body.page-template-split-guide-template header.header {
-    display: block !important;               /* keep nav */
-    background-image: none !important;       /* kill catalog-header.jpg */
-    background: #fff !important;             /* clean background */
-    height: auto !important;                 /* remove tall hero height */
+  .pbsg-container {
+    flex-direction: column !important;
+    height: auto !important;
     min-height: 0 !important;
-    padding: 12px 0 !important;              /* keep a normal nav bar height */
   }
+}
 
-  /* Some themes add extra spacing below header; remove it on template pages */
-  body.page-template-split-guide-template #page,
-  body.page-template-split-guide-template .site,
-  body.page-template-split-guide-template #content,
-  body.page-template-split-guide-template .site-content {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-  }
-
-  /* Optional: hide page title area if you don’t want “FINAL EXAM GUIDE” centered above */
   body.page-template-split-guide-template header.entry-header,
   body.page-template-split-guide-template .post-thumbnail,
   body.page-template-split-guide-template figure.wp-block-post-featured-image {
     display: none !important;
   }
-
 
 .pbsg-banner-actions{
   display:flex;
@@ -191,14 +174,11 @@
   background:#f6f6f6;
 }
 
-/* ===== Focus Modes (works with your JS class names) ===== */
 body.pbsg-focus-tutorial,
 body.pbsg-focus-quiz{
   overflow: hidden !important;
 }
 
-/* IMPORTANT: your .pbsg-wrap uses transform; disable it during focus
-   otherwise "fixed" positioning behaves wrong */
 body.pbsg-focus-tutorial .pbsg-wrap,
 body.pbsg-focus-quiz .pbsg-wrap{
   left: 0 !important;
@@ -309,5 +289,16 @@ body.pbsg-focus-quiz .pbsg-left-inner{
 
 
 
- 
+body.page-template-split-guide-template #page,
+body.page-template-split-guide-template .site,
+body.page-template-split-guide-template #content,
+body.page-template-split-guide-template .site-content {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
 
+body.page-template-split-guide-template header.entry-header,
+body.page-template-split-guide-template .post-thumbnail,
+body.page-template-split-guide-template figure.wp-block-post-featured-image {
+  display: none !important;
+}

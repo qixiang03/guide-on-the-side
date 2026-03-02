@@ -5,9 +5,12 @@
  * Version: 0.5.0
  * Author: Team 8
  */
-require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
 
 if (!defined('ABSPATH')) exit;
+
+require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
+require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics.php';
+require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics-dashboard.php';
 
 class PB_Split_Guide_Plugin {
   const TEMPLATE_SLUG = 'split-guide-template.php';
@@ -213,6 +216,16 @@ class PB_Split_Guide_Plugin {
       [],
       '0.5.0'
     );
+
+    $steps_json = get_post_meta( $page_id, '_pbsg_steps_json', true );
+    $steps_data = json_decode( $steps_json, true );
+    $total_steps = is_array( $steps_data ) ? count( $steps_data ) : 1;
+
+    wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
+        'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+        'tutorialPageId' => $page_id,
+        'totalSteps'     => $total_steps,
+    ) ); 
   }
 
   public function enqueue_admin_assets($hook) {
@@ -274,3 +287,8 @@ class PB_Split_Guide_Plugin {
 }
 
 new PB_Split_Guide_Plugin();
+
+register_activation_hook( __FILE__, array( 'PBSG_Analytics', 'create_tables' ) );
+
+PBSG_Analytics::init();
+PBSG_Analytics_Dashboard::init();
