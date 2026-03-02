@@ -14,7 +14,7 @@ The Guide on the Side Interactive Tutorial System allows librarians to create se
 
 ## Technology Stack
 
-- **CMS**: Pressbooks or Drupal 10 (under evaluation)
+- **CMS**: Pressbooks
 - **Backend**: PHP
 - **Frontend**: HTML, CSS, JavaScript
 - **Version Control**: Git/GitHub
@@ -124,18 +124,19 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 - [API Documentation](docs/api/README.md)
 - [User Guide](docs/user-guide/README.md)
 - [Deployment Guide](docs/deployment.md)
+- [Testing Log](docs/TESTING_LOG.md)
 
 ## Testing
 
 ```bash
 # Run all tests
-npm test
+lando phpunit --configuration phpunit.xml --testdox
 
 # Run unit tests only
-npm run test:unit
+lando phpunit
 
-# Run with coverage
-npm run test:coverage
+# Run with Integration
+lando phpunit --configuration phpunit.xml --testsuite "UPEI Guide-on-the-Side Integration Smoke Tests" --testdox
 ```
 
 ## Deployment
