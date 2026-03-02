@@ -7,6 +7,10 @@
         <testsuite name="UPEI Guide-on-the-Side Unit Tests">
             <directory>tests/Unit</directory>
         </testsuite>
+        <testsuite name="UPEI Guide-on-the-Side Integration Smoke Tests">
+            <directory>tests/Integration</directory>
+            <exclude>tests/Integration/Helpers</exclude>
+        </testsuite>
     </testsuites>
 
     <logging>
