@@ -1,6 +1,21 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+// Enqueue assets directly in template — ensures they load on Multisite subsites
+wp_enqueue_style(
+    'pbsg_split_guide_css',
+    plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.css',
+    array(),
+    '0.4.0'
+);
+wp_enqueue_script(
+    'pbsg-tracker',
+    plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
+    array(),
+    '1.0.0',
+    true
+);
+
 get_header();
 
 $page_id = get_the_ID();
@@ -42,8 +57,12 @@ foreach ($steps as $s) {
 
   $s['tutorial'] = $tutorial;
   $steps_enriched[] = $s;
+
+  $is_logged_in = is_user_logged_in();
+  $cert_nonce = wp_create_nonce(PBSG_Certificate::NONCE_ACTION);
 }
 ?>
+
 
 <div class="pbsg-wrap">
   <div class="pbsg-header">
@@ -100,9 +119,52 @@ foreach ($steps as $s) {
       <a id="pbsgFallbackLink" href="#" target="_blank">Open file in new tab</a>
     </div>
 
+    <div class="pbsg-certificate" id="pbsgCertificate" style="display:none;">
+      <?php if ($is_logged_in): ?>
+        <div class="pbsg-certificate-inner">
+          <div class="pbsg-certificate-title"><strong>Certificate</strong></div>
+          <div class="pbsg-certificate-row">
+            <input id="pbsgCertName" type="text" placeholder="Name on certificate (optional)" />
+            <button type="button" class="button button-primary" id="pbsgCertDownload">
+              Download Certificate (PDF)
+            </button>
+          </div>
+          <div class="pbsg-certificate-hint" id="pbsgCertHint"></div>
+        </div>
+      <?php else: ?>
+        <div class="pbsg-certificate-inner">
+          <strong>Certificate</strong> — Please log in to download your certificate.
+        </div>
+      <?php endif; ?>
+    </div>
+
   </section>
 
 </div>
+
+<!-- Bottom progress indicator (fixed) -->
+<div class="pbsg-progressbar" role="status" aria-live="polite">
+  <div class="pbsg-progressbar-inner">
+    <div class="pbsg-progressbar-track" aria-hidden="true">
+      <div id="pbsgProgressFill" class="pbsg-progressbar-fill"></div>
+    </div>
+    <div id="pbsgProgressLabel" class="pbsg-progressbar-label"></div>
+  </div>
+</div>
+
+
+
+
+
+<script>
+window.PBSG_CERT = {
+  ajaxUrl: <?php echo wp_json_encode($ajax_url); ?>,
+  tutorialId: <?php echo (int)$page_id; ?>,
+  nonce: <?php echo wp_json_encode($cert_nonce); ?>,
+  isLoggedIn: <?php echo $is_logged_in ? 'true' : 'false'; ?>,
+};
+</script>
+
 
 <script>
 (function () {
@@ -118,10 +180,145 @@ const fallbackLink = document.getElementById('pbsgFallbackLink');
 
 const prevBtn = document.getElementById('pbsgPrev');
 const nextBtn = document.getElementById('pbsgNext');
+
+
+// --------------------
+// Gate NEXT by quiz correctness (H5P)
+// --------------------
+const passedSteps = new Set(); // remember which steps are already correct
+let h5pObs = null;
+
+function lockNext(locked){
+  if (!nextBtn) return;
+  nextBtn.disabled = !!locked;
+  nextBtn.classList.toggle('pbsg-locked', !!locked);
+}
+
+// Heuristics to detect "correct" in H5P iframe document.
+// Works across common H5P content types.
+function isH5PCorrect(doc){
+  if (!doc || !doc.body) return false;
+
+  // 1) Look for text like "You got X out of Y"
+  const txt = (doc.body.innerText || '').replace(/\s+/g,' ').trim();
+  const m = txt.match(/You got\s+(\d+)\s+out of\s+(\d+)/i);
+  if (m) {
+    const got = Number(m[1]), total = Number(m[2]);
+    if (Number.isFinite(got) && Number.isFinite(total) && total > 0) {
+      return got === total;
+    }
+  }
+
+  // 2) Some H5P types show "100%"
+  if (/100%/i.test(txt)) return true;
+
+  // 3) Common correct/incorrect classes
+  if (doc.querySelector('.h5p-incorrect, .h5p-feedback-incorrect')) return false;
+  if (doc.querySelector('.h5p-correct, .h5p-feedback-correct')) return true;
+
+  return false;
+}
+
+function attachH5PWatcher(stepIndex){
+  // If this step already passed, unlock
+  if (passedSteps.has(stepIndex)) {
+    lockNext(false);
+    return;
+  }
+
+  // If no quiz iframe or no quiz in this step, don't gate
+  if (!h5pFrame || !steps[stepIndex]?.h5p_id) {
+    lockNext(false);
+    return;
+  }
+
+  // Disconnect old observer
+  if (h5pObs) {
+    try { h5pObs.disconnect(); } catch(e) {}
+    h5pObs = null;
+  }
+
+  const tryAttach = () => {
+    let doc;
+    try {
+      doc = h5pFrame.contentDocument || h5pFrame.contentWindow.document;
+    } catch (e) {
+      // Cross-origin (shouldn't happen in your case) -> fail open
+      lockNext(false);
+      return true;
+    }
+
+    if (!doc || !doc.body) return false;
+
+    const check = () => {
+      if (isH5PCorrect(doc)) {
+        passedSteps.add(stepIndex);
+        lockNext(false);
+      } else {
+        lockNext(true);
+      }
+    };
+
+    // initial check
+    check();
+
+    h5pObs = new MutationObserver(check);
+    h5pObs.observe(doc.body, { childList: true, subtree: true, attributes: true });
+
+    return true;
+  };
+
+  // H5P iframe loads async: retry a few times
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries++;
+    if (tryAttach() || tries > 30) clearInterval(timer);
+  }, 300);
+}
+
+
+
 const titleEl = document.getElementById('pbsgStepTitle');
 const progressEl = document.getElementById('pbsgProgress');
+const progressFillEl = document.getElementById('pbsgProgressFill');
+const progressLabelEl = document.getElementById('pbsgProgressLabel');
+
+const certBox = document.getElementById('pbsgCertificate');
+const certNameInput = document.getElementById('pbsgCertName');
+const certBtn = document.getElementById('pbsgCertDownload');
+const certHint = document.getElementById('pbsgCertHint');
+
+let certMarked = false;
 
 let i = 0;
+
+async function markCompletedOnce(){
+  if (!window.PBSG_CERT?.isLoggedIn) return;
+  if (certMarked) return;
+  certMarked = true;
+
+  const form = new FormData();
+  form.append('action', 'pbsg_mark_completed');
+  form.append('tutorial_id', String(window.PBSG_CERT.tutorialId));
+  form.append('nonce', window.PBSG_CERT.nonce);
+
+  try{
+    const res = await fetch(window.PBSG_CERT.ajaxUrl, {
+      method: 'POST',
+      body: form,
+      credentials: 'same-origin',
+    });
+    const json = await res.json();
+    if (!json?.success) {
+      if (certHint) certHint.textContent = json?.data?.message || 'Unable to mark completed.';
+      return;
+    }
+    if (certHint) certHint.textContent = 'Completion recorded. You can download your certificate.';
+  } catch(e){
+    if (certHint) certHint.textContent = 'Network error while saving completion.';
+  }
+}
+
 
 function h5pUrl(id){
   const u = new URL(ajaxUrl, location.origin);
@@ -210,15 +407,58 @@ function render(){
   renderTutorial(step);
 
   titleEl.textContent = step.title || `Step ${i+1}`;
-  progressEl.textContent = `${i+1} / ${steps.length}`;
+  // Inline (left pane) progress
+  progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
 
-  prevBtn.disabled = i===0;
-  nextBtn.disabled = i===steps.length-1;
+  // Bottom progress bar
+  const pct = steps.length ? ((i + 1) / steps.length) * 100 : 0;
+  if (progressFillEl) progressFillEl.style.width = pct.toFixed(2) + '%';
+  if (progressLabelEl) progressLabelEl.textContent = `Page: ${i+1} of ${steps.length}`;
+
+  prevBtn.disabled = i === 0;
+
+  // Default rule: last step has no NEXT
+  if (i === steps.length - 1) {
+    lockNext(true);
+  } else {
+    // Gate NEXT only if this step has a quiz (h5p_id)
+    if (step.h5p_id) {
+      lockNext(true);          // locked until correct
+      attachH5PWatcher(i);     // unlock when correct
+    } else {
+      lockNext(false);         // no quiz -> allow next
+    }
+  }
+
+
+  // Certificate: show only on final step
+  if (certBox) {
+    if (i === steps.length - 1) {
+      certBox.style.display = 'block';
+      markCompletedOnce();
+    } else {
+      certBox.style.display = 'none';
+    }
+  }
 }
 
 prevBtn.onclick = ()=>{ if(i>0){i--;render();} };
 nextBtn.onclick = ()=>{ if(i<steps.length-1){i++;render();} };
 
+if (certBtn) {
+  certBtn.onclick = () => {
+    const name = (certNameInput?.value || '').trim();
+
+    const u = new URL(window.PBSG_CERT.ajaxUrl, location.origin);
+    u.searchParams.set('action', 'pbsg_download_certificate');
+    u.searchParams.set('tutorial_id', String(window.PBSG_CERT.tutorialId));
+    u.searchParams.set('nonce', window.PBSG_CERT.nonce);
+    if (name) u.searchParams.set('name', name);
+
+    // Navigate to trigger browser download
+    window.location.href = u.toString();
+  };
+}
 
 // ===== Focus System =====
 const focusTutBtn = document.getElementById('pbsgFocusTutorial');
