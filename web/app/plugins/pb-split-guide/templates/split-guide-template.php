@@ -57,10 +57,10 @@ foreach ($steps as $s) {
 
   $s['tutorial'] = $tutorial;
   $steps_enriched[] = $s;
+}
 
   $is_logged_in = is_user_logged_in();
   $cert_nonce = wp_create_nonce(PBSG_Certificate::NONCE_ACTION);
-}
 ?>
 
 
@@ -199,34 +199,53 @@ function lockNext(locked){
 function isH5PCorrect(doc){
   if (!doc || !doc.body) return false;
 
-  // 1) Look for text like "You got X out of Y"
+  // A) Look for "You got X out of Y"
   const txt = (doc.body.innerText || '').replace(/\s+/g,' ').trim();
   const m = txt.match(/You got\s+(\d+)\s+out of\s+(\d+)/i);
   if (m) {
     const got = Number(m[1]), total = Number(m[2]);
-    if (Number.isFinite(got) && Number.isFinite(total) && total > 0) {
-      return got === total;
+    return Number.isFinite(got) && Number.isFinite(total) && total > 0 && got === total;
+  }
+
+  // B) Look for "100%"
+  if (/\b100\s*%\b/i.test(txt)) return true;
+
+  // C) Look for score format like "1/1" (your screenshot)
+  // Check common score elements first (more reliable than scanning whole page text)
+  const scoreNodes = doc.querySelectorAll(
+    '.h5p-joubelui-score-number,' +
+    '.h5p-score,' +
+    '.h5p-question-score,' +
+    '[class*="score"]'
+  );
+
+  for (const el of scoreNodes) {
+    const s = (el.textContent || '').trim();
+    const mm = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (mm) {
+      const got = Number(mm[1]), total = Number(mm[2]);
+      if (total > 0 && got === total) return true;
     }
   }
 
-  // 2) Some H5P types show "100%"
-  if (/100%/i.test(txt)) return true;
+  // As a fallback, search the full text for the first "x/y" and evaluate it
+  const any = txt.match(/\b(\d+)\s*\/\s*(\d+)\b/);
+  if (any) {
+    const got = Number(any[1]), total = Number(any[2]);
+    if (total > 0 && got === total) return true;
+  }
 
-  // 3) Common correct/incorrect classes
+  // D) Common correct/incorrect classes
   if (doc.querySelector('.h5p-incorrect, .h5p-feedback-incorrect')) return false;
   if (doc.querySelector('.h5p-correct, .h5p-feedback-correct')) return true;
+
+  if (txt.includes('✓')) return true;
 
   return false;
 }
 
 function attachH5PWatcher(stepIndex){
-  // If this step already passed, unlock
-  if (passedSteps.has(stepIndex)) {
-    lockNext(false);
-    return;
-  }
-
-  // If no quiz iframe or no quiz in this step, don't gate
+  // If no quiz in this step, no gating needed
   if (!h5pFrame || !steps[stepIndex]?.h5p_id) {
     lockNext(false);
     return;
@@ -243,7 +262,7 @@ function attachH5PWatcher(stepIndex){
     try {
       doc = h5pFrame.contentDocument || h5pFrame.contentWindow.document;
     } catch (e) {
-      // Cross-origin (shouldn't happen in your case) -> fail open
+      // Cross-origin -> can't read, fail open
       lockNext(false);
       return true;
     }
@@ -251,31 +270,42 @@ function attachH5PWatcher(stepIndex){
     if (!doc || !doc.body) return false;
 
     const check = () => {
+      // 1) Update pass/fail for THIS step
       if (isH5PCorrect(doc)) {
         passedSteps.add(stepIndex);
-        lockNext(false);
       } else {
-        lockNext(true);
+        passedSteps.delete(stepIndex);
       }
+
+      // 2) Next gating (only if not last page)
+      const isLast = (i === steps.length - 1);
+      if (!isLast) {
+        lockNext(!passedSteps.has(stepIndex)); // lock next until correct
+      } else {
+        lockNext(true); // last page never has next
+      }
+
+      // 3) Update certificate button
+      updateCertificateGate();
     };
 
-    // initial check
+    // Run once now
     check();
 
+    // Observe changes after "Check"
     h5pObs = new MutationObserver(check);
     h5pObs.observe(doc.body, { childList: true, subtree: true, attributes: true });
 
     return true;
   };
 
-  // H5P iframe loads async: retry a few times
+  // iframe loads async: retry attach
   let tries = 0;
   const timer = setInterval(() => {
     tries++;
     if (tryAttach() || tries > 30) clearInterval(timer);
   }, 300);
 }
-
 
 
 const titleEl = document.getElementById('pbsgStepTitle');
@@ -287,6 +317,57 @@ const certBox = document.getElementById('pbsgCertificate');
 const certNameInput = document.getElementById('pbsgCertName');
 const certBtn = document.getElementById('pbsgCertDownload');
 const certHint = document.getElementById('pbsgCertHint');
+
+function lockCert(locked, msg){
+  if (!certBtn) return;
+  certBtn.classList.toggle('pbsg-locked', !!locked);
+  certBtn.disabled = !!locked;
+  if (certHint && msg !== undefined) certHint.textContent = msg;
+}
+
+function requiredQuizStepsCount(){
+  return steps.filter(s => !!s.h5p_id).length;
+}
+
+function passedQuizStepsCount(){
+  // only count steps that actually have quizzes
+  let n = 0;
+  steps.forEach((s, idx) => {
+    if (s.h5p_id && passedSteps.has(idx)) n++;
+  });
+  return n;
+}
+
+function allQuizzesPassed(){
+  return passedQuizStepsCount() === requiredQuizStepsCount();
+}
+
+function updateCertificateGate(){
+  if (!certBtn) return;
+
+  // Only show/allow certificate on last step
+  if (i !== steps.length - 1) {
+    lockCert(true, '');
+    return;
+  }
+
+  const total = requiredQuizStepsCount();
+  const passed = passedQuizStepsCount();
+
+  if (total === 0) {
+    lockCert(false, ''); // no quizzes => allow
+    return;
+  }
+
+  if (allQuizzesPassed()) {
+    lockCert(false, 'All steps passed. You can download your certificate.');
+  } else {
+    lockCert(true, `Complete all quiz steps correctly first (${passed}/${total} passed).`);
+  }
+
+  finalizeCompletionIfReady();
+}
+
 
 let certMarked = false;
 
@@ -318,6 +399,20 @@ async function markCompletedOnce(){
     if (certHint) certHint.textContent = 'Network error while saving completion.';
   }
 }
+
+
+async function finalizeCompletionIfReady(){
+  // Only mark completed when:
+  // - logged in
+  // - last step
+  // - all quizzes passed
+  if (!window.PBSG_CERT?.isLoggedIn) return;
+  if (i !== steps.length - 1) return;
+  if (!allQuizzesPassed()) return;
+
+  await markCompletedOnce();
+}
+
 
 
 function h5pUrl(id){
@@ -417,29 +512,33 @@ function render(){
 
   prevBtn.disabled = i === 0;
 
-  // Default rule: last step has no NEXT
-  if (i === steps.length - 1) {
-    lockNext(true);
+  const isLast = (i === steps.length - 1);
+
+  if (isLast) {
+    lockNext(true); // last page: no next
   } else {
-    // Gate NEXT only if this step has a quiz (h5p_id)
     if (step.h5p_id) {
-      lockNext(true);          // locked until correct
-      attachH5PWatcher(i);     // unlock when correct
+      lockNext(true); // will be unlocked by watcher when correct
     } else {
-      lockNext(false);         // no quiz -> allow next
+      lockNext(false);
     }
   }
 
+  // IMPORTANT: if this step has a quiz, attach watcher even on last page
+  if (step.h5p_id) {
+    attachH5PWatcher(i);
+  }
 
   // Certificate: show only on final step
   if (certBox) {
     if (i === steps.length - 1) {
       certBox.style.display = 'block';
-      markCompletedOnce();
     } else {
       certBox.style.display = 'none';
     }
   }
+
+  updateCertificateGate();
 }
 
 prevBtn.onclick = ()=>{ if(i>0){i--;render();} };
@@ -447,15 +546,19 @@ nextBtn.onclick = ()=>{ if(i<steps.length-1){i++;render();} };
 
 if (certBtn) {
   certBtn.onclick = () => {
-    const name = (certNameInput?.value || '').trim();
+    // extra safety check in UI
+    if (!allQuizzesPassed() || i !== steps.length - 1) {
+      updateCertificateGate();
+      return;
+    }
 
+    const name = (certNameInput?.value || '').trim();
     const u = new URL(window.PBSG_CERT.ajaxUrl, location.origin);
     u.searchParams.set('action', 'pbsg_download_certificate');
     u.searchParams.set('tutorial_id', String(window.PBSG_CERT.tutorialId));
     u.searchParams.set('nonce', window.PBSG_CERT.nonce);
     if (name) u.searchParams.set('name', name);
 
-    // Navigate to trigger browser download
     window.location.href = u.toString();
   };
 }
@@ -491,6 +594,7 @@ document.addEventListener('keydown',e=>{
 render();
 
 })();
+
 </script>
 
 <?php endif; ?>

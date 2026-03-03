@@ -480,3 +480,10 @@ body.pbsg-standalone .pbsg-wrap{
 #pbsgCertDownload {
   white-space: nowrap;
 }
+
+/* Certificate button locked */
+#pbsgCertDownload.pbsg-locked {
+  opacity: 0.5 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
