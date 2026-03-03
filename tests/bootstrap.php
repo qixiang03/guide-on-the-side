@@ -25,6 +25,25 @@ require_once __DIR__ . '/Integration/Helpers/WPStubs.php';
 
 // 4. Load the plugin so PB_Split_Guide_Plugin is available to integration tests.
 //    The plugin's top-level `new PB_Split_Guide_Plugin()` is harmless with stubs.
+//    Some branches may include optional files that emit a benign PHP warning
+//    ("use TCPDF has no effect"). Suppress only that exact warning here so
+//    PHPUnit subprocess tests remain stable in CI.
+$previous_error_handler = set_error_handler(
+    static function (int $severity, string $message): bool {
+        if (
+            $severity === E_WARNING
+            && strpos($message, "use statement with non-compound name 'TCPDF' has no effect") !== false
+        ) {
+            return true;
+        }
+        return false;
+    }
+);
 require_once $root_dir . '/web/app/plugins/pb-split-guide/pb-split-guide.php';
+if ($previous_error_handler !== null) {
+    set_error_handler($previous_error_handler);
+} else {
+    restore_error_handler();
+}
 
 echo "UPEI Project Test Bootstrap: Initialized successfully.\n";
