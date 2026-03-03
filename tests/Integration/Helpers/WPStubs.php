@@ -80,6 +80,27 @@ if (!function_exists('add_action')) {
     }
 }
 
+if (!function_exists('register_activation_hook')) {
+    function register_activation_hook(string $file, callable $callback): void
+    {
+        WPStubs::record('register_activation_hook', [$file, $callback]);
+    }
+}
+
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook(string $file, callable $callback): void
+    {
+        WPStubs::record('register_deactivation_hook', [$file, $callback]);
+    }
+}
+
+if (!function_exists('register_uninstall_hook')) {
+    function register_uninstall_hook(string $file, $callback): void
+    {
+        WPStubs::record('register_uninstall_hook', [$file, $callback]);
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Template / query stubs                                            */
 /* ------------------------------------------------------------------ */
