@@ -1,293 +1,14 @@
-/* ===========================
-   1) TRUE CENTERING (viewport)
-   =========================== */
-.pbsg-wrap{
-  position: relative !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
+/* =========================================
+   PB Split Guide — Clean Layout (Fullscreen)
+   ========================================= */
 
-  width: 100vw !important;
-  max-width: 100vw !important;
-
-  margin: 0 !important;
-  padding: 0 !important;
-  box-sizing: border-box !important;
-  overflow-x: clip !important;
+/* ---------- 1) Hide theme chrome for this template ---------- */
+body.page-template-split-guide-template header.entry-header,
+body.page-template-split-guide-template .post-thumbnail,
+body.page-template-split-guide-template figure.wp-block-post-featured-image,
+body.page-template-split-guide-template header.header {
+  display: none !important;
 }
-
-/* Center the actual split player and title within the full-bleed wrap */
-.pbsg-title,
-.pbsg-container{
-  width: min(1600px, 98vw) !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-
-/* ===========================
-   2) Better split layout sizing
-   =========================== */
-.pbsg-container{
-  display: flex !important;
-  align-items: stretch !important;
-  gap: 0 !important;
-
-  /* make it tall like libwizard */
-  height: calc(100vh - 220px) !important;
-  min-height: 720px !important;
-}
-
-/* Left / right widths */
-.pbsg-left{
-  width: 35% !important;
-  min-width: 360px !important;
-  border-right: 1px solid rgba(0,0,0,.12) !important;
-  background: #fff !important;
-}
-
-.pbsg-right{
-  width: 65% !important;
-  min-width: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-/* ===========================
-   3) LEFT PANE: stop the huge blank space
-   - don’t force iframe to be 100% height
-   - keep buttons right under quiz
-   =========================== */
-.pbsg-left-inner{
-  height: 100% !important;
-  overflow-y: auto !important;
-  padding: 14px !important;
-
-  display: flex !important;
-  flex-direction: column !important;
-  gap: 12px !important;
-}
-
-/* IMPORTANT: left iframe should size to content, not fill column */
-.pbsg-left .pbsg-iframe-wrap{
-  flex: 0 0 auto !important;
-  min-height: 0 !important;
-  overflow: visible !important;
-}
-
-.pbsg-left .pbsg-iframe{
-  width: 100% !important;
-  height: 520px !important;         /* reasonable default */
-  max-height: 70vh !important;      /* avoid too tall on small screens */
-  border: 0 !important;
-}
-
-/* If H5P resizer changes height, allow it */
-.pbsg-left iframe#pbsgH5PFrame{
-  height: 520px !important; /* fallback */
-}
-
-/* Nav always visible + fits pane width */
-.pbsg-nav{
-  flex: 0 0 auto !important;
-  display: grid !important;
-  grid-template-columns: 1fr auto 1fr !important;
-  gap: 10px !important;
-  align-items: center !important;
-
-  padding-top: 10px !important;
-  border-top: 1px solid rgba(0,0,0,.08) !important;
-}
-
-#pbsgPrev,
-#pbsgNext{
-  width: 100% !important;
-  padding: 14px 12px !important;
-  font-size: 16px !important;
-}
-
-.pbsg-progress{
-  white-space: nowrap !important;
-  font-size: 14px !important;
-  opacity: .75 !important;
-  text-align: center !important;
-}
-
-/* ===========================
-   4) RIGHT PANE iframe should fill remaining height
-   =========================== */
-.pbsg-right .pbsg-iframe-wrap{
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-}
-
-.pbsg-right .pbsg-iframe{
-  width: 100% !important;
-  height: 100% !important;
-  border: 0 !important;
-}
-
-/* ===========================
-   5) Mobile stacking
-   =========================== */
-@media (max-width: 980px) {
-  body.page-template-split-guide-template header.header {
-    display: none !important;
-  }
-
-  .pbsg-left, .pbsg-right {
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  .pbsg-right {
-    height: 70vh !important;
-  }
-
-  .pbsg-container {
-    flex-direction: column !important;
-    height: auto !important;
-    min-height: 0 !important;
-  }
-}
-
-  body.page-template-split-guide-template header.entry-header,
-  body.page-template-split-guide-template .post-thumbnail,
-  body.page-template-split-guide-template figure.wp-block-post-featured-image {
-    display: none !important;
-  }
-
-.pbsg-banner-actions{
-  display:flex;
-  gap:10px;
-  align-items:center;
-}
-
-.pbsg-focus-btn{
-  border:1px solid #cfcfcf;
-  background:#fff;
-  padding:8px 12px;
-  border-radius:6px;
-  cursor:pointer;
-}
-
-.pbsg-focus-btn:hover{
-  background:#f6f6f6;
-}
-
-body.pbsg-focus-tutorial,
-body.pbsg-focus-quiz{
-  overflow: hidden !important;
-}
-
-body.pbsg-focus-tutorial .pbsg-wrap,
-body.pbsg-focus-quiz .pbsg-wrap{
-  left: 0 !important;
-  transform: none !important;
-  width: 100vw !important;
-  max-width: 100vw !important;
-}
-
-/* Dim the background side */
-body.pbsg-focus-tutorial .pbsg-left,
-body.pbsg-focus-quiz .pbsg-right{
-  opacity: .12 !important;
-  pointer-events: none !important;
-}
-
-/* Bring tutorial to front */
-body.pbsg-focus-tutorial .pbsg-right{
-  position: fixed !important;
-  inset: 16px !important;
-  z-index: 999999 !important;
-  background: #fff !important;
-  border-radius: 12px !important;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.25) !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-body.pbsg-focus-tutorial .pbsg-right .pbsg-iframe-wrap{
-  flex: 1 1 auto !important;
-  min-height: 0 !important;
-}
-
-/* Bring quiz to front */
-body.pbsg-focus-quiz .pbsg-left{
-  position: fixed !important;
-  inset: 16px !important;
-  z-index: 999999 !important;
-  background: #fff !important;
-  border-radius: 12px !important;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.25) !important;
-}
-
-body.pbsg-focus-quiz .pbsg-left-inner{
-  height: 100% !important;
-}
-
-/* Header rows for title + buttons */
-.pbsg-quiz-header{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:space-between !important;
-  gap:12px !important;
-}
-
-.pbsg-step-title{
-  font-size:16px !important;
-  font-weight:600 !important;
-  line-height:1.2 !important;
-}
-
-/* Tutorial banner layout */
-.pbsg-banner{
-  display:flex !important;
-  align-items:center !important;
-  justify-content:space-between !important;
-  gap:12px !important;
-  padding: 12px 14px !important;
-  border-bottom: 1px solid rgba(0,0,0,.08) !important;
-}
-
-.pbsg-banner-text{
-  flex:1 1 auto !important;
-  min-width:0 !important;
-  font-size:14px !important;
-  opacity:.85 !important;
-}
-
-.pbsg-banner-actions{
-  display:flex !important;
-  align-items:center !important;
-  gap:10px !important;
-  flex:0 0 auto !important;
-}
-
-/* Make buttons look like buttons (not tiny input boxes) */
-.pbsg-focus-btn{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  padding:8px 12px !important;
-  border:1px solid rgba(0,0,0,.18) !important;
-  background:#fff !important;
-  color:#222 !important;
-  border-radius:8px !important;
-  cursor:pointer !important;
-  font-size:14px !important;
-  font-weight:600 !important;
-  white-space:nowrap !important;
-}
-
-.pbsg-focus-btn:hover{
-  background:#f6f6f6 !important;
-}
-
-
-
-
-
-
 
 body.page-template-split-guide-template #page,
 body.page-template-split-guide-template .site,
@@ -297,8 +18,465 @@ body.page-template-split-guide-template .site-content {
   padding-top: 0 !important;
 }
 
-body.page-template-split-guide-template header.entry-header,
-body.page-template-split-guide-template .post-thumbnail,
-body.page-template-split-guide-template figure.wp-block-post-featured-image {
-  display: none !important;
+/* ---------- 2) Prevent page scroll (app handles its own scrolling) ---------- */
+body.page-template-split-guide-template,
+body.pbsg-standalone {
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Admin bar offset (prevents top being hidden) */
+body.admin-bar.page-template-split-guide-template,
+body.admin-bar.pbsg-standalone {
+  height: calc(100vh - 32px);
+}
+@media (max-width: 782px) {
+  body.admin-bar.page-template-split-guide-template,
+  body.admin-bar.pbsg-standalone {
+    height: calc(100vh - 46px);
+  }
+}
+
+/* ---------- 3) Fullscreen overlay wrapper (ignores theme hero/header/footer) ---------- */
+body.page-template-split-guide-template .pbsg-wrap,
+body.pbsg-standalone .pbsg-wrap {
+  position: fixed !important;
+  inset: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  margin: 0 !important;
+
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+
+  background: #fff !important;
+  z-index: 99999 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  overflow-x: clip !important;
+}
+
+/* Optional: if you keep a fixed bottom progress bar in the template */
+body.page-template-split-guide-template .pbsg-wrap {
+  padding-bottom: 48px !important; /* match progress bar height */
+}
+
+/* Admin bar overlay offset */
+body.admin-bar.page-template-split-guide-template .pbsg-wrap,
+body.admin-bar.pbsg-standalone .pbsg-wrap {
+  top: 32px !important;
+  height: calc(100vh - 32px) !important;
+}
+@media (max-width: 782px) {
+  body.admin-bar.page-template-split-guide-template .pbsg-wrap,
+  body.admin-bar.pbsg-standalone .pbsg-wrap {
+    top: 46px !important;
+    height: calc(100vh - 46px) !important;
+  }
+}
+
+/* ---------- 4) Center the app content inside the fullscreen wrap ---------- */
+.pbsg-title,
+.pbsg-container {
+  width: min(1600px, 98vw) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* ---------- 5) Split layout sizing ---------- */
+.pbsg-container {
+  display: flex !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+
+
+  overflow: hidden !important; /* panes manage their own overflow */
+}
+
+/* Left / right widths */
+.pbsg-left {
+  width: 35% !important;
+  min-width: 360px !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.12) !important;
+  background: #fff !important;
+
+  /* Allow inner flex children to size properly */
+  min-height: 0 !important;
+}
+
+.pbsg-right {
+  width: 65% !important;
+  min-width: 0 !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+
+/* ---------- 6) LEFT PANE: header + quiz(scroll) + nav(always visible) ---------- */
+.pbsg-left-inner {
+  display: flex !important;
+  flex-direction: column !important;
+
+  height: 100% !important;
+  min-height: 0 !important;
+
+  padding: 14px !important;
+  gap: 12px !important;
+
+  overflow: hidden !important; /* do not scroll the whole left pane */
+}
+
+.pbsg-quiz-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+
+  flex: 0 0 auto !important;
+}
+
+.pbsg-step-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+}
+
+/* The quiz area is the only scroll region on the left */
+.pbsg-left .pbsg-iframe-wrap {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+/* Make H5P iframe fill the scroll area */
+.pbsg-left .pbsg-iframe,
+.pbsg-left iframe#pbsgH5PFrame {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  display: block !important;
+}
+
+/* Nav stays visible at the bottom */
+.pbsg-nav {
+  flex: 0 0 auto !important;
+
+  display: grid !important;
+  grid-template-columns: 1fr auto 1fr !important;
+  gap: 10px !important;
+  align-items: center !important;
+
+  padding-top: 10px !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.08) !important;
+
+  background: #fff !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 5 !important;
+}
+
+#pbsgPrev,
+#pbsgNext {
+  width: 100% !important;
+  padding: 14px 12px !important;
+  font-size: 16px !important;
+}
+
+/* Lock Next until correct */
+#pbsgNext.pbsg-locked {
+  opacity: 0.5 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
+
+.pbsg-progress {
+  white-space: nowrap !important;
+  font-size: 14px !important;
+  opacity: 0.75 !important;
+  text-align: center !important;
+}
+
+/* ---------- 7) RIGHT PANE: banner fixed + iframe fills remainder ---------- */
+.pbsg-banner {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+
+  padding: 12px 14px !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08) !important;
+
+  flex: 0 0 auto !important;
+}
+
+.pbsg-banner-text {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  font-size: 14px !important;
+  opacity: 0.85 !important;
+}
+
+.pbsg-banner-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex: 0 0 auto !important;
+}
+
+.pbsg-focus-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 8px 12px !important;
+  border: 1px solid rgba(0, 0, 0, 0.18) !important;
+  background: #fff !important;
+  color: #222 !important;
+
+  border-radius: 8px !important;
+  cursor: pointer !important;
+
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+.pbsg-focus-btn:hover {
+  background: #f6f6f6 !important;
+}
+
+.pbsg-right .pbsg-iframe-wrap {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.pbsg-right .pbsg-iframe {
+  width: 100% !important;
+  height: 100% !important;
+  border: 0 !important;
+  display: block !important;
+}
+
+/* ---------- 8) Focus modes (bring one side to front) ---------- */
+body.pbsg-focus-tutorial,
+body.pbsg-focus-quiz {
+  overflow: hidden !important;
+}
+
+/* Dim the background side */
+body.pbsg-focus-tutorial .pbsg-left,
+body.pbsg-focus-quiz .pbsg-right {
+  opacity: 0.12 !important;
+  pointer-events: none !important;
+}
+
+/* Bring tutorial to front */
+body.pbsg-focus-tutorial .pbsg-right {
+  position: fixed !important;
+  inset: 16px !important;
+  z-index: 999999 !important;
+
+  background: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25) !important;
+
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+
+/* Bring quiz to front */
+body.pbsg-focus-quiz .pbsg-left {
+  position: fixed !important;
+  inset: 16px !important;
+  z-index: 999999 !important;
+
+  background: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25) !important;
+
+  min-height: 0 !important;
+}
+
+/* ---------- 9) Mobile stacking ---------- */
+@media (max-width: 980px) {
+  .pbsg-container {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+
+  .pbsg-left,
+  .pbsg-right {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .pbsg-right {
+    height: 70vh !important;
+  }
+}
+
+
+/* ================================
+   OVERRIDE: make layout fit viewport
+   ================================ */
+
+/* pbsg-wrap is the fullscreen app */
+body.page-template-split-guide-template .pbsg-wrap,
+body.pbsg-standalone .pbsg-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+
+/* Title/header area should not force extra height */
+body.page-template-split-guide-template .pbsg-title,
+body.pbsg-standalone .pbsg-title {
+  flex: 0 0 auto !important;
+}
+
+/* IMPORTANT: container takes the remaining height (NO fixed calc) */
+body.page-template-split-guide-template .pbsg-container,
+body.pbsg-standalone .pbsg-container {
+  flex: 1 1 auto !important;
+  height: auto !important;
+  min-height: 0 !important;     /* critical */
+  overflow: hidden !important;
+  margin: 0 auto;
+  padding: 0 20px 20px 20px;   /* left/right + bottom space */
+  gap: 20px
+}
+
+/* ==========================================
+   Bottom progress bar (fixed)
+   Uses:
+   - #pbsgProgressFill
+   - #pbsgProgressLabel
+   ========================================== */
+
+:root{
+  --pbsg-progressbar-h: 44px;
+  --pbsg-progress-track-h: 6px;
+}
+
+/* Reserve space so the bar doesn't cover content */
+body.page-template-split-guide-template .pbsg-wrap,
+body.pbsg-standalone .pbsg-wrap{
+  padding-bottom: var(--pbsg-progressbar-h) !important;
+  box-sizing: border-box;
+}
+
+.pbsg-progressbar{
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--pbsg-progressbar-h);
+  background: #f3f4f6;
+  border-top: 1px solid rgba(0,0,0,.08);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+}
+
+.pbsg-progressbar-inner{
+  width: min(1400px, 96vw);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pbsg-progressbar-track{
+  flex: 1 1 auto;
+  height: var(--pbsg-progress-track-h);
+  background: rgba(0,0,0,.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pbsg-progressbar-fill{
+  height: 100%;
+  width: 0%;
+  background: #0ea5e9; /* blue-ish like your screenshot */
+  border-radius: 999px;
+  transition: width 200ms ease;
+}
+
+.pbsg-progressbar-label{
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0,0,0,.75);
+  white-space: nowrap;
+}
+
+
+/* ==========================================
+   Visual Spacing Improvement (Cleaner UI)
+   ========================================== */
+
+
+/* Add subtle rounding + shadow to panes */
+.pbsg-left,
+.pbsg-right {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+  background: #ffffff;
+}
+
+/* Improve separation between left & right */
+.pbsg-left {
+  border-right: none !important;  /* remove hard divider line */
+}
+
+/* Improve top title spacing */
+.pbsg-title {
+  margin-bottom: 24px;
+}
+
+/* ------------------------------------------
+   Floating progress bar (clean look)
+   ------------------------------------------ */
+
+.pbsg-certificate {
+  width: 100%;
+  margin: 0;
+  padding: 20px 0;
+}
+
+.pbsg-certificate-inner {
+  width: 100%;
+  border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  padding: 20px;
+  background: #fff;
+  box-sizing: border-box;
+}
+
+.pbsg-certificate-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+#pbsgCertName {
+  flex: 1;
+  min-width: 260px;
+  padding: 10px 12px;
+}
+
+#pbsgCertDownload {
+  white-space: nowrap;
 }

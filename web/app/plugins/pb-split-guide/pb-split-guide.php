@@ -8,9 +8,17 @@
 
 if (!defined('ABSPATH')) exit;
 
+// Load Composer deps (TCPDF)
+$autoload = plugin_dir_path(__FILE__) . 'vendor/autoload.php';
+if (file_exists($autoload)) {
+  require_once $autoload;
+}
+
 require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics-dashboard.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
+
 
 class PB_Split_Guide_Plugin {
   const TEMPLATE_SLUG = 'split-guide-template.php';
@@ -292,3 +300,4 @@ register_activation_hook( __FILE__, array( 'PBSG_Analytics', 'create_tables' ) )
 
 PBSG_Analytics::init();
 PBSG_Analytics_Dashboard::init();
+PBSG_Certificate::init();
