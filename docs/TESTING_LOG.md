@@ -216,7 +216,8 @@ WordPress runtime or database. H5P internals are explicitly excluded.
 
 **Traceability**
 
-- Branch: develop
+- Commit SHA: 950572f
+- Branch: develop → main
 - Test Files:
   - `tests/Unit/PBSGAnalyticsSchemaTest.php` (17 tests)
   - `tests/Unit/PBSGAnalyticsEventIngestionTest.php` (31 tests)
@@ -274,3 +275,7 @@ verified via source-code inspection. WPDieException simulates `die()` behavior i
 
 - Local Run: 206 tests (181 new + 25 existing), 418 assertions, 0 failures (PHPUnit 9.6.34, PHP 8.3, 0.105s)
 - Test command: `docker exec -w /app osspblocal_appserver_1 ./vendor/bin/phpunit`
+- CI Run: https://github.com/qixiang03/guide-on-the-side/actions/runs/22691597832
+- Commit SHA: 950572f
+- Artifact: phpunit-test-log
+- JUnit Path: build/logs/junit.xml
