@@ -63,7 +63,7 @@
 }
 
 .pbsg-subtitle {
-    font-size: 13px;
+    font-size: 14px;
     color: #777;
     margin: 0;
 }
@@ -89,7 +89,7 @@
 
 .pbsg-tab {
     font-family: var(--pbsg-font-button);
-    font-size: 13px;
+    font-size: 14px;
     padding: 12px 20px;
     color: var(--pbsg-text);
     text-decoration: none;
@@ -117,7 +117,7 @@
 
 .pbsg-breadcrumb {
     font-family: var(--pbsg-font-button);
-    font-size: 12px;
+    font-size: 13px;
     margin-bottom: 14px;
     color: #888;
 }
@@ -154,7 +154,7 @@
 
 .pbsg-filter-bar label {
     font-family: var(--pbsg-font-button);
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.4px;
     color: #777;
@@ -163,7 +163,7 @@
 .pbsg-filter-bar input[type="date"],
 .pbsg-filter-bar select {
     font-family: var(--pbsg-font-body);
-    font-size: 13px;
+    font-size: 14px;
     padding: 6px 10px;
     border: 1px solid var(--pbsg-border);
     border-radius: 3px;
@@ -173,7 +173,7 @@
 
 .pbsg-filter-sep {
     color: #888;
-    font-size: 12px;
+    font-size: 13px;
 }
 
 .pbsg-filter-device-label {
@@ -190,7 +190,7 @@
 
 .pbsg-btn {
     font-family: var(--pbsg-font-button);
-    font-size: 13px;
+    font-size: 14px;
     padding: 8px 16px;
     border: none;
     border-radius: 3px;
@@ -228,7 +228,7 @@
 }
 
 .pbsg-btn-sm {
-    font-size: 11px;
+    font-size: 12px;
     padding: 5px 10px;
 }
 
@@ -269,7 +269,7 @@
 
 .pbsg-stat-label {
     font-family: var(--pbsg-font-button);
-    font-size: 11px;
+    font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #888;
@@ -284,7 +284,7 @@
 }
 
 .pbsg-stat-delta {
-    font-size: 12px;
+    font-size: 13px;
     margin-top: 2px;
 }
 
@@ -306,7 +306,7 @@
 
 .pbsg-card-header {
     font-family: var(--pbsg-font-heading);
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 700;
     margin-bottom: 12px;
     padding-bottom: 8px;
@@ -318,7 +318,7 @@
 
 .pbsg-card-action {
     font-family: var(--pbsg-font-button);
-    font-size: 11px;
+    font-size: 12px;
     color: var(--pbsg-red);
     text-decoration: none;
     cursor: pointer;
@@ -338,13 +338,13 @@
 .pbsg-data-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .pbsg-data-table thead th {
     font-family: var(--pbsg-font-button);
     text-transform: uppercase;
-    font-size: 11px;
+    font-size: 12px;
     letter-spacing: 0.4px;
     padding: 10px 14px;
     text-align: left;
@@ -421,7 +421,7 @@
     padding: 2px 8px;
     border-radius: 10px;
     font-family: var(--pbsg-font-button);
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
     letter-spacing: 0.3px;
 }
@@ -462,7 +462,7 @@
 }
 
 .pbsg-funnel-label {
-    font-size: 12px;
+    font-size: 13px;
     width: 160px;
     text-align: right;
     white-space: nowrap;
@@ -477,7 +477,7 @@
     align-items: center;
     padding-left: 10px;
     font-family: var(--pbsg-font-button);
-    font-size: 11px;
+    font-size: 12px;
     color: #fff;
     font-weight: 700;
     min-width: 40px;
@@ -485,7 +485,7 @@
 }
 
 .pbsg-funnel-count {
-    font-size: 12px;
+    font-size: 13px;
     color: #888;
     margin-left: 8px;
     white-space: nowrap;
@@ -529,7 +529,7 @@
     left: 50%;
     transform: translateX(-50%);
     font-family: var(--pbsg-font-button);
-    font-size: 10px;
+    font-size: 11px;
     color: #666;
     white-space: nowrap;
     opacity: 0;
@@ -541,7 +541,7 @@
 }
 
 .pbsg-bar-label {
-    font-size: 9px;
+    font-size: 10px;
     font-family: var(--pbsg-font-button);
     color: #888;
     text-align: center;
@@ -559,7 +559,7 @@
     display: inline-block;
     padding: 4px 8px;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     font-family: var(--pbsg-font-button);
 }
@@ -586,7 +586,7 @@
 }
 
 .pbsg-attention-reason {
-    font-size: 11px;
+    font-size: 12px;
     color: #888;
     margin-top: 2px;
 }
@@ -663,7 +663,7 @@
 }
 
 .pbsg-empty-state p {
-    font-size: 14px;
+    font-size: 15px;
     color: #888;
     max-width: 500px;
     margin: 0 auto;
@@ -698,7 +698,7 @@
     align-items: center;
     gap: 5px;
     font-family: var(--pbsg-font-button);
-    font-size: 11px;
+    font-size: 12px;
     color: #666;
 }
 
@@ -717,7 +717,7 @@
     background: #fef8f6;
     padding: 10px 14px;
     margin: 12px 0;
-    font-size: 12px;
+    font-size: 13px;
     color: #666;
 }
 
@@ -725,6 +725,433 @@
     color: var(--pbsg-red);
     font-family: var(--pbsg-font-button);
     text-transform: uppercase;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 0.3px;
+}
+
+/* =========================================================================
+   ALL-TIME BADGE & DATE SCOPE LABEL
+   ========================================================================= */
+
+.pbsg-alltime-badge {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-family: var(--pbsg-font-button);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    background: #fef3e0;
+    color: var(--pbsg-amber);
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.pbsg-date-scope {
+    font-family: var(--pbsg-font-button);
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+    margin-left: 4px;
+}
+
+/* =========================================================================
+   COMPARISON TABLE
+   ========================================================================= */
+
+.pbsg-compare-table {
+    background: var(--pbsg-card-bg);
+    border: 1px solid var(--pbsg-border);
+    border-radius: 4px;
+    box-shadow: 0 1px 3px var(--pbsg-shadow);
+    overflow: hidden;
+}
+
+/* --- Header (sticky, dark) --- */
+
+.pbsg-compare-head {
+    display: grid;
+    grid-template-columns: 200px repeat(var(--compare-cols, 3), 1fr);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--pbsg-header-bg);
+    color: var(--pbsg-header-text);
+}
+
+.pbsg-compare-head .col-label {
+    padding: 16px 18px;
+    font-family: var(--pbsg-font-button);
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: #999;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid #444;
+}
+
+.pbsg-compare-head .col-tutorial {
+    padding: 14px 16px;
+    border-right: 1px solid #444;
+    min-height: 80px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    position: relative;
+}
+
+.pbsg-compare-head .col-tutorial:last-child {
+    border-right: none;
+}
+
+.pbsg-compare-head .col-filled .col-name {
+    font-family: var(--pbsg-font-heading);
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+}
+
+.pbsg-compare-head .col-filled .col-meta {
+    font-family: var(--pbsg-font-button);
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 6px;
+}
+
+.pbsg-compare-head .col-actions {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* --- Change button (wireframe: white bg, dark text, rounded, with arrow) --- */
+
+.pbsg-col-change-btn {
+    font-family: var(--pbsg-font-button);
+    font-size: 11px;
+    padding: 4px 12px;
+    background: #fff;
+    color: var(--pbsg-text);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    margin-top: 4px;
+}
+
+.pbsg-col-change-btn:hover {
+    background: #e8e8e8;
+    color: var(--pbsg-text);
+}
+
+/* --- Remove button (hover-reveal, top-right corner) --- */
+
+.pbsg-col-remove {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 14px;
+    color: #999;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.col-tutorial:hover .pbsg-col-remove {
+    opacity: 1;
+}
+
+.pbsg-col-remove:hover {
+    color: var(--pbsg-red);
+}
+
+/* --- Filled column green bottom accent bar --- */
+
+.col-tutorial.col-filled::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 16px;
+    right: 16px;
+    height: 3px;
+    background: var(--pbsg-green);
+    border-radius: 2px 2px 0 0;
+}
+
+/* --- Empty column prompt (+ icon and "Add Tutorial" text) --- */
+
+.col-empty-prompt {
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.col-empty-prompt .empty-plus {
+    font-size: 24px;
+    color: rgba(255,255,255,0.2);
+    line-height: 1;
+    margin-bottom: 4px;
+}
+
+.col-empty-prompt .empty-label {
+    font-family: var(--pbsg-font-button);
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+/* --- Swap select (inline dropdown for changing tutorial) --- */
+
+.col-swap-select {
+    display: none;
+    width: 100%;
+    font-family: var(--pbsg-font-body);
+    font-size: 12px;
+    padding: 5px 8px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #eee;
+    cursor: pointer;
+    margin-top: 4px;
+}
+
+.col-swap-select:focus {
+    outline: 2px solid var(--pbsg-green);
+    outline-offset: 1px;
+}
+
+/* Swap mode: show the dropdown, dim name/meta, hide Change button */
+
+.col-tutorial.swapping .col-swap-select {
+    display: block;
+}
+
+.col-tutorial.swapping .col-name,
+.col-tutorial.swapping .col-meta {
+    opacity: 0.4;
+}
+
+.col-tutorial.swapping .pbsg-col-change-btn {
+    display: none;
+}
+
+.col-select {
+    width: 100%;
+    font-family: var(--pbsg-font-body);
+    font-size: 13px;
+    padding: 6px 8px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    background: #444;
+    color: #eee;
+    cursor: pointer;
+}
+
+.col-select:focus {
+    outline: 2px solid var(--pbsg-green);
+    outline-offset: 1px;
+}
+
+/* --- Section Dividers --- */
+
+.pbsg-compare-section {
+    border-top: 3px solid var(--pbsg-green);
+    margin-top: 0;
+}
+
+.pbsg-compare-section-title {
+    display: grid;
+    grid-template-columns: 200px repeat(var(--compare-cols, 3), 1fr);
+    font-family: var(--pbsg-font-heading);
+    font-size: 15px;
+    font-weight: 700;
+    padding: 12px 18px;
+    background: #eef6e6;
+    color: var(--pbsg-green);
+    border-bottom: 1px solid var(--pbsg-border);
+}
+
+/* --- Data Rows --- */
+
+.pbsg-compare-row {
+    display: grid;
+    grid-template-columns: 200px repeat(var(--compare-cols, 3), 1fr);
+    border-bottom: 1px solid var(--pbsg-border);
+}
+
+.pbsg-compare-row:last-child {
+    border-bottom: none;
+}
+
+.pbsg-compare-row:nth-child(even) {
+    background: var(--pbsg-card-alt);
+}
+
+.pbsg-compare-row .row-label {
+    padding: 14px 18px;
+    font-family: var(--pbsg-font-button);
+    font-size: 13px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    border-right: 1px solid var(--pbsg-border);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.pbsg-compare-row .row-value {
+    padding: 12px 16px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-right: 1px solid #eee;
+    transition: background 0.15s;
+}
+
+.pbsg-compare-row .row-value:last-child {
+    border-right: none;
+}
+
+/* --- Winner Highlight --- */
+
+.pbsg-compare-row .row-value.winner {
+    background: #eef6e6;
+}
+
+.pbsg-compare-row .row-value.winner .metric-big {
+    color: var(--pbsg-green);
+}
+
+/* --- Concern (red text for poor metrics) --- */
+
+.metric-big.concern {
+    color: var(--pbsg-red) !important;
+}
+
+/* --- Metric Typography --- */
+
+.metric-big {
+    font-family: var(--pbsg-font-heading);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--pbsg-text);
+}
+
+.metric-unit {
+    font-family: var(--pbsg-font-button);
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- Mini Progress Bar --- */
+
+.mini-bar {
+    width: 80%;
+    max-width: 120px;
+    height: 6px;
+    background: var(--pbsg-border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.mini-bar-fill {
+    height: 100%;
+    background: var(--pbsg-green);
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.row-value.winner .mini-bar-fill {
+    background: var(--pbsg-green);
+}
+
+/* --- Funnel Step Bar (horizontal) --- */
+
+.funnel-step {
+    width: 100%;
+}
+
+.funnel-step-bar {
+    height: 20px;
+    background: var(--pbsg-green);
+    border-radius: 3px;
+    min-width: 4px;
+    transition: width 0.3s;
+    opacity: 0.7;
+}
+
+/* --- Compare Actions (footer) --- */
+
+.pbsg-compare-actions {
+    padding: 14px 18px;
+    border-top: 1px solid var(--pbsg-border);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    background: var(--pbsg-card-bg);
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 960px) {
+    .pbsg-compare-head,
+    .pbsg-compare-section-title,
+    .pbsg-compare-row {
+        grid-template-columns: 140px repeat(var(--compare-cols, 3), 1fr);
+    }
+
+    .pbsg-compare-head .col-filled .col-name {
+        font-size: 13px;
+    }
+
+    .metric-big {
+        font-size: 24px;
+    }
+
+    .pbsg-compare-row .row-label {
+        font-size: 12px;
+        padding: 10px 12px;
+    }
+}
+
+@media (max-width: 700px) {
+    .pbsg-compare-head,
+    .pbsg-compare-section-title,
+    .pbsg-compare-row {
+        grid-template-columns: 100px repeat(var(--compare-cols, 3), 1fr);
+    }
+
+    .metric-big {
+        font-size: 20px;
+    }
+
+    .col-select {
+        font-size: 11px;
+    }
 }

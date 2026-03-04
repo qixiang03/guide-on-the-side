@@ -21,6 +21,9 @@
     const config = pbsgAnalytics;
     const $wrap  = $( '#pbsg-dashboard-content' );
 
+    // Compare view state
+    let compareIds = [];
+
     // =========================================================================
     // INIT — Load data for the current view
     // =========================================================================
@@ -30,6 +33,17 @@
         const tutorialId = $wrap.data( 'tutorial-id' ) || 0;
         const h5pId      = $wrap.data( 'h5p-id' ) || 0;
         const qIndex     = $wrap.data( 'q-index' ) || 0;
+
+        // Initialize compareIds from URL if on compare view
+        if ( view === 'compare' ) {
+            const urlParams = new URLSearchParams( window.location.search );
+            const idsParam  = urlParams.get( 'ids' ) || '';
+            compareIds = idsParam ? idsParam.split( ',' ).map( Number ).filter( Boolean ) : [];
+
+            // Hide KPI stats row and device filter for compare view
+            $( '#pbsg-stats-row' ).hide();
+            $( '.pbsg-filter-device-label, #pbsg-device-filter' ).hide();
+        }
 
         loadView( view, tutorialId, h5pId, qIndex );
 
@@ -42,9 +56,43 @@
         $( '#pbsg-refresh-btn' ).on( 'click', function() {
             loadView( view, tutorialId, h5pId, qIndex );
         } );
+
+        // Compare view event delegation
+        $( document ).on( 'change', '.pbsg-compare-select', function() {
+            const colIndex  = parseInt( $( this ).data( 'col' ), 10 );
+            const newId     = parseInt( $( this ).val(), 10 );
+            if ( newId ) {
+                addTutorial( colIndex, newId );
+            }
+        } );
+
+        $( document ).on( 'click', '.pbsg-col-change-btn', function() {
+            const $col = $( this ).closest( '.col-tutorial' );
+            $col.addClass( 'swapping' );
+            $col.find( '.col-swap-select' ).focus();
+        } );
+
+        $( document ).on( 'blur', '.col-swap-select', function() {
+            $( this ).closest( '.col-tutorial' ).removeClass( 'swapping' );
+        } );
+
+        $( document ).on( 'click', '.pbsg-col-remove', function() {
+            const colIndex = parseInt( $( this ).data( 'col' ), 10 );
+            removeTutorial( colIndex );
+        } );
     }
 
     function loadView( view, tutorialId, h5pId, qIndex ) {
+        if ( view === 'compare' ) {
+            if ( compareIds.length === 0 ) {
+                hideLoading();
+                renderComparison( { tutorials: {}, date_scope: {} } );
+                return;
+            }
+            loadComparisonData();
+            return;
+        }
+
         showLoading();
 
         const params = {
@@ -118,7 +166,7 @@
         html += '<div class="pbsg-card">';
         html += '<div class="pbsg-card-header">';
         html += 'All Tutorials';
-        html += '<a class="pbsg-card-action" href="' + config.exportUrl + '&type=overview">↓ Export CSV</a>';
+        html += '<a class="pbsg-card-action" href="' + getExportUrl( 'overview' ) + '">↓ Export CSV</a>';
         html += '</div>';
         html += renderTutorialTable( tutorials, trend );
         html += '</div>';
@@ -167,13 +215,18 @@
         ] );
 
         // Update export button
-        $( '#pbsg-export-btn' ).attr( 'href', config.exportUrl + '&type=questions&tutorial_id=' + stats.tutorial_page_id );
+        $( '#pbsg-export-btn' ).attr( 'href', getExportUrl( 'questions', stats.tutorial_page_id ) );
+
+        const dateScope = data.date_scope || {};
+        const scopeLabel = dateScope.date_from && dateScope.date_to
+            ? dateScope.date_from + ' to ' + dateScope.date_to
+            : '';
 
         let html = '<div class="pbsg-grid-2">';
 
         // Daily views bar chart
         html += '<div class="pbsg-card">';
-        html += '<div class="pbsg-card-header">Daily Views (Last 14 Days)</div>';
+        html += '<div class="pbsg-card-header">Daily Views' + ( scopeLabel ? ' <span class="pbsg-date-scope">(' + scopeLabel + ')</span>' : '' ) + '</div>';
         html += renderDailyBars( dailyViews );
         html += '</div>';
 
@@ -195,8 +248,8 @@
         if ( questions.length ) {
             html += '<div class="pbsg-card">';
             html += '<div class="pbsg-card-header">';
-            html += 'Quiz Questions';
-            html += '<a class="pbsg-card-action" href="' + config.exportUrl + '&type=questions&tutorial_id=' + stats.tutorial_page_id + '">↓ Export CSV</a>';
+            html += 'Quiz Questions <span class="pbsg-alltime-badge">all-time</span>';
+            html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">↓ Export CSV</a>';
             html += '</div>';
             html += renderQuestionsTable( questions, stats.tutorial_page_id );
             html += '</div>';
@@ -215,6 +268,9 @@
         const q = data;
         const dist = q.attempt_distribution || {};
 
+        $( '#pbsg-export-btn' ).attr( 'href',
+            getExportUrl( 'question_detail', q.tutorial_page_id, q.h5p_content_id, q.question_index ) );
+
         renderKPIs( [
             { label: 'Total Attempts', value: formatNumber( q.total_attempts ), color: 'green' },
             { label: 'Correct Rate', value: q.correct_rate + '%', color: getBadgeColor( q.correct_rate ) },
@@ -222,7 +278,8 @@
             { label: 'Avg Time', value: formatTime( q.avg_time_seconds ), color: 'blue' },
         ] );
 
-        let html = '<div class="pbsg-grid-2">';
+        let html = '<div class="pbsg-annotation"><strong>Note</strong><br>Question statistics are aggregated across all time. The date range filter does not apply to this view.</div>';
+        html += '<div class="pbsg-grid-2">';
 
         // Attempt distribution bar chart
         html += '<div class="pbsg-card">';
@@ -288,7 +345,7 @@
             const y   = padT + ( chartH / gridCount ) * i;
             const val = Math.round( maxVal - ( maxVal / gridCount ) * i );
             grid += '<line x1="' + padL + '" y1="' + y + '" x2="' + ( W - padR ) + '" y2="' + y + '" stroke="#E0E0E0" stroke-width="1"/>';
-            grid += '<text x="' + ( padL - 8 ) + '" y="' + ( y + 4 ) + '" text-anchor="end" font-size="10" fill="#888" font-family="Roboto Condensed">' + val + '</text>';
+            grid += '<text x="' + ( padL - 8 ) + '" y="' + ( y + 4 ) + '" text-anchor="end" font-size="11" fill="#888" font-family="Roboto Condensed">' + val + '</text>';
         }
 
         // X-axis labels (show every Nth for readability)
@@ -299,7 +356,7 @@
                 const x  = padL + i * scaleX;
                 const dt = d.stat_date || '';
                 const label = dt.substring( 5 ); // MM-DD
-                xLabels += '<text x="' + x + '" y="' + ( H - 5 ) + '" text-anchor="middle" font-size="9" fill="#888" font-family="Roboto Condensed">' + label + '</text>';
+                xLabels += '<text x="' + x + '" y="' + ( H - 5 ) + '" text-anchor="middle" font-size="10" fill="#888" font-family="Roboto Condensed">' + label + '</text>';
             }
         } );
 
@@ -347,8 +404,8 @@
         } );
 
         // Center text
-        svg += '<text x="' + cx + '" y="' + ( cy - 6 ) + '" text-anchor="middle" font-size="18" font-weight="700" font-family="Lusitana" fill="#333">' + formatNumber( total ) + '</text>';
-        svg += '<text x="' + cx + '" y="' + ( cy + 10 ) + '" text-anchor="middle" font-size="10" fill="#888" font-family="Roboto Condensed">TOTAL VIEWS</text>';
+        svg += '<text x="' + cx + '" y="' + ( cy - 6 ) + '" text-anchor="middle" font-size="20" font-weight="700" font-family="Lusitana" fill="#333">' + formatNumber( total ) + '</text>';
+        svg += '<text x="' + cx + '" y="' + ( cy + 10 ) + '" text-anchor="middle" font-size="11" fill="#888" font-family="Roboto Condensed">TOTAL VIEWS</text>';
         svg += '</svg>';
 
         // Legend
@@ -356,7 +413,7 @@
         devices.forEach( d => {
             const pct = total > 0 ? Math.round( parseInt( d.views, 10 ) / total * 100 ) : 0;
             const color = colors[ d.device_type ] || '#999';
-            svg += '<div style="display:inline-flex;align-items:center;gap:6px;margin:4px 10px;font-size:12px;">';
+            svg += '<div style="display:inline-flex;align-items:center;gap:6px;margin:4px 10px;font-size:13px;">';
             svg += '<span style="width:10px;height:10px;border-radius:2px;background:' + color + ';display:inline-block;"></span>';
             svg += '<span style="text-transform:capitalize;">' + d.device_type + '</span>';
             svg += '<strong>' + pct + '%</strong>';
@@ -374,7 +431,7 @@
         let html = '<table class="pbsg-data-table">';
         html += '<thead><tr>';
         html += '<th>Tutorial</th><th>Views</th><th>Completions</th>';
-        html += '<th>Completion Rate</th><th>Avg Score</th><th>Trend</th>';
+        html += '<th>Completion Rate</th><th>Avg Score <span class="pbsg-alltime-badge">all-time</span></th><th>Trend</th>';
         html += '</tr></thead><tbody>';
 
         tutorials.forEach( t => {
@@ -407,7 +464,7 @@
         } );
 
         if ( ! flagged.length ) {
-            return '<p style="color:#888;font-size:13px;padding:10px 0;">All tutorials are performing within acceptable thresholds. 👍</p>';
+            return '<p style="color:#888;font-size:14px;padding:10px 0;">All tutorials are performing within acceptable thresholds. 👍</p>';
         }
 
         let html = '';
@@ -636,15 +693,15 @@
             offset += dash;
         } );
 
-        svg += '<text x="' + cx + '" y="' + ( cy - 4 ) + '" text-anchor="middle" font-size="16" font-weight="700" font-family="Lusitana" fill="#333">' + total + '</text>';
-        svg += '<text x="' + cx + '" y="' + ( cy + 10 ) + '" text-anchor="middle" font-size="9" fill="#888" font-family="Roboto Condensed">TOTAL</text>';
+        svg += '<text x="' + cx + '" y="' + ( cy - 4 ) + '" text-anchor="middle" font-size="18" font-weight="700" font-family="Lusitana" fill="#333">' + total + '</text>';
+        svg += '<text x="' + cx + '" y="' + ( cy + 10 ) + '" text-anchor="middle" font-size="10" fill="#888" font-family="Roboto Condensed">TOTAL</text>';
         svg += '</svg>';
 
         // Legend
         svg += '<div style="margin-top:10px;">';
         segments.forEach( seg => {
             const pct = Math.round( seg.val / total * 100 );
-            svg += '<div style="display:inline-flex;align-items:center;gap:5px;margin:3px 8px;font-size:11px;">';
+            svg += '<div style="display:inline-flex;align-items:center;gap:5px;margin:3px 8px;font-size:12px;">';
             svg += '<span style="width:10px;height:10px;border-radius:2px;background:' + seg.color + ';display:inline-block;"></span>';
             svg += seg.label + ' <strong>' + seg.val + '</strong> (' + pct + '%)';
             svg += '</div>';
@@ -652,6 +709,350 @@
         svg += '</div></div>';
 
         return svg;
+    }
+
+    // =========================================================================
+    // VIEW D — COMPARE TUTORIALS
+    // =========================================================================
+
+    function loadComparisonData() {
+        showLoading();
+
+        const params = {
+            action:    'pbsg_get_analytics',
+            view:      'compare',
+            ids:       compareIds.join( ',' ),
+            date_from: $( '#pbsg-date-from' ).val(),
+            date_to:   $( '#pbsg-date-to' ).val(),
+        };
+
+        $.get( config.ajaxUrl, params )
+            .done( function( response ) {
+                if ( response.success && response.data ) {
+                    hideLoading();
+                    renderComparison( response.data );
+                    updateCompareUrl();
+                } else {
+                    showEmpty();
+                }
+            } )
+            .fail( function() {
+                showEmpty();
+            } );
+    }
+
+    function addTutorial( colIndex, tutorialId ) {
+        // Fill the slot or push
+        while ( compareIds.length <= colIndex ) {
+            compareIds.push( 0 );
+        }
+        compareIds[ colIndex ] = tutorialId;
+        // Remove empty trailing slots
+        while ( compareIds.length && !compareIds[ compareIds.length - 1 ] ) {
+            compareIds.pop();
+        }
+        loadComparisonData();
+    }
+
+    function removeTutorial( colIndex ) {
+        compareIds.splice( colIndex, 1 );
+        renderComparison( lastComparisonData || { tutorials: {}, date_scope: {} } );
+        if ( compareIds.length ) {
+            loadComparisonData();
+        } else {
+            updateCompareUrl();
+        }
+    }
+
+    function updateCompareUrl() {
+        const url = new URL( window.location );
+        if ( compareIds.length ) {
+            url.searchParams.set( 'ids', compareIds.join( ',' ) );
+        } else {
+            url.searchParams.delete( 'ids' );
+        }
+        history.replaceState( null, '', url );
+
+        // Update export button
+        let exportUrl = config.exportUrl + '&type=compare';
+        if ( compareIds.length ) exportUrl += '&ids=' + compareIds.join( ',' );
+        const dateFrom = $( '#pbsg-date-from' ).val();
+        const dateTo   = $( '#pbsg-date-to' ).val();
+        if ( dateFrom ) exportUrl += '&date_from=' + encodeURIComponent( dateFrom );
+        if ( dateTo )   exportUrl += '&date_to=' + encodeURIComponent( dateTo );
+        $( '#pbsg-export-btn' ).attr( 'href', exportUrl );
+    }
+
+    let lastComparisonData = null;
+
+    function renderComparison( data ) {
+        lastComparisonData = data;
+        const tutorials = data.tutorials || {};
+        const cols = 3; // Always show 3 slots
+
+        // Hide KPI stats row for compare view
+        $( '#pbsg-stats-row' ).hide();
+
+        // Set CSS variable for grid columns
+        let html = '<div class="pbsg-compare-table" style="--compare-cols: ' + cols + ';">';
+
+        // === HEADER ===
+        html += '<div class="pbsg-compare-head">';
+        html += '<div class="col-label">Metric</div>';
+
+        for ( let i = 0; i < cols; i++ ) {
+            const tid = compareIds[ i ] || 0;
+            const tData = tid ? tutorials[ tid ] : null;
+
+            if ( tData ) {
+                html += '<div class="col-tutorial col-filled" data-col="' + i + '">';
+                html += '<button type="button" class="pbsg-col-remove" data-col="' + i + '" title="Remove">✕</button>';
+                html += '<div class="col-name">' + escapeHtml( tData.name ) + '</div>';
+                html += '<div class="col-meta">' + escapeHtml( tData.meta ) + '</div>';
+                html += '<button type="button" class="pbsg-col-change-btn" data-col="' + i + '">Change ▾</button>';
+                html += '<select class="col-swap-select pbsg-compare-select" data-col="' + i + '">';
+                html += buildTutorialOptions( i, tid );
+                html += '</select>';
+                html += '</div>';
+            } else {
+                html += '<div class="col-tutorial col-empty" data-col="' + i + '">';
+                html += '<div class="col-empty-prompt">';
+                html += '<div class="empty-plus">＋</div>';
+                html += '<div class="empty-label">Add Tutorial</div>';
+                html += '</div>';
+                html += '<select class="pbsg-compare-select col-select" data-col="' + i + '">';
+                html += buildTutorialOptions( i, 0 );
+                html += '</select>';
+                html += '</div>';
+            }
+        }
+        html += '</div>'; // end header
+
+        // Only render data sections if we have at least 1 tutorial selected
+        const tids = compareIds.filter( Boolean );
+        if ( tids.length > 0 ) {
+
+            // === KPI SECTION ===
+            html += renderCompareSection( 'Key Performance Indicators', [
+                { label: 'Views',           key: 'views',           unit: '',  higher: true },
+                { label: 'Completions',     key: 'completions',     unit: '',  higher: true },
+                { label: 'Completion Rate', key: 'completion_rate', unit: '%', higher: true },
+                { label: 'Avg Time',        key: 'avg_time_seconds',unit: 's', higher: false, format: 'time' },
+            ], tutorials, cols );
+
+            // === COMPLETION FUNNEL SECTION ===
+            html += '<div class="pbsg-compare-section">';
+            html += '<div class="pbsg-compare-section-title">Completion Funnel</div>';
+
+            // Find max steps across all tutorials
+            let maxSteps = 0;
+            tids.forEach( function( tid ) {
+                const t = tutorials[ tid ];
+                if ( t && t.funnel ) maxSteps = Math.max( maxSteps, t.funnel.length );
+            } );
+
+            if ( maxSteps > 0 ) {
+                for ( let s = 0; s < maxSteps; s++ ) {
+                    html += '<div class="pbsg-compare-row">';
+                    html += '<div class="row-label">Step ' + ( s + 1 ) + '</div>';
+
+                    // Find max views for this step across tutorials for scaling
+                    let stepMax = 0;
+                    tids.forEach( function( tid ) {
+                        const t = tutorials[ tid ];
+                        if ( t && t.funnel && t.funnel[ s ] ) {
+                            stepMax = Math.max( stepMax, t.funnel[ s ].views );
+                        }
+                    } );
+
+                    for ( let i = 0; i < cols; i++ ) {
+                        const tid = compareIds[ i ] || 0;
+                        const t   = tid ? tutorials[ tid ] : null;
+                        if ( t && t.funnel && t.funnel[ s ] ) {
+                            const views = t.funnel[ s ].views;
+                            const pct   = stepMax > 0 ? Math.round( views / stepMax * 100 ) : 0;
+                            html += '<div class="row-value">';
+                            html += '<div class="funnel-step">';
+                            html += '<div class="funnel-step-bar" style="width:' + Math.max( 5, pct ) + '%;"></div>';
+                            html += '</div>';
+                            html += '<span class="metric-unit">' + views + ' views</span>';
+                            html += '</div>';
+                        } else {
+                            html += '<div class="row-value"><span class="metric-unit">—</span></div>';
+                        }
+                    }
+                    html += '</div>';
+                }
+            } else {
+                html += '<div class="pbsg-compare-row"><div class="row-label" style="grid-column:1/-1;color:#888;">No funnel data available</div></div>';
+            }
+            html += '</div>'; // end funnel section
+
+            // === QUESTION PERFORMANCE SECTION ===
+            html += renderCompareSection( 'Question Performance <span class="pbsg-alltime-badge">all-time</span>', [
+                { label: 'Avg Score',           key: 'avg_score',          unit: '%', higher: true },
+                { label: 'First Attempt Rate',  key: 'first_attempt_rate', unit: '%', higher: true },
+                { label: 'Avg Attempts/Q',      key: 'avg_attempts',       unit: '',  higher: false },
+                { label: 'Give-up Rate',        key: 'giveup_rate',        unit: '%', higher: false },
+            ], tutorials, cols );
+
+            // Hardest question row
+            html += '<div class="pbsg-compare-section" style="border-top:none;margin-top:-12px;">';
+            html += '<div class="pbsg-compare-row">';
+            html += '<div class="row-label">Hardest Question</div>';
+            for ( let i = 0; i < cols; i++ ) {
+                const tid = compareIds[ i ] || 0;
+                const t   = tid ? tutorials[ tid ] : null;
+                if ( t && t.hardest_question ) {
+                    const hq = t.hardest_question;
+                    html += '<div class="row-value">';
+                    html += '<div class="metric-big concern">' + hq.correct_rate + '%</div>';
+                    html += '<div class="metric-unit">' + escapeHtml( hq.question_text || 'Q' + ( hq.question_index + 1 ) ) + '</div>';
+                    html += '</div>';
+                } else {
+                    html += '<div class="row-value"><span class="metric-unit">—</span></div>';
+                }
+            }
+            html += '</div></div>';
+
+            // === DEVICE BREAKDOWN SECTION ===
+            html += '<div class="pbsg-compare-section">';
+            html += '<div class="pbsg-compare-section-title">Device Breakdown</div>';
+
+            [ 'desktop', 'tablet', 'mobile' ].forEach( function( deviceType ) {
+                html += '<div class="pbsg-compare-row">';
+                html += '<div class="row-label" style="text-transform:capitalize;">' + deviceType + '</div>';
+
+                // Find winner for this device
+                let bestVal = -1, bestIdx = -1;
+                for ( let i = 0; i < cols; i++ ) {
+                    const tid = compareIds[ i ] || 0;
+                    const t   = tid ? tutorials[ tid ] : null;
+                    if ( t && t.devices && t.devices[ deviceType ] > bestVal ) {
+                        bestVal = t.devices[ deviceType ];
+                        bestIdx = i;
+                    }
+                }
+
+                for ( let i = 0; i < cols; i++ ) {
+                    const tid = compareIds[ i ] || 0;
+                    const t   = tid ? tutorials[ tid ] : null;
+                    if ( t && t.devices ) {
+                        const pct = t.devices[ deviceType ] || 0;
+                        const winClass = ( tids.length > 1 && i === bestIdx && bestVal > 0 ) ? ' winner' : '';
+                        html += '<div class="row-value' + winClass + '">';
+                        html += '<div class="mini-bar"><div class="mini-bar-fill" style="width:' + pct + '%;"></div></div>';
+                        html += '<span class="metric-unit">' + pct + '%</span>';
+                        html += '</div>';
+                    } else {
+                        html += '<div class="row-value"><span class="metric-unit">—</span></div>';
+                    }
+                }
+                html += '</div>';
+            } );
+            html += '</div>'; // end device section
+
+        } // end if tids.length > 0
+
+        // === FOOTER ===
+        if ( tids.length > 0 ) {
+            html += '<div class="pbsg-compare-actions">';
+            let exportUrl = config.exportUrl + '&type=compare&ids=' + compareIds.join( ',' );
+            const dateFrom = $( '#pbsg-date-from' ).val();
+            const dateTo   = $( '#pbsg-date-to' ).val();
+            if ( dateFrom ) exportUrl += '&date_from=' + encodeURIComponent( dateFrom );
+            if ( dateTo )   exportUrl += '&date_to=' + encodeURIComponent( dateTo );
+            html += '<a href="' + exportUrl + '" class="pbsg-btn pbsg-btn-primary pbsg-btn-sm">↓ Export Comparison CSV</a>';
+            html += '</div>';
+        }
+
+        html += '</div>'; // end compare-table
+
+        $( '#pbsg-main-content' ).html( html ).show();
+    }
+
+    function renderCompareSection( title, metrics, tutorials, cols ) {
+        const tids = compareIds.filter( Boolean );
+        let html = '<div class="pbsg-compare-section">';
+        html += '<div class="pbsg-compare-section-title">' + title + '</div>';
+
+        metrics.forEach( function( m ) {
+            html += '<div class="pbsg-compare-row">';
+            html += '<div class="row-label">' + m.label + '</div>';
+
+            // Find winner
+            let bestVal = null, bestIdx = -1;
+            for ( let i = 0; i < cols; i++ ) {
+                const tid = compareIds[ i ] || 0;
+                const t   = tid ? tutorials[ tid ] : null;
+                if ( t ) {
+                    const val = parseFloat( t[ m.key ] ) || 0;
+                    if ( bestVal === null ||
+                         ( m.higher && val > bestVal ) ||
+                         ( !m.higher && val < bestVal ) ) {
+                        bestVal = val;
+                        bestIdx = i;
+                    }
+                }
+            }
+
+            for ( let i = 0; i < cols; i++ ) {
+                const tid = compareIds[ i ] || 0;
+                const t   = tid ? tutorials[ tid ] : null;
+                if ( t ) {
+                    const val      = parseFloat( t[ m.key ] ) || 0;
+                    const winClass = ( tids.length > 1 && i === bestIdx ) ? ' winner' : '';
+                    const concern  = ( !m.higher && val > 50 ) || ( m.higher && val < 30 ) ? ' concern' : '';
+                    const display  = m.format === 'time' ? formatTime( val ) : val + m.unit;
+
+                    html += '<div class="row-value' + winClass + '">';
+                    html += '<div class="metric-big' + concern + '">' + display + '</div>';
+                    if ( m.unit && m.format !== 'time' ) {
+                        html += '<div class="metric-unit">' + m.label + '</div>';
+                    }
+                    // Add mini progress bar for percentage metrics
+                    if ( m.unit === '%' ) {
+                        html += '<div class="mini-bar"><div class="mini-bar-fill" style="width:' + Math.min( val, 100 ) + '%;"></div></div>';
+                    }
+                    html += '</div>';
+                } else {
+                    html += '<div class="row-value"><span class="metric-unit">—</span></div>';
+                }
+            }
+            html += '</div>';
+        } );
+
+        html += '</div>';
+        return html;
+    }
+
+    function buildTutorialSelect( colIndex, selectedId ) {
+        const list = config.tutorials || [];
+        let html = '<select class="pbsg-compare-select col-select" data-col="' + colIndex + '">';
+        html += '<option value="">Select tutorial…</option>';
+        list.forEach( function( t ) {
+            // Don't show tutorials already selected in other slots
+            const alreadyUsed = compareIds.indexOf( t.id ) !== -1 && t.id !== selectedId;
+            if ( !alreadyUsed ) {
+                const sel = t.id === selectedId ? ' selected' : '';
+                html += '<option value="' + t.id + '"' + sel + '>' + escapeHtml( t.title ) + '</option>';
+            }
+        } );
+        html += '</select>';
+        return html;
+    }
+
+    function buildTutorialOptions( colIndex, selectedId ) {
+        const list = config.tutorials || [];
+        let html = '<option value="">Select tutorial…</option>';
+        list.forEach( function( t ) {
+            const alreadyUsed = compareIds.indexOf( t.id ) !== -1 && t.id !== selectedId;
+            if ( !alreadyUsed ) {
+                const sel = t.id === selectedId ? ' selected' : '';
+                html += '<option value="' + t.id + '"' + sel + '>' + escapeHtml( t.title ) + '</option>';
+            }
+        } );
+        return html;
     }
 
     // =========================================================================
@@ -709,6 +1110,18 @@
         if ( rate >= 70 ) return 'green';
         if ( rate >= 50 ) return 'amber';
         return 'red';
+    }
+
+    function getExportUrl( type, tutorialId, h5pId, qIndex ) {
+        let url = config.exportUrl + '&type=' + type;
+        const dateFrom = $( '#pbsg-date-from' ).val();
+        const dateTo   = $( '#pbsg-date-to' ).val();
+        if ( dateFrom ) url += '&date_from=' + encodeURIComponent( dateFrom );
+        if ( dateTo )   url += '&date_to='   + encodeURIComponent( dateTo );
+        if ( tutorialId ) url += '&tutorial_id=' + tutorialId;
+        if ( h5pId )      url += '&h5p_id=' + h5pId;
+        if ( qIndex !== undefined && qIndex !== null ) url += '&q_index=' + qIndex;
+        return url;
     }
 
     function escapeHtml( str ) {
