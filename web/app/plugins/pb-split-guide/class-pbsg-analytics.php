@@ -434,6 +434,11 @@ class PBSG_Analytics {
                 wp_send_json_success( self::get_question_detail( $tutorial_id, $h5p_id, $q_index ) );
                 break;
 
+            case 'compare':
+                $ids = isset( $_GET['ids'] ) ? sanitize_text_field( $_GET['ids'] ) : '';
+                wp_send_json_success( self::get_comparison_data( $ids ) );
+                break;
+
             default:
                 wp_send_json_error( 'Unknown view', 400 );
         }
@@ -444,31 +449,29 @@ class PBSG_Analytics {
      */
     public static function get_overview_data() {
         global $wpdb;
-        $table = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
         $daily = $wpdb->prefix . self::TABLE_DAILY_STATS;
 
-        $date_from = isset( $_GET['date_from'] ) ? sanitize_text_field( $_GET['date_from'] ) : date( 'Y-m-d', strtotime( '-30 days' ) );
-        $date_to   = isset( $_GET['date_to'] ) ? sanitize_text_field( $_GET['date_to'] ) : date( 'Y-m-d' );
+        $date_from = self::sanitize_date( isset( $_GET['date_from'] ) ? $_GET['date_from'] : '', date( 'Y-m-d', strtotime( '-30 days' ) ) );
+        $date_to   = self::sanitize_date( isset( $_GET['date_to'] ) ? $_GET['date_to'] : '', date( 'Y-m-d' ) );
         $device    = isset( $_GET['device'] ) ? sanitize_text_field( $_GET['device'] ) : '';
 
-        // Tutorial summaries
+        // Tutorial summaries — aggregated from daily stats with date range filtering
         $tutorials = $wpdb->get_results( $wpdb->prepare(
-            "SELECT
-                ts.tutorial_page_id,
-                p.post_title AS tutorial_name,
-                ts.view_count,
-                ts.completion_count,
-                CASE WHEN ts.view_count > 0
-                    THEN ROUND(ts.completion_count / ts.view_count * 100, 1)
-                    ELSE 0 END AS completion_rate,
-                CASE WHEN ts.total_sessions > 0
-                    THEN ROUND(ts.total_time_seconds / ts.total_sessions)
-                    ELSE 0 END AS avg_time_seconds
-             FROM {$table} ts
-             JOIN {$wpdb->posts} p ON p.ID = ts.tutorial_page_id
-             WHERE p.post_status = 'publish'
-             ORDER BY ts.view_count DESC",
-            array()
+            "SELECT d.tutorial_page_id, p.post_title AS tutorial_name,
+                    SUM(d.view_count) AS view_count,
+                    SUM(d.completion_count) AS completion_count,
+                    CASE WHEN SUM(d.view_count) > 0
+                        THEN ROUND(SUM(d.completion_count) / SUM(d.view_count) * 100, 1)
+                        ELSE 0 END AS completion_rate,
+                    CASE WHEN SUM(d.completion_count) > 0
+                        THEN ROUND(SUM(d.total_time_seconds) / SUM(d.completion_count))
+                        ELSE 0 END AS avg_time_seconds
+             FROM {$daily} d
+             JOIN {$wpdb->posts} p ON p.ID = d.tutorial_page_id
+             WHERE p.post_status = 'publish' AND d.stat_date BETWEEN %s AND %s
+             GROUP BY d.tutorial_page_id, p.post_title
+             ORDER BY SUM(d.view_count) DESC",
+            $date_from, $date_to
         ), ARRAY_A ) ?: array();
 
         // Add question stats (avg score) per tutorial
@@ -530,6 +533,10 @@ class PBSG_Analytics {
             'tutorials'        => $tutorials,
             'daily_trend'      => $daily_trend,
             'device_breakdown' => $device_breakdown,
+            'date_scope'       => array(
+                'date_from' => $date_from,
+                'date_to'   => $date_to,
+            ),
         );
     }
 
@@ -538,44 +545,60 @@ class PBSG_Analytics {
      */
     public static function get_tutorial_detail( $tutorial_id ) {
         global $wpdb;
-        $table   = $wpdb->prefix . self::TABLE_TUTORIAL_STATS;
         $daily   = $wpdb->prefix . self::TABLE_DAILY_STATS;
         $q_table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
 
-        // Tutorial aggregate stats
+        $date_from = self::sanitize_date( isset( $_GET['date_from'] ) ? $_GET['date_from'] : '', date( 'Y-m-d', strtotime( '-30 days' ) ) );
+        $date_to   = self::sanitize_date( isset( $_GET['date_to'] ) ? $_GET['date_to'] : '', date( 'Y-m-d' ) );
+
+        // Tutorial aggregate stats — from daily stats with date range filtering
         $stats = $wpdb->get_row( $wpdb->prepare(
-            "SELECT ts.*, p.post_title AS tutorial_name
-             FROM {$table} ts
-             JOIN {$wpdb->posts} p ON p.ID = ts.tutorial_page_id
-             WHERE ts.tutorial_page_id = %d",
-            $tutorial_id
+            "SELECT d.tutorial_page_id, p.post_title AS tutorial_name,
+                    COALESCE(SUM(d.view_count), 0) AS view_count,
+                    COALESCE(SUM(d.completion_count), 0) AS completion_count,
+                    COALESCE(SUM(d.total_time_seconds), 0) AS total_time_seconds
+             FROM {$daily} d
+             JOIN {$wpdb->posts} p ON p.ID = d.tutorial_page_id
+             WHERE d.tutorial_page_id = %d AND d.stat_date BETWEEN %s AND %s
+             GROUP BY d.tutorial_page_id, p.post_title",
+            $tutorial_id, $date_from, $date_to
         ), ARRAY_A );
 
         if ( ! $stats ) {
-            return array( 'error' => 'Tutorial not found or has no data' );
+            // No daily data for this range — return zeroed stats with question data
+            $post_title = get_the_title( $tutorial_id );
+            $stats = array(
+                'tutorial_page_id'  => $tutorial_id,
+                'tutorial_name'     => $post_title ?: 'Tutorial #' . $tutorial_id,
+                'view_count'        => 0,
+                'completion_count'  => 0,
+                'total_time_seconds'=> 0,
+                'completion_rate'   => 0,
+                'avg_time_seconds'  => 0,
+            );
+        } else {
+            $stats['completion_rate'] = $stats['view_count'] > 0
+                ? round( $stats['completion_count'] / $stats['view_count'] * 100, 1 )
+                : 0;
+            $stats['avg_time_seconds'] = $stats['completion_count'] > 0
+                ? round( $stats['total_time_seconds'] / $stats['completion_count'] )
+                : 0;
         }
 
-        $stats['completion_rate'] = $stats['view_count'] > 0
-            ? round( $stats['completion_count'] / $stats['view_count'] * 100, 1 )
-            : 0;
-        $stats['avg_time_seconds'] = $stats['total_sessions'] > 0
-            ? round( $stats['total_time_seconds'] / $stats['total_sessions'] )
-            : 0;
-
-        // Daily views for this tutorial (last 14 days)
+        // Daily views for this tutorial — filtered by selected date range
         $daily_views = $wpdb->get_results( $wpdb->prepare(
             "SELECT stat_date, SUM(view_count) AS views, SUM(completion_count) AS completions
              FROM {$daily}
-             WHERE tutorial_page_id = %d AND stat_date >= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
+             WHERE tutorial_page_id = %d AND stat_date BETWEEN %s AND %s
              GROUP BY stat_date ORDER BY stat_date ASC",
-            $tutorial_id
+            $tutorial_id, $date_from, $date_to
         ), ARRAY_A ) ?: array();
 
-        // Step dwell times (aggregated from daily stats)
+        // Step dwell times — filtered by date range
         $step_data = $wpdb->get_results( $wpdb->prepare(
             "SELECT step_views FROM {$daily}
-             WHERE tutorial_page_id = %d AND step_views IS NOT NULL",
-            $tutorial_id
+             WHERE tutorial_page_id = %d AND step_views IS NOT NULL AND stat_date BETWEEN %s AND %s",
+            $tutorial_id, $date_from, $date_to
         ), ARRAY_A ) ?: array();
 
         $step_aggregates = array();
@@ -628,6 +651,10 @@ class PBSG_Analytics {
             'step_dwell'  => $step_dwell,
             'questions'   => $questions,
             'giveup_rate' => $giveup_rate,
+            'date_scope'  => array(
+                'date_from' => $date_from,
+                'date_to'   => $date_to,
+            ),
         );
     }
 
@@ -669,12 +696,20 @@ class PBSG_Analytics {
             ? round( $question['total_time_seconds'] / $question['total_answered'] )
             : 0;
 
+        $question['date_scope'] = array( 'all_time' => true );
+
         return $question;
     }
 
     /* =========================================================================
        CSV EXPORT
        ========================================================================= */
+
+    private static function send_csv_headers( $filename ) {
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename=' . $filename );
+        header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+    }
 
     public static function handle_export_csv() {
         if ( ! current_user_can( 'edit_pages' ) ) {
@@ -683,14 +718,15 @@ class PBSG_Analytics {
 
         $export_type = isset( $_GET['type'] ) ? sanitize_text_field( $_GET['type'] ) : 'overview';
 
-        // Set CSV headers
-        header( 'Content-Type: text/csv; charset=utf-8' );
-        header( 'Content-Disposition: attachment; filename=tutorial-analytics-' . $export_type . '-' . date( 'Y-m-d' ) . '.csv' );
-        header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+        $date_from = self::sanitize_date( isset( $_GET['date_from'] ) ? $_GET['date_from'] : '', date( 'Y-m-d', strtotime( '-30 days' ) ) );
+        $date_to   = self::sanitize_date( isset( $_GET['date_to'] ) ? $_GET['date_to'] : '', date( 'Y-m-d' ) );
 
         $output = fopen( 'php://output', 'w' );
 
         if ( 'overview' === $export_type ) {
+            $filename = 'tutorial-analytics-overview-' . $date_from . '-to-' . $date_to . '.csv';
+            self::send_csv_headers( $filename );
+
             fputcsv( $output, array( 'Tutorial', 'Views', 'Completions', 'Completion Rate (%)', 'Avg Score (%)', 'Avg Time (s)' ) );
             $data = self::get_overview_data();
             foreach ( $data['tutorials'] as $t ) {
@@ -703,8 +739,50 @@ class PBSG_Analytics {
                     $t['avg_time_seconds'],
                 ) );
             }
+        } elseif ( 'compare' === $export_type ) {
+            $ids  = isset( $_GET['ids'] ) ? sanitize_text_field( $_GET['ids'] ) : '';
+            $data = self::get_comparison_data( $ids );
+            $tuts = array_values( $data['tutorials'] );
+
+            $tut_names = array_map( function( $t ) {
+                return sanitize_title( $t['name'] );
+            }, $tuts );
+            $filename = 'comparison-' . implode( '-', $tut_names ) . '-' . $date_from . '-to-' . $date_to . '.csv';
+            self::send_csv_headers( $filename );
+
+            fputcsv( $output, array( 'Metric', 'Tutorial 1', 'Tutorial 2', 'Tutorial 3' ) );
+
+            $metrics = array(
+                array( 'Views', 'views' ),
+                array( 'Completions', 'completions' ),
+                array( 'Completion Rate (%)', 'completion_rate' ),
+                array( 'Avg Time (s)', 'avg_time_seconds' ),
+                array( 'Avg Score (%)', 'avg_score' ),
+                array( 'First Attempt Rate (%)', 'first_attempt_rate' ),
+                array( 'Avg Attempts', 'avg_attempts' ),
+                array( 'Give-up Rate (%)', 'giveup_rate' ),
+            );
+
+            // Tutorial names header
+            $name_row = array( 'Tutorial' );
+            for ( $i = 0; $i < 3; $i++ ) {
+                $name_row[] = isset( $tuts[ $i ] ) ? $tuts[ $i ]['name'] : '';
+            }
+            fputcsv( $output, $name_row );
+
+            foreach ( $metrics as $m ) {
+                $row = array( $m[0] );
+                for ( $i = 0; $i < 3; $i++ ) {
+                    $row[] = isset( $tuts[ $i ] ) ? $tuts[ $i ][ $m[1] ] : '';
+                }
+                fputcsv( $output, $row );
+            }
         } elseif ( 'questions' === $export_type ) {
             $tutorial_id = isset( $_GET['tutorial_id'] ) ? absint( $_GET['tutorial_id'] ) : 0;
+            $tutorial_slug = sanitize_title( get_the_title( $tutorial_id ) ?: 'tutorial-' . $tutorial_id );
+            $filename = $tutorial_slug . '-tutorial-' . $date_from . '-to-' . $date_to . '.csv';
+            self::send_csv_headers( $filename );
+
             fputcsv( $output, array( 'Question', 'H5P ID', 'Attempts', 'Correct', 'Incorrect', 'Give-ups', 'Correct Rate (%)', 'Avg Attempts' ) );
 
             global $wpdb;
@@ -728,6 +806,45 @@ class PBSG_Analytics {
                     $avg,
                 ) );
             }
+        } elseif ( 'question_detail' === $export_type ) {
+            $tutorial_id = isset( $_GET['tutorial_id'] ) ? absint( $_GET['tutorial_id'] ) : 0;
+            $h5p_id      = isset( $_GET['h5p_id'] ) ? absint( $_GET['h5p_id'] ) : 0;
+            $q_index     = isset( $_GET['q_index'] ) ? absint( $_GET['q_index'] ) : 0;
+            $tutorial_slug = sanitize_title( get_the_title( $tutorial_id ) ?: 'tutorial-' . $tutorial_id );
+            $filename = $tutorial_slug . '-question-' . $date_from . '-to-' . $date_to . '.csv';
+            self::send_csv_headers( $filename );
+
+            fputcsv( $output, array(
+                'Question', 'H5P ID', 'Question Index', 'Total Attempts',
+                'Correct', 'Incorrect', 'Give-ups', 'Correct Rate (%)',
+                '1st Attempt Correct', '2nd Attempt Correct', '3rd+ Attempt Correct',
+                'Avg Attempts', 'Avg Time (s)',
+            ) );
+
+            $question = self::get_question_detail( $tutorial_id, $h5p_id, $q_index );
+
+            if ( ! isset( $question['error'] ) ) {
+                $dist = $question['attempt_distribution'];
+                $avg_attempts = $question['total_answered'] > 0
+                    ? round( $question['total_attempts'] / $question['total_answered'], 1 )
+                    : 0;
+
+                fputcsv( $output, array(
+                    $question['question_text'] ?: 'Q' . ( $question['question_index'] + 1 ),
+                    $question['h5p_content_id'],
+                    $question['question_index'],
+                    $question['total_attempts'],
+                    $question['correct_count'],
+                    $question['incorrect_count'],
+                    $question['giveup_count'],
+                    $question['correct_rate'],
+                    $dist['first_attempt_correct'],
+                    $dist['second_attempt_correct'],
+                    $dist['third_plus_correct'],
+                    $avg_attempts,
+                    $question['avg_time_seconds'],
+                ) );
+            }
         }
 
         fclose( $output );
@@ -735,8 +852,210 @@ class PBSG_Analytics {
     }
 
     /* =========================================================================
+       COMPARISON DATA (Admin-only)
+       ========================================================================= */
+
+    /**
+     * Get comparison data for up to 3 tutorials side-by-side.
+     *
+     * @param string $ids_string Comma-separated tutorial page IDs.
+     * @return array Keyed by tutorial_page_id with aggregate metrics.
+     */
+    public static function get_comparison_data( $ids_string ) {
+        global $wpdb;
+        $daily   = $wpdb->prefix . self::TABLE_DAILY_STATS;
+        $q_table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
+
+        // Parse and limit to 3 IDs
+        $raw_ids = array_filter( array_map( 'absint', explode( ',', $ids_string ) ) );
+        $ids     = array_slice( $raw_ids, 0, 3 );
+
+        if ( empty( $ids ) ) {
+            return array( 'tutorials' => array(), 'date_scope' => array() );
+        }
+
+        $date_from = self::sanitize_date( isset( $_GET['date_from'] ) ? $_GET['date_from'] : '', date( 'Y-m-d', strtotime( '-30 days' ) ) );
+        $date_to   = self::sanitize_date( isset( $_GET['date_to'] ) ? $_GET['date_to'] : '', date( 'Y-m-d' ) );
+
+        $tutorials = array();
+
+        foreach ( $ids as $tid ) {
+            // Aggregate from daily stats (date-filterable)
+            $stats = $wpdb->get_row( $wpdb->prepare(
+                "SELECT COALESCE(SUM(d.view_count), 0) AS view_count,
+                        COALESCE(SUM(d.completion_count), 0) AS completion_count,
+                        COALESCE(SUM(d.total_time_seconds), 0) AS total_time_seconds
+                 FROM {$daily} d
+                 WHERE d.tutorial_page_id = %d AND d.stat_date BETWEEN %s AND %s",
+                $tid, $date_from, $date_to
+            ) );
+
+            $views       = (int) $stats->view_count;
+            $completions = (int) $stats->completion_count;
+            $comp_rate   = $views > 0 ? round( $completions / $views * 100, 1 ) : 0;
+            $avg_time    = $completions > 0 ? round( $stats->total_time_seconds / $completions ) : 0;
+
+            // Device breakdown (date-filtered)
+            $device_rows = $wpdb->get_results( $wpdb->prepare(
+                "SELECT device_type, SUM(view_count) AS views
+                 FROM {$daily}
+                 WHERE tutorial_page_id = %d AND stat_date BETWEEN %s AND %s
+                 GROUP BY device_type",
+                $tid, $date_from, $date_to
+            ), ARRAY_A ) ?: array();
+
+            $total_device_views = array_sum( array_column( $device_rows, 'views' ) );
+            $devices = array( 'desktop' => 0, 'tablet' => 0, 'mobile' => 0 );
+            foreach ( $device_rows as $dr ) {
+                $dt = $dr['device_type'];
+                if ( isset( $devices[ $dt ] ) ) {
+                    $devices[ $dt ] = $total_device_views > 0
+                        ? round( (int) $dr['views'] / $total_device_views * 100, 1 )
+                        : 0;
+                }
+            }
+
+            // Step funnel data (date-filtered)
+            $step_data = $wpdb->get_results( $wpdb->prepare(
+                "SELECT step_views FROM {$daily}
+                 WHERE tutorial_page_id = %d AND step_views IS NOT NULL AND stat_date BETWEEN %s AND %s",
+                $tid, $date_from, $date_to
+            ), ARRAY_A ) ?: array();
+
+            $step_aggregates = array();
+            foreach ( $step_data as $row ) {
+                $steps = json_decode( $row['step_views'], true ) ?: array();
+                foreach ( $steps as $key => $vals ) {
+                    if ( ! isset( $step_aggregates[ $key ] ) ) {
+                        $step_aggregates[ $key ] = 0;
+                    }
+                    $step_aggregates[ $key ] += $vals['views'];
+                }
+            }
+
+            // Sort funnel by step index
+            uksort( $step_aggregates, function( $a, $b ) {
+                return (int) str_replace( 'step_', '', $a ) - (int) str_replace( 'step_', '', $b );
+            } );
+
+            $funnel = array();
+            foreach ( $step_aggregates as $key => $step_views ) {
+                $funnel[] = array(
+                    'step'  => $key,
+                    'views' => $step_views,
+                );
+            }
+
+            // Question stats (all-time, not date-filtered)
+            $q_stats = $wpdb->get_row( $wpdb->prepare(
+                "SELECT SUM(total_attempts) AS total_attempts,
+                        SUM(correct_count) AS correct_count,
+                        SUM(first_attempt_correct) AS first_attempt_correct,
+                        SUM(total_answered) AS total_answered,
+                        SUM(giveup_count) AS giveup_count
+                 FROM {$q_table} WHERE tutorial_page_id = %d",
+                $tid
+            ) );
+
+            $total_attempts = (int) ( $q_stats->total_attempts ?? 0 );
+            $correct_count  = (int) ( $q_stats->correct_count ?? 0 );
+            $first_correct  = (int) ( $q_stats->first_attempt_correct ?? 0 );
+            $total_answered = (int) ( $q_stats->total_answered ?? 0 );
+            $total_giveups  = (int) ( $q_stats->giveup_count ?? 0 );
+
+            $avg_score          = $total_attempts > 0 ? round( $correct_count / $total_attempts * 100, 1 ) : 0;
+            $first_attempt_rate = $total_answered > 0 ? round( $first_correct / $total_answered * 100, 1 ) : 0;
+            $avg_attempts       = $total_answered > 0 ? round( $total_attempts / $total_answered, 1 ) : 0;
+            $giveup_rate        = $total_answered > 0 ? round( $total_giveups / $total_answered * 100, 1 ) : 0;
+
+            // Hardest question (lowest correct rate with at least 1 attempt)
+            $hardest = $wpdb->get_row( $wpdb->prepare(
+                "SELECT question_text, question_index,
+                        ROUND(correct_count / total_attempts * 100, 1) AS correct_rate
+                 FROM {$q_table}
+                 WHERE tutorial_page_id = %d AND total_attempts > 0
+                 ORDER BY (correct_count / total_attempts) ASC
+                 LIMIT 1",
+                $tid
+            ), ARRAY_A );
+
+            // Get tutorial name and published date
+            $post = get_post( $tid );
+            $name = $post ? $post->post_title : 'Tutorial #' . $tid;
+            $meta = $post ? 'Published ' . get_the_date( 'M j, Y', $post ) : '';
+
+            $tutorials[ $tid ] = array(
+                'name'               => $name,
+                'meta'               => $meta,
+                'views'              => $views,
+                'completions'        => $completions,
+                'completion_rate'    => $comp_rate,
+                'avg_time_seconds'   => $avg_time,
+                'avg_score'          => $avg_score,
+                'first_attempt_rate' => $first_attempt_rate,
+                'avg_attempts'       => $avg_attempts,
+                'giveup_rate'        => $giveup_rate,
+                'hardest_question'   => $hardest ?: null,
+                'funnel'             => $funnel,
+                'devices'            => $devices,
+            );
+        }
+
+        return array(
+            'tutorials'  => $tutorials,
+            'date_scope' => array(
+                'date_from' => $date_from,
+                'date_to'   => $date_to,
+            ),
+        );
+    }
+
+    /**
+     * Get list of all published tutorials with the split-guide template.
+     * Used for the comparison dropdown selectors.
+     *
+     * @return array [ { id, title, date } ]
+     */
+    public static function get_tutorial_list() {
+        global $wpdb;
+
+        $results = $wpdb->get_results(
+            "SELECT p.ID, p.post_title, p.post_date
+             FROM {$wpdb->posts} p
+             INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID
+             WHERE p.post_status = 'publish'
+               AND pm.meta_key = '_wp_page_template'
+               AND pm.meta_value IN ('split-guide-template.php', 'templates/split-guide-template.php')
+             ORDER BY p.post_title ASC",
+            ARRAY_A
+        );
+
+        $tutorials = array();
+        foreach ( $results ?: array() as $row ) {
+            $tutorials[] = array(
+                'id'    => (int) $row['ID'],
+                'title' => $row['post_title'],
+                'date'  => date( 'M j, Y', strtotime( $row['post_date'] ) ),
+            );
+        }
+
+        return $tutorials;
+    }
+
+    /* =========================================================================
        UTILITY METHODS
        ========================================================================= */
+
+    /**
+     * Validate and sanitize a YYYY-MM-DD date string.
+     */
+    private static function sanitize_date( $date_str, $default ) {
+        $date_str = sanitize_text_field( $date_str );
+        if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date_str ) ) {
+            return $date_str;
+        }
+        return $default;
+    }
 
     /**
      * Check if a page ID is a valid split-guide tutorial.

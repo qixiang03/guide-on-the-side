@@ -55,6 +55,20 @@ final class WPStubs
 }
 
 /* ------------------------------------------------------------------ */
+/*  WordPress constants                                               */
+/* ------------------------------------------------------------------ */
+
+if (!defined('ARRAY_A')) {
+    define('ARRAY_A', 'ARRAY_A');
+}
+if (!defined('ARRAY_N')) {
+    define('ARRAY_N', 'ARRAY_N');
+}
+if (!defined('OBJECT')) {
+    define('OBJECT', 'OBJECT');
+}
+
+/* ------------------------------------------------------------------ */
 /*  WordPress hook system stubs                                       */
 /* ------------------------------------------------------------------ */
 
@@ -259,18 +273,34 @@ if (!function_exists('wp_json_encode')) {
 }
 
 if (!function_exists('wp_send_json_success')) {
+    /**
+     * Stub records the call and throws WPDieException to simulate die().
+     * Tests should catch WPDieException when calling handlers that use this.
+     */
     function wp_send_json_success($data = null, ?int $status_code = null): void
     {
         WPStubs::record('wp_send_json_success', [$data, $status_code]);
+        throw new WPDieException('wp_send_json_success');
     }
 }
 
 if (!function_exists('wp_send_json_error')) {
+    /**
+     * Stub records the call and throws WPDieException to simulate die().
+     * Tests should catch WPDieException when calling handlers that use this.
+     */
     function wp_send_json_error($data = null, ?int $status_code = null): void
     {
         WPStubs::record('wp_send_json_error', [$data, $status_code]);
+        throw new WPDieException('wp_send_json_error');
     }
 }
+
+/**
+ * Exception thrown by wp_send_json_* stubs to simulate die() behavior.
+ * Test code should catch this exception to verify handler responses.
+ */
+class WPDieException extends \RuntimeException {}
 
 /* ------------------------------------------------------------------ */
 /*  Enqueue stubs                                                     */
@@ -387,4 +417,148 @@ if (!function_exists('get_header')) {
 
 if (!function_exists('get_footer')) {
     function get_footer(string $name = null, array $args = []): void {}
+}
+
+/* ------------------------------------------------------------------ */
+/*  Transient stubs (used by analytics rate limiting)                  */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('get_transient')) {
+    function get_transient(string $transient)
+    {
+        WPStubs::record('get_transient', [$transient]);
+        $map = WPStubs::returnFor('transients', []);
+        return $map[$transient] ?? false;
+    }
+}
+
+if (!function_exists('set_transient')) {
+    function set_transient(string $transient, $value, int $expiration = 0): bool
+    {
+        WPStubs::record('set_transient', [$transient, $value, $expiration]);
+        return true;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Page template stub (used by analytics tutorial validation)         */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('get_page_template_slug')) {
+    function get_page_template_slug($post = null): string
+    {
+        WPStubs::record('get_page_template_slug', [$post]);
+        $map = WPStubs::returnFor('page_template_slugs', []);
+        $post_id = is_object($post) ? $post->ID : (int) $post;
+        return $map[$post_id] ?? '';
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Option stubs                                                      */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('update_option')) {
+    function update_option(string $option, $value, $autoload = null): bool
+    {
+        WPStubs::record('update_option', [$option, $value, $autoload]);
+        return true;
+    }
+}
+
+if (!function_exists('get_option')) {
+    function get_option(string $option, $default = false)
+    {
+        WPStubs::record('get_option', [$option, $default]);
+        return WPStubs::returnFor('get_option_' . $option, $default);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Date / time stubs                                                 */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('current_time')) {
+    function current_time(string $type, bool $gmt = false): string
+    {
+        WPStubs::record('current_time', [$type, $gmt]);
+        $override = WPStubs::returnFor('current_time', null);
+        if ($override !== null) {
+            return $override;
+        }
+        return date($type);
+    }
+}
+
+if (!function_exists('get_the_date')) {
+    function get_the_date(string $format = '', $post = null): string
+    {
+        WPStubs::record('get_the_date', [$format, $post]);
+        return (string) WPStubs::returnFor('get_the_date', '');
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Post stubs                                                        */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('get_post')) {
+    function get_post($post = null, string $output = 'OBJECT', string $filter = 'raw')
+    {
+        WPStubs::record('get_post', [$post, $output, $filter]);
+        return WPStubs::returnFor('get_post', null);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Misc stubs (analytics, dashboard, i18n)                           */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('wp_die')) {
+    function wp_die($message = '', $title = '', $args = []): void
+    {
+        WPStubs::record('wp_die', [$message, $title, $args]);
+        throw new WPDieException('wp_die: ' . $message);
+    }
+}
+
+if (!function_exists('sanitize_title')) {
+    function sanitize_title(string $title, string $fallback_title = '', string $context = 'save'): string
+    {
+        return strtolower(preg_replace('/[^a-z0-9\-]/', '-', strtolower($title)));
+    }
+}
+
+// Note: dbDelta is NOT stubbed here because PBSG_Analytics::create_tables()
+// does `require_once ABSPATH . 'wp-admin/includes/upgrade.php'` which defines
+// the real dbDelta. Stubbing it here would cause a redeclaration fatal error.
+// Schema tests verify SQL generation via source-code inspection instead.
+
+if (!function_exists('__')) {
+    function __(string $text, string $domain = 'default'): string
+    {
+        return $text;
+    }
+}
+
+if (!function_exists('esc_html_e')) {
+    function esc_html_e(string $text, string $domain = 'default'): void
+    {
+        echo htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+}
+
+if (!function_exists('esc_url')) {
+    function esc_url(string $url, ?array $protocols = null, string $_context = 'display'): string
+    {
+        return $url;
+    }
+}
+
+if (!function_exists('add_menu_page')) {
+    function add_menu_page(string $page_title, string $menu_title, string $capability, string $menu_slug, callable $callback = null, string $icon_url = '', ?int $position = null): string
+    {
+        WPStubs::record('add_menu_page', [$page_title, $menu_title, $capability, $menu_slug, $callback, $icon_url, $position]);
+        return $menu_slug;
+    }
 }
