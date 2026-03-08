@@ -115,6 +115,17 @@ class MockWpdb
     }
 
     /**
+     * Mock insert() — records insert call.
+     */
+    public function insert(string $table, array $data, $format = null)
+    {
+        $this->calls[] = ['method' => 'insert', 'args' => [$table, $data, $format]];
+        $this->rows_affected = 1;
+        $this->insert_id = $this->insert_id + 1;
+        return $this->findReturn('insert', $table, 1);
+    }
+
+    /**
      * Mock update() — records update call.
      */
     public function update(string $table, array $data, array $where, $format = null, $where_format = null)
