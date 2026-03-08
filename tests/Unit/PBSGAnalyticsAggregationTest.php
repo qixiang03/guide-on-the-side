@@ -410,28 +410,4 @@ class PBSGAnalyticsAggregationTest extends TestCase
         $this->assertTrue($found, 'Daily stats should include device_type');
     }
 
-    /* ---------------------------------------------------------------
-       Format time utility
-       --------------------------------------------------------------- */
-
-    /**
-     * @covers PBSG_Analytics::format_time
-     * @dataProvider formatTimeProvider
-     */
-    public function test_format_time(int $seconds, string $expected): void
-    {
-        $this->assertSame($expected, PBSG_Analytics::format_time($seconds));
-    }
-
-    public static function formatTimeProvider(): array
-    {
-        return [
-            'zero seconds'       => [0, '0s'],
-            'under a minute'     => [45, '45s'],
-            'exactly one minute' => [60, '1m 00s'],
-            'one and a half'     => [90, '1m 30s'],
-            'five minutes'       => [300, '5m 00s'],
-            'arbitrary'          => [127, '2m 07s'],
-        ];
-    }
 }

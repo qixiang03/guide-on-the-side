@@ -21,7 +21,7 @@ wp_enqueue_script(
     'pbsg-tracker',
     plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
     array(),
-    '1.0.0',
+    filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js' ),
     true
 );
 

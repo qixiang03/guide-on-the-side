@@ -204,6 +204,7 @@
         const stats      = data.stats || {};
         const dailyViews = data.daily_views || [];
         const stepDwell  = data.step_dwell || {};
+        const stepNames  = data.step_names || {};
         const questions  = data.questions || [];
 
         // KPIs for this tutorial
@@ -233,7 +234,7 @@
         // Completion funnel
         html += '<div class="pbsg-card">';
         html += '<div class="pbsg-card-header">Completion Funnel</div>';
-        html += renderCompletionFunnel( stepDwell, stats.view_count );
+        html += renderCompletionFunnel( stepDwell, stats.view_count, stepNames );
         html += '</div>';
 
         html += '</div>'; // end grid
@@ -241,7 +242,7 @@
         // Dwell time table
         html += '<div class="pbsg-card">';
         html += '<div class="pbsg-card-header">Step Dwell Time</div>';
-        html += renderDwellTable( stepDwell );
+        html += renderDwellTable( stepDwell, stepNames );
         html += '</div>';
 
         // Questions table
@@ -535,7 +536,7 @@
     /**
      * Completion funnel — horizontal bars.
      */
-    function renderCompletionFunnel( stepDwell, totalViews ) {
+    function renderCompletionFunnel( stepDwell, totalViews, stepNames ) {
         const keys = Object.keys( stepDwell ).sort( ( a, b ) => {
             const ia = parseInt( a.replace( 'step_', '' ), 10 );
             const ib = parseInt( b.replace( 'step_', '' ), 10 );
@@ -545,12 +546,15 @@
         if ( ! keys.length ) return '<p style="color:#888;padding:20px;">No step data yet</p>';
 
         const maxViews = Math.max( totalViews || 1, ...keys.map( k => stepDwell[k].views || 0 ) );
+        const names = stepNames || {};
 
         let html = '';
         keys.forEach( ( key, i ) => {
-            const views = stepDwell[ key ].views || 0;
-            const pct   = Math.round( ( views / maxViews ) * 100 );
-            const label = 'Step ' + ( parseInt( key.replace( 'step_', '' ), 10 ) + 1 );
+            const views   = stepDwell[ key ].views || 0;
+            const pct     = Math.round( ( views / maxViews ) * 100 );
+            const stepNum = parseInt( key.replace( 'step_', '' ), 10 ) + 1;
+            const name    = names[ key ] || '';
+            const label   = name ? stepNum + '. ' + name : 'Step ' + stepNum;
 
             // Color gradient: green → amber → red
             const ratio = keys.length > 1 ? i / ( keys.length - 1 ) : 0;
@@ -569,12 +573,14 @@
     /**
      * Step dwell time table.
      */
-    function renderDwellTable( stepDwell ) {
+    function renderDwellTable( stepDwell, stepNames ) {
         const keys = Object.keys( stepDwell ).sort( ( a, b ) => {
             return parseInt( a.replace( 'step_', '' ), 10 ) - parseInt( b.replace( 'step_', '' ), 10 );
         } );
 
         if ( ! keys.length ) return '<p style="color:#888;">No dwell data yet</p>';
+
+        const names = stepNames || {};
 
         let html = '<table class="pbsg-data-table">';
         html += '<thead><tr><th>Step</th><th>Views</th><th>Avg Dwell Time</th></tr></thead>';
@@ -583,13 +589,15 @@
         keys.forEach( key => {
             const d = stepDwell[ key ];
             const stepNum = parseInt( key.replace( 'step_', '' ), 10 ) + 1;
+            const name    = names[ key ] || '';
+            const label   = name ? stepNum + '. ' + name : 'Step ' + stepNum;
             const avgSecs = d.avg_dwell_secs || 0;
 
             // Color code: <30s low, 30-120s med, >120s high
             const dwellClass = avgSecs < 30 ? 'pbsg-dwell-low' : ( avgSecs < 120 ? 'pbsg-dwell-med' : 'pbsg-dwell-high' );
 
             html += '<tr>';
-            html += '<td>Step ' + stepNum + '</td>';
+            html += '<td>' + label + '</td>';
             html += '<td>' + ( d.views || 0 ) + '</td>';
             html += '<td><span class="' + dwellClass + '">' + formatTime( avgSecs ) + '</span></td>';
             html += '</tr>';

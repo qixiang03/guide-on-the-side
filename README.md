@@ -1,33 +1,40 @@
 # Guide on the Side - Interactive Tutorial System
 
-A web-based interactive tutorial system for UPEI Library that enables librarians to create split-screen tutorials with instructional content on the left and embedded library resources on the right.
+A WordPress/Pressbooks plugin (`pb-split-guide`) that lets librarians create split-screen tutorials where instructional content and H5P quizzes appear on the left pane, and embedded library resources (YouTube, databases, PDFs) appear on the right — all without requiring student logins.
 
-## Project Overview
+Built for **UPEI Library** as a free, accessible, PIPEDA-compliant alternative to the now-abandoned [University of Arizona Guide on the Side](https://ualibraries.github.io/Guide-on-the-Side/about.html) and the commercial [LibWizard by SpringShare](https://www.springshare.com/libwizard).
 
-The Guide on the Side Interactive Tutorial System allows librarians to create self-paced learning modules that guide students through using library databases, catalogues, and research tools. The system features:
+## Features
 
-- **Split-screen interface**: Instructions and quizzes on the left, live library resources on the right
-- **WYSIWYG editor**: Task-relevant design interface for librarians
-- **Quiz functionality**: Multiple choice, checkbox, yes/no, and open-ended questions with immediate feedback
-- **Template system**: Consistent look and feel with customizable overrides
-- **Accessibility compliance**: WCAG 2.1 AA standards
+- **Split-screen interface**: Step-by-step instructions and H5P quizzes on the left, live embedded resources on the right
+- **Multi-source embedding**: YouTube (auto-converted to embed format), library databases via iframe, uploaded PDFs, and web URLs
+- **H5P quiz integration**: Multiple choice, fill-in-the-blank, and interactive content with xAPI event tracking
+- **Privacy-first analytics**: Aggregate-only dashboard with zero PII — fully PIPEDA compliant
+- **Certificate generation**: PDF completion certificates via TCPDF
+- **Accessibility compliance**: WCAG 2.1 AA — keyboard navigation, ARIA labels, screen reader support
 
 ## Technology Stack
 
-- **CMS**: Pressbooks
-- **Backend**: PHP
-- **Frontend**: HTML, CSS, JavaScript
-- **Version Control**: Git/GitHub
+| Layer | Technology |
+|-------|------------|
+| CMS | WordPress Multisite + Pressbooks |
+| Plugin | `pb-split-guide` (this repo) |
+| Backend | PHP 8.3, MariaDB |
+| Frontend | HTML, CSS (BEM), JavaScript (jQuery) |
+| Interactive Content | H5P |
+| Local Dev | Lando / Docker |
+| CI/CD | GitHub Actions + PHPUnit |
+| Version Control | Git (Gitflow) |
 
 ## Team Members
 
-| Name | Role |
-|------|------|
-| Yang Guo | Developer |
-| Qi Xiang Phang | Developer |
-| Xiaohan Yu | Developer |
-| Daniel McGrath | Developer |
-| Caleb Jones | Developer |
+| Name | Role | Focus Areas |
+|------|------|-------------|
+| Qi Xiang Phang | Communication Rep & Developer | Analytics, dashboard, documentation |
+| Daniel McGrath | Tech Lead | Deployment, backup/versioning, tutorial storage |
+| Yang Guo (Cindy) | Developer | Admin UI, multi-source embeds, H5P integration, certificates |
+| Xiaohan Yu (Reagan) | Developer | CI/CD, testing framework, automated reporting |
+| Caleb Jones | Developer | Accessibility audits, WCAG compliance, custom themes |
 
 ### Past Contributors
 
@@ -35,18 +42,15 @@ The Guide on the Side Interactive Tutorial System allows librarians to create se
 |------|------|--------------|
 | Tanguy Merrien | Team Lead (Fall 2024) | Project coordination, Jira board setup, initial architecture |
 
-
-**Project Advisor**: Dr. David LeBlanc
+**Project Advisor**: Dr. David LeBlanc, UPEI Computer Science
 
 ## Getting Started
 
 ### Prerequisites
 
-- PHP 8.1 or higher
-- MySQL/MariaDB 8.0+
+- [Lando](https://lando.dev/) (includes Docker)
 - Composer
-- Node.js 18+ (for frontend tooling)
-- Local server environment (XAMPP, MAMP, or Docker)
+- Git
 
 ### Installation
 
@@ -59,7 +63,6 @@ The Guide on the Side Interactive Tutorial System allows librarians to create se
 2. **Install dependencies**
    ```bash
    composer install
-   npm install
    ```
 
 3. **Configure environment**
@@ -68,41 +71,54 @@ The Guide on the Side Interactive Tutorial System allows librarians to create se
    # Edit .env with your local database credentials
    ```
 
-4. **Set up the database**
+4. **Start the Lando environment**
    ```bash
-   # Import the database schema
-   mysql -u [username] -p [database_name] < database/schema.sql
+   lando start
    ```
 
-5. **Start the development server**
+5. **Install plugin dependencies**
    ```bash
-   # For XAMPP/MAMP: Place project in htdocs/www folder
-   # For Docker: docker-compose up -d
+   cd web/app/plugins/pb-split-guide
+   composer install
+   cd ../../../..
    ```
 
 6. **Access the application**
-   - Development: `http://localhost/guide-on-the-side`
-   - Admin panel: `http://localhost/guide-on-the-side/admin`
+   - WordPress: `http://localhost:8080`
+   - WordPress Admin: `http://localhost:8080/wp/wp-admin/`
+   - phpMyAdmin: `http://localhost:8081`
+
+For detailed setup instructions, see [docs/DEV-SETUP-GUIDE.md](docs/DEV-SETUP-GUIDE.md).
 
 ## Project Structure
 
 ```
 guide-on-the-side/
-├── docs/                    # Documentation
-│   ├── api/                 # API documentation
-│   ├── user-guide/          # User manual
-│   └── technical/           # Technical documentation
-├── src/                     # Source code
-│   ├── backend/             # PHP backend code
-│   ├── frontend/            # Frontend assets
-│   └── modules/             # CMS modules/plugins
-├── tests/                   # Test suites
-│   ├── unit/                # Unit tests
-│   ├── integration/         # Integration tests
-│   └── e2e/                 # End-to-end tests
-├── database/                # Database migrations and seeds
-├── config/                  # Configuration files
-└── public/                  # Public web root
+├── web/app/plugins/pb-split-guide/   # The plugin (all source code)
+│   ├── pb-split-guide.php            # Entry point, hooks registration
+│   ├── class-pbsg-analytics.php      # Analytics tracking & data API
+│   ├── class-pbsg-analytics-dashboard.php  # Admin dashboard rendering
+│   ├── includes/                     # PHP classes
+│   │   ├── steps-normalizer.php      # Step data validation/migration
+│   │   └── class-pbsg-certificate.php # PDF certificate generation
+│   ├── templates/                    # Page templates
+│   │   └── split-guide-template.php  # Student-facing split-screen view
+│   └── assets/                       # CSS and JavaScript
+│       ├── split-guide.css           # Frontend styles
+│       ├── split-guide.js            # Frontend interaction logic
+│       ├── split-guide-tracker.js    # Analytics event tracking
+│       ├── analytics-dashboard.js    # Admin dashboard charts
+│       ├── analytics-dashboard.css   # Dashboard styles
+│       └── admin/                    # Admin editor assets
+├── tests/                            # PHPUnit test suite
+│   ├── bootstrap.php                 # Test bootstrap (WP stubs)
+│   ├── Unit/                         # Unit tests
+│   └── Integration/                  # Integration smoke tests
+├── docs/                             # Project documentation
+├── .github/workflows/                # GitHub Actions CI/CD
+├── .lando.yml                        # Lando local dev config
+├── phpunit.xml                       # PHPUnit configuration
+└── composer.json                     # Root Composer config
 ```
 
 ## Development Workflow
@@ -111,37 +127,42 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ### Quick Reference
 
-- **Main branch**: `main` - Production-ready code
-- **Development branch**: `develop` - Integration branch for features
-- **Feature branches**: `feature/[feature-name]` - New features
-- **Bugfix branches**: `bugfix/[issue-number]-[description]` - Bug fixes
-- **Hotfix branches**: `hotfix/[issue-number]-[description]` - Urgent production fixes
+- **Main branch**: `main` — Production-ready code
+- **Development branch**: `develop` — Integration branch for features
+- **Feature branches**: `feature/{issue#}-{description}` — New features
+- **Bugfix branches**: `bugfix/{issue#}-{description}` — Bug fixes
+- **Hotfix branches**: `hotfix/{issue#}-{description}` — Urgent production fixes
+- **Merge strategy**: Squash and Merge
 
 ## Documentation
 
-- [Project Plan](docs/project-plan.md)
-- [Feature List](docs/features.md)
-- [API Documentation](docs/api/README.md)
-- [User Guide](docs/user-guide/README.md)
-- [Deployment Guide](docs/deployment.md)
+- [Dev Environment Setup](docs/DEV-SETUP-GUIDE.md)
+- [Deployment & Staging](docs/DEPLOYMENT-STAGING.md)
+- [Tutorial Data Model](docs/TUTORIAL-DATA-MODEL.md)
+- [Tutorial Storage System](docs/TUTORIAL-STORAGE-SYSTEM.md)
+- [Backup & Versioning Policy](docs/BACKUP-VERSIONING-POLICY.md)
+- [Migration Guide](docs/MIGRATION-GUIDE.md)
 - [Testing Log](docs/TESTING_LOG.md)
 
 ## Testing
 
 ```bash
-# Run all tests
+# Run all tests (via Lando)
 lando phpunit --configuration phpunit.xml --testdox
 
 # Run unit tests only
 lando phpunit
 
-# Run with Integration
+# Run integration smoke tests
 lando phpunit --configuration phpunit.xml --testsuite "UPEI Guide-on-the-Side Integration Smoke Tests" --testdox
+
+# Run locally (without Lando)
+vendor/bin/phpunit --configuration phpunit.xml --testdox
 ```
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions.
+See [docs/DEPLOYMENT-STAGING.md](docs/DEPLOYMENT-STAGING.md) for deployment instructions.
 
 ## License
 
@@ -149,7 +170,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- UPEI Library for project requirements and guidance
+- UPEI Library (Melissa Belvadi) for project requirements and guidance
 - University of Arizona for the original Guide on the Side concept
 - Dr. David LeBlanc for project supervision
 
