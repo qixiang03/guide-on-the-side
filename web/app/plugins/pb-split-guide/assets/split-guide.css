@@ -147,6 +147,119 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   line-height: 1.2 !important;
 }
 
+
+/* ===== Quiz pane Menu ===== */
+.pbsg-quiz-header-left{
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+}
+
+.pbsg-menu-wrap{
+  position: relative !important;
+  flex: 0 0 auto !important;
+}
+
+.pbsg-menu-btn{
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+
+  padding: 8px 14px !important;
+  border: 2px solid #cfd8dc !important;
+  border-radius: 12px !important;
+
+  background: #f3f4f6 !important;
+  color: #111827 !important;
+
+  font-size: 16px !important;
+  font-weight: 500 !important;
+
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.pbsg-menu-btn:hover{
+  background: #e5e7eb !important;
+  border-color: #9ca3af !important;
+}
+
+.pbsg-menu-icon{
+  font-size: 18px !important;
+}
+
+.pbsg-menu-arrow{
+  font-size: 14px !important;
+  margin-right: 2px !important;
+}
+
+.pbsg-menu-text{
+  font-size: 18px !important;
+}
+
+.pbsg-menu-icon{
+  font-size: 18px !important;
+}
+
+.pbsg-menu-btn[aria-expanded="true"] .pbsg-menu-arrow{
+  transform: rotate(180deg);
+  transition: transform 0.2s ease;
+}
+
+.pbsg-menu-dropdown{
+  position: absolute !important;
+  top: calc(100% + 8px) !important;
+  left: 0 !important;
+  width: min(360px, 70vw) !important;
+  max-height: 420px !important;
+  overflow: auto !important;
+  background: #fff !important;
+  border: 1px solid rgba(0,0,0,.12) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,.12) !important;
+  display: none !important;
+  z-index: 50 !important;
+}
+
+.pbsg-menu-dropdown.is-open{
+  display: block !important;
+}
+
+.pbsg-menu-list{
+  list-style: none !important;
+  margin: 0 !important;
+  padding: 8px !important;
+}
+
+.pbsg-menu-item{
+  width: 100% !important;
+  text-align: left !important;
+  padding: 10px 10px !important;
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+  font-size: 15px !important;
+  color: #111827 !important;
+}
+
+.pbsg-menu-item:hover{
+  background: rgba(59,130,246,.10) !important;
+}
+
+.pbsg-menu-item.is-current{
+  background: rgba(16,185,129,.12) !important;
+  font-weight: 600 !important;
+}
+
+.pbsg-menu-item.is-disabled{
+  opacity: .45 !important;
+  cursor: not-allowed !important;
+}
+
+
+
 /* The quiz area is the only scroll region on the left */
 .pbsg-left .pbsg-iframe-wrap {
   flex: 1 1 auto !important;
@@ -479,4 +592,95 @@ body.pbsg-standalone .pbsg-wrap{
 
 #pbsgCertDownload {
   white-space: nowrap;
+}
+
+/* Certificate button locked */
+#pbsgCertDownload.pbsg-locked {
+  opacity: 0.5 !important;
+  pointer-events: none !important;
+  cursor: not-allowed !important;
+}
+
+/* Tutorial overview page */
+.pbsg-course-overview-wrap {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.pbsg-course-overview-title {
+  font-size: 3rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.pbsg-course-overview-subtitle {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0 0 24px;
+}
+
+.pbsg-course-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.pbsg-course-card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.pbsg-course-card-image-wrap {
+  width: 100%;
+  height: 220px;
+  overflow: hidden;
+  background: #f2f2f2;
+}
+
+.pbsg-course-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pbsg-course-card-body {
+  padding: 18px 18px 22px;
+}
+
+.pbsg-course-card-title {
+  margin: 0 0 10px;
+  font-size: 1.8rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.pbsg-course-card-title a {
+  color: #b5121b;
+  text-decoration: none;
+}
+
+.pbsg-course-card-title a:hover {
+  text-decoration: underline;
+}
+
+.pbsg-course-card-meta {
+  color: #666;
+  font-size: 1rem;
+}
+
+@media (max-width: 1100px) {
+  .pbsg-course-grid {
+    grid-template-columns: repeat(2, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .pbsg-course-grid {
+    grid-template-columns: 1fr;
+  }
 }

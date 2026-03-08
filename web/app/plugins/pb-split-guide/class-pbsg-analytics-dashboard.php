@@ -68,7 +68,7 @@ class PBSG_Analytics_Dashboard {
             'pbsg-analytics-dashboard',
             $plugin_url . 'assets/analytics-dashboard.css',
             array(),
-            '1.0.0'
+            '1.3.0'
         );
 
         // Dashboard JS
@@ -76,7 +76,7 @@ class PBSG_Analytics_Dashboard {
             'pbsg-analytics-dashboard',
             $plugin_url . 'assets/analytics-dashboard.js',
             array( 'jquery' ),
-            '1.0.0',
+            '1.3.0',
             true
         );
 
@@ -85,6 +85,7 @@ class PBSG_Analytics_Dashboard {
             'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
             'nonce'     => wp_create_nonce( 'pbsg_analytics_nonce' ),
             'exportUrl' => admin_url( 'admin-ajax.php?action=pbsg_export_csv' ),
+            'tutorials' => PBSG_Analytics::get_tutorial_list(),
         ) );
     }
 
@@ -142,6 +143,11 @@ class PBSG_Analytics_Dashboard {
                     <?php esc_html_e( 'Question Detail', 'pb-split-guide' ); ?>
                 </a>
                 <?php endif; ?>
+                <a href="<?php echo esc_url( admin_url( 'admin.php?page=pbsg-analytics&tab=compare' ) ); ?>"
+                   class="pbsg-tab <?php echo ( 'compare' === $current_view ) ? 'active' : ''; ?>"
+                   role="tab">
+                    <?php esc_html_e( 'Compare', 'pb-split-guide' ); ?>
+                </a>
             </nav>
 
             <!-- Breadcrumb -->
@@ -161,6 +167,10 @@ class PBSG_Analytics_Dashboard {
                     <span id="pbsg-breadcrumb-question">
                         <?php printf( esc_html__( 'Question %d', 'pb-split-guide' ), $q_index + 1 ); ?>
                     </span>
+                <?php endif; ?>
+                <?php if ( 'compare' === $current_view ) : ?>
+                    <span class="sep">›</span>
+                    <span><?php esc_html_e( 'Compare Tutorials', 'pb-split-guide' ); ?></span>
                 <?php endif; ?>
             </div>
 

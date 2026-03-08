@@ -77,3 +77,16 @@ Page Attributes → Template → Split Guide Template
 - Assign the Split Guide Template
 - Add tutorial content (text, H5P, links) to the page body
 - Embed live resources (iframe, video, external tools) as needed
+
+
+
+### Certificate Generation
+
+- enter into plugins fold
+
+```
+lando composer require tecnickcom/tcpdf
+
+```
+
+

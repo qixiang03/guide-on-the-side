@@ -413,6 +413,48 @@ jQuery(function ($) {
     setSteps(steps);
     renderStepsTable();
   });
+
+
+  // --- Page-level cover image picker ---
+  $(document).on('click', '#pbsg_pick_cover_image', function (e) {
+    e.preventDefault();
+
+    const frame = wp.media({
+      title: 'Select Tutorial Cover Image',
+      button: { text: 'Use this image' },
+      library: { type: 'image' },
+      multiple: false
+    });
+
+    frame.on('select', function () {
+      const attachment = frame.state().get('selection').first().toJSON();
+      const imageUrl = attachment.url || '';
+      const imageId = attachment.id || 0;
+
+      $('#pbsg_cover_image_id').val(imageId);
+      $('#pbsg_cover_image_url').val(imageUrl);
+
+      $('#pbsg_cover_preview')
+        .attr('src', imageUrl)
+        .show();
+    });
+
+    frame.open();
+  });
+
+  $(document).on('click', '#pbsg_clear_cover_image', function (e) {
+    e.preventDefault();
+
+    $('#pbsg_cover_image_id').val('');
+    $('#pbsg_cover_image_url').val('');
+    $('#pbsg_cover_preview')
+      .attr('src', '')
+      .hide();
+  });
+
+
+
+
 });
 
 
