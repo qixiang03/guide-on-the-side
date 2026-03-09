@@ -102,7 +102,6 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 .pbsg-left {
   width: 35% !important;
   min-width: 360px !important;
-  border-right: 1px solid rgba(0, 0, 0, 0.12) !important;
   background: #fff !important;
 
   /* Allow inner flex children to size properly */
@@ -195,10 +194,6 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 }
 
 .pbsg-menu-text{
-  font-size: 18px !important;
-}
-
-.pbsg-menu-icon{
   font-size: 18px !important;
 }
 

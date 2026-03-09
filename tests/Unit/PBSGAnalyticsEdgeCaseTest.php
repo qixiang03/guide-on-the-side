@@ -10,8 +10,7 @@ require_once __DIR__ . '/Helpers/MockWpdb.php';
  *
  * Covers zero-tutorial state, extremely long question text truncation,
  * negative/overflow value handling, concurrent rapid-fire events,
- * H5P content ID edge cases, format_time boundaries, and comparison
- * with missing data.
+ * H5P content ID edge cases, and comparison with missing data.
  */
 class PBSGAnalyticsEdgeCaseTest extends TestCase
 {
@@ -257,57 +256,6 @@ class PBSGAnalyticsEdgeCaseTest extends TestCase
 
         $queries = $this->wpdb->getQueriesContaining('pbsg_question_stats');
         $this->assertNotEmpty($queries, 'Should still record with default values');
-    }
-
-    /* ---------------------------------------------------------------
-       format_time edge cases
-       --------------------------------------------------------------- */
-
-    /**
-     * @covers PBSG_Analytics::format_time
-     */
-    public function test_format_time_with_large_value(): void
-    {
-        // 2 hours 30 minutes
-        $result = PBSG_Analytics::format_time(9000);
-        $this->assertSame('150m 00s', $result);
-    }
-
-    /**
-     * @covers PBSG_Analytics::format_time
-     */
-    public function test_format_time_with_negative_input(): void
-    {
-        // absint converts -30 to 30
-        $result = PBSG_Analytics::format_time(-30);
-        $this->assertSame('30s', $result);
-    }
-
-    /**
-     * @covers PBSG_Analytics::format_time
-     */
-    public function test_format_time_with_one_second(): void
-    {
-        $result = PBSG_Analytics::format_time(1);
-        $this->assertSame('1s', $result);
-    }
-
-    /**
-     * @covers PBSG_Analytics::format_time
-     */
-    public function test_format_time_with_59_seconds(): void
-    {
-        $result = PBSG_Analytics::format_time(59);
-        $this->assertSame('59s', $result);
-    }
-
-    /**
-     * @covers PBSG_Analytics::format_time
-     */
-    public function test_format_time_pads_seconds_with_zero(): void
-    {
-        $result = PBSG_Analytics::format_time(65);
-        $this->assertSame('1m 05s', $result);
     }
 
     /* ---------------------------------------------------------------

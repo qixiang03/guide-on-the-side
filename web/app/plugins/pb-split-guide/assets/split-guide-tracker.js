@@ -347,54 +347,56 @@
      * We observe step changes by watching the URL hash or the step indicator.
      */
     function hookNavigation() {
-        // Strategy 1: Listen for hashchange (template uses location.hash)
-        window.addEventListener( 'hashchange', function() {
-            const hash      = window.location.hash;
-            const stepMatch = hash.match( /step-(\d+)/ );
-            if ( stepMatch ) {
-                const newStep = parseInt( stepMatch[1], 10 ) - 1; // Convert to 0-indexed
-                if ( newStep !== session.currentStep ) {
-                    recordStepTransition( newStep );
-                }
-            }
-        } );
-
-        // Strategy 2: MutationObserver on step indicator (fallback)
-        const stepIndicator = document.querySelector( '.split-guide-step-indicator, [data-current-step]' );
+        // Strategy 1: MutationObserver on progress indicator.
+        // split-guide.js render() updates #pbsgProgress with "Page: X of Y".
+        var stepIndicator = document.getElementById( 'pbsgProgress' ) ||
+                            document.getElementById( 'pbsgProgressLabel' );
         if ( stepIndicator ) {
-            const observer = new MutationObserver( function( mutations ) {
-                mutations.forEach( function( mutation ) {
-                    if ( mutation.type === 'childList' || mutation.type === 'characterData' ) {
-                        const text  = stepIndicator.textContent || '';
-                        const match = text.match( /(\d+)\s*\/\s*(\d+)/ );
-                        if ( match ) {
-                            const newStep = parseInt( match[1], 10 ) - 1;
-                            if ( newStep !== session.currentStep ) {
-                                recordStepTransition( newStep );
-                            }
-                        }
-                    }
-                } );
-            } );
-            observer.observe( stepIndicator, { childList: true, characterData: true, subtree: true } );
-        }
-
-        // Strategy 3: Direct button interception
-        document.addEventListener( 'click', function( e ) {
-            const btn = e.target.closest( '.split-guide-prev, .split-guide-next, [data-step-nav]' );
-            if ( ! btn ) return;
-
-            // Small delay to let the template's own handler update state
-            setTimeout( function() {
-                const hash      = window.location.hash;
-                const stepMatch = hash.match( /step-(\d+)/ );
-                if ( stepMatch ) {
-                    const newStep = parseInt( stepMatch[1], 10 ) - 1;
+            var observer = new MutationObserver( function() {
+                var text  = stepIndicator.textContent || '';
+                var match = text.match( /(\d+)\s*(?:\/|of)\s*(\d+)/ );
+                if ( match ) {
+                    var newStep = parseInt( match[1], 10 ) - 1;
                     if ( newStep !== session.currentStep ) {
                         recordStepTransition( newStep );
                     }
                 }
+            } );
+            observer.observe( stepIndicator, { childList: true, characterData: true, subtree: true } );
+        }
+
+        // Strategy 2: Direct button interception (prev/next and menu items).
+        document.addEventListener( 'click', function( e ) {
+            var btn = e.target.closest( '#pbsgPrev, #pbsgNext, .pbsg-menu-item, [data-step-nav]' );
+            if ( ! btn ) return;
+
+            // Small delay to let the template's own handler update state
+            setTimeout( function() {
+                var progressEl = document.getElementById( 'pbsgProgress' ) ||
+                                 document.getElementById( 'pbsgProgressLabel' );
+                if ( progressEl ) {
+                    var text  = progressEl.textContent || '';
+                    var match = text.match( /(\d+)\s*(?:\/|of)\s*(\d+)/ );
+                    if ( match ) {
+                        var newStep = parseInt( match[1], 10 ) - 1;
+                        if ( newStep !== session.currentStep ) {
+                            recordStepTransition( newStep );
+                        }
+                    }
+                }
             }, 50 );
+        } );
+
+        // Strategy 3: Listen for hashchange (fallback if template uses hashes)
+        window.addEventListener( 'hashchange', function() {
+            var hash      = window.location.hash;
+            var stepMatch = hash.match( /step-(\d+)/ );
+            if ( stepMatch ) {
+                var newStep = parseInt( stepMatch[1], 10 ) - 1;
+                if ( newStep !== session.currentStep ) {
+                    recordStepTransition( newStep );
+                }
+            }
         } );
     }
 
