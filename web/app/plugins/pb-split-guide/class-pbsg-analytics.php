@@ -288,10 +288,11 @@ class PBSG_Analytics {
         $daily = $wpdb->prefix . self::TABLE_DAILY_STATS;
         $today = current_time( 'Y-m-d' );
 
-        // Get existing step_views JSON and merge
+        // Find today's row for this tutorial (any device type)
         $row = $wpdb->get_row( $wpdb->prepare(
             "SELECT id, step_views FROM {$daily}
-             WHERE stat_date = %s AND tutorial_page_id = %d AND device_type = 'desktop'",
+             WHERE stat_date = %s AND tutorial_page_id = %d
+             ORDER BY view_count DESC LIMIT 1",
             $today, $tutorial_id
         ) );
 
@@ -314,6 +315,19 @@ class PBSG_Analytics {
                 array( 'id' => $row->id ),
                 array( '%s' ),
                 array( '%d' )
+            );
+        } else {
+            // No daily row yet — create one so step data isn't lost
+            $device = self::detect_device();
+            $wpdb->insert(
+                $daily,
+                array(
+                    'stat_date'        => $today,
+                    'tutorial_page_id' => $tutorial_id,
+                    'device_type'      => $device,
+                    'step_views'       => wp_json_encode( $step_views ),
+                ),
+                array( '%s', '%d', '%s', '%s' )
             );
         }
     }
@@ -645,10 +659,21 @@ class PBSG_Analytics {
             ? round( $total_giveups / $total_completions * 100, 1 )
             : 0;
 
+        // Step names from tutorial post meta
+        $step_names = array();
+        $steps_json = get_post_meta( $tutorial_id, '_pbsg_steps_json', true );
+        $steps_data = $steps_json ? json_decode( $steps_json, true ) : array();
+        if ( is_array( $steps_data ) ) {
+            foreach ( $steps_data as $idx => $step ) {
+                $step_names[ 'step_' . $idx ] = ! empty( $step['title'] ) ? $step['title'] : '';
+            }
+        }
+
         return array(
             'stats'       => $stats,
             'daily_views' => $daily_views,
             'step_dwell'  => $step_dwell,
+            'step_names'  => $step_names,
             'questions'   => $questions,
             'giveup_rate' => $giveup_rate,
             'date_scope'  => array(
@@ -1096,16 +1121,4 @@ class PBSG_Analytics {
         return true;
     }
 
-    /**
-     * Format seconds into human-readable time string.
-     */
-    public static function format_time( $seconds ) {
-        $seconds = absint( $seconds );
-        if ( $seconds < 60 ) {
-            return $seconds . 's';
-        }
-        $minutes = floor( $seconds / 60 );
-        $secs    = $seconds % 60;
-        return $minutes . 'm ' . str_pad( $secs, 2, '0', STR_PAD_LEFT ) . 's';
-    }
 }

@@ -555,6 +555,13 @@ if (!function_exists('esc_url')) {
     }
 }
 
+if (!function_exists('add_shortcode')) {
+    function add_shortcode(string $tag, callable $callback): void
+    {
+        WPStubs::record('add_shortcode', [$tag, $callback]);
+    }
+}
+
 if (!function_exists('add_menu_page')) {
     function add_menu_page(string $page_title, string $menu_title, string $capability, string $menu_slug, callable $callback = null, string $icon_url = '', ?int $position = null): string
     {

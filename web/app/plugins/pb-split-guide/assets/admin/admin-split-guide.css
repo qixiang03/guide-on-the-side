@@ -20,9 +20,6 @@
   white-space: nowrap;
 }
 
-/* Keep table stable */
-#pbsg-steps-table { table-layout: fixed; width: 100%; }
-
 /* Column widths (1=title, 2=H5P, 3=tutorial, 4=remove) */
 #pbsg-steps-table th:nth-child(2),
 #pbsg-steps-table td:nth-child(2) { width: 240px; }  /* H5P column */
