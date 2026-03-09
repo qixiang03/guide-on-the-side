@@ -9,6 +9,10 @@ const fallbackLink = document.getElementById('pbsgFallbackLink');
 const prevBtn = document.getElementById('pbsgPrev');
 const nextBtn = document.getElementById('pbsgNext');
 
+const introScreen = document.getElementById('pbsgIntroScreen');
+const mainContent = document.getElementById('pbsgMainContent');
+const startTutorialBtn = document.getElementById('pbsgStartTutorial');
+
 
 // --------------------
 // Menu (step list) in quiz pane
@@ -166,6 +170,9 @@ function attachH5PWatcher(stepIndex){
     if (!doc || !doc.body) return false;
 
     const check = () => {
+
+      // count each attempt
+        attemptCounts[stepIndex] = (attemptCounts[stepIndex] || 0) + 1;
       // 1) Update pass/fail for THIS step
       if (isH5PCorrect(doc)) {
         passedSteps.add(stepIndex);
@@ -173,13 +180,9 @@ function attachH5PWatcher(stepIndex){
         passedSteps.delete(stepIndex);
       }
 
-      // 2) Next gating (only if not last page)
+     
       const isLast = (i === steps.length - 1);
-      if (!isLast) {
-        lockNext(!passedSteps.has(stepIndex)); // lock next until correct
-      } else {
-        lockNext(true); // last page never has next
-      }
+      lockNext(!passedSteps.has(stepIndex));
 
       // 3) Update certificate button
       updateCertificateGate();
@@ -212,7 +215,11 @@ const progressLabelEl = document.getElementById('pbsgProgressLabel');
 const certBox = document.getElementById('pbsgCertificate');
 const certNameInput = document.getElementById('pbsgCertName');
 const certBtn = document.getElementById('pbsgCertDownload');
+const summaryCertBtn = document.getElementById('pbsgSummaryCertDownload');
+const summaryCertName = document.getElementById('pbsgSummaryCertName');
 const certHint = document.getElementById('pbsgCertHint');
+const finalGradeEl = document.getElementById('pbsgFinalGrade');
+const retakeBtn = document.getElementById('pbsgRetakeTutorial');
 
 function lockCert(locked, msg){
   if (!certBtn) return;
@@ -236,6 +243,35 @@ function passedQuizStepsCount(){
 
 function allQuizzesPassed(){
   return passedQuizStepsCount() === requiredQuizStepsCount();
+}
+
+function getFinalGradePercent(){
+  const total = requiredQuizStepsCount();
+  const passed = passedQuizStepsCount();
+
+  if (total === 0) return 100;
+
+  return ((passed / total) * 100).toFixed(2);
+}
+
+function resetTutorialToStart(){
+  const summaryScreen = document.getElementById('pbsgSummaryScreen');
+
+  if (summaryScreen) summaryScreen.style.display = 'none';
+
+  i = 0;
+
+  if (hasIntroScreen()) {
+    if (introScreen) introScreen.style.display = '';
+    if (mainContent) mainContent.style.display = 'none';
+  } else {
+    if (mainContent) mainContent.style.display = '';
+    render();
+  }
+}
+
+function hasIntroScreen(){
+  return !!introScreen;
 }
 
 function updateCertificateGate(){
@@ -268,6 +304,11 @@ function updateCertificateGate(){
 let certMarked = false;
 
 let i = 0;
+
+let attemptCounts = {};
+steps.forEach((_, idx) => {
+  attemptCounts[idx] = 0;
+});
 
 async function markCompletedOnce(){
   if (!window.PBSG_CERT?.isLoggedIn) return;
@@ -411,16 +452,10 @@ function render(){
 
   prevBtn.disabled = i === 0;
 
-  const isLast = (i === steps.length - 1);
-
-  if (isLast) {
-    lockNext(true); // last page: no next
+  if (step.h5p_id) {
+    lockNext(!passedSteps.has(i));
   } else {
-    if (step.h5p_id) {
-      lockNext(true); // will be unlocked by watcher when correct
-    } else {
-      lockNext(false);
-    }
+    lockNext(false);
   }
 
   // IMPORTANT: if this step has a quiz, attach watcher even on last page
@@ -442,7 +477,15 @@ function render(){
 }
 
 prevBtn.onclick = ()=>{ if(i>0){i--;render();} };
-nextBtn.onclick = ()=>{ if(i<steps.length-1){i++;render();} };
+
+nextBtn.onclick = ()=>{
+  if(i < steps.length - 1){
+    i++;
+    render();
+  } else {
+    showSummaryScreen();
+  }
+};
 
 if (certBtn) {
   certBtn.onclick = () => {
@@ -460,6 +503,28 @@ if (certBtn) {
     if (name) u.searchParams.set('name', name);
 
     window.location.href = u.toString();
+  };
+}
+
+if(summaryCertBtn){
+  summaryCertBtn.onclick = () => {
+
+    const name = (summaryCertName?.value || '').trim();
+
+    const u = new URL(window.PBSG_CERT.ajaxUrl, location.origin);
+    u.searchParams.set('action', 'pbsg_download_certificate');
+    u.searchParams.set('tutorial_id', String(window.PBSG_CERT.tutorialId));
+    u.searchParams.set('nonce', window.PBSG_CERT.nonce);
+
+    if(name) u.searchParams.set('name', name);
+
+    window.location.href = u.toString();
+  };
+}
+
+if (retakeBtn) {
+  retakeBtn.onclick = () => {
+    resetTutorialToStart();
   };
 }
 
@@ -490,6 +555,70 @@ focusQuizBtn.onclick = ()=>toggleFocus('quiz');
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') clearFocus();
 });
+
+if (startTutorialBtn && introScreen && mainContent) {
+  startTutorialBtn.onclick = () => {
+    introScreen.style.display = 'none';
+    mainContent.style.display = '';
+  };
+}
+
+function getFinalGradePercent(){
+  const total = requiredQuizStepsCount();
+  const passed = passedQuizStepsCount();
+
+  if (total === 0) return 100;
+
+  return ((passed / total) * 100).toFixed(2);
+}
+
+function resetTutorialToStart(){
+  const summaryScreen = document.getElementById('pbsgSummaryScreen');
+
+  if (summaryScreen) summaryScreen.style.display = 'none';
+
+  i = 0;
+
+  if (hasIntroScreen()) {
+    if (introScreen) introScreen.style.display = '';
+    if (mainContent) mainContent.style.display = 'none';
+  } else {
+    if (mainContent) mainContent.style.display = '';
+    render();
+  }
+}
+
+function hasIntroScreen(){
+  return !!introScreen;
+}
+
+function showSummaryScreen(){
+
+  const mainContent = document.getElementById('pbsgMainContent');
+  const summaryScreen = document.getElementById('pbsgSummaryScreen');
+  const attemptBox = document.getElementById('pbsgAttemptSummary');
+
+  if(mainContent) mainContent.style.display = 'none';
+  if(summaryScreen) summaryScreen.style.display = '';
+
+  if(attemptBox){
+    let html = '<ul>';
+
+    steps.forEach((step, idx)=>{
+      const tries = attemptCounts[idx] || 0;
+      const label = step.title || `Question ${idx+1}`;
+      html += `<li><strong>${label}</strong>: tried ${tries} time${tries===1?'':'s'}</li>`;
+    });
+
+    html += '</ul>';
+    attemptBox.innerHTML = html;
+  }
+
+  if (finalGradeEl) {
+    const grade = getFinalGradePercent();
+    finalGradeEl.innerHTML = `<p><strong>Final Grade:</strong> ${grade}%</p>`;
+  }
+}
 
 bindMenu();
 render();
