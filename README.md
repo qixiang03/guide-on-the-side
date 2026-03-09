@@ -30,11 +30,11 @@ Built for **UPEI Library** as a free, accessible, PIPEDA-compliant alternative t
 
 | Name | Role | Focus Areas |
 |------|------|-------------|
-| Qi Xiang Phang | Communication Rep & Developer | Analytics, dashboard, documentation |
-| Daniel McGrath | Tech Lead | Deployment, backup/versioning, tutorial storage |
+| Qi Xiang Phang | Communication Rep, Developer | Analytics, dashboard, documentation |
+| Daniel McGrath | Tech Lead, Developer | Deployment, backup/versioning, tutorial storage |
 | Yang Guo (Cindy) | Developer | Admin UI, multi-source embeds, H5P integration, certificates |
 | Xiaohan Yu (Reagan) | Developer | CI/CD, testing framework, automated reporting |
-| Caleb Jones | Developer | Accessibility audits, WCAG compliance, custom themes |
+| Caleb Jones | Team Lead, Developer | Accessibility audits, WCAG compliance, custom themes |
 
 ### Past Contributors
 
