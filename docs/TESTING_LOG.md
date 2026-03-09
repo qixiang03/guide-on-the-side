@@ -346,12 +346,6 @@ server-side utility (now client-side). Cleaned up legacy code and stale CSS rule
    - Expected: Plugin file contains only active, used code. No stale CSS rules in asset files.
    - Result: PASS
 
-7. **CI Merge Regression — Auto-Merge Conflict**
-   - Input/Action: Open PR from `develop` to `main`. Git auto-merges `pb-split-guide.php` without textual conflict, but silently re-introduces `main`'s removed code (cover image fields, role filters, permission methods).
-   - Expected: Tests detect the regression — 3 smoke tests fail: hook count (4 filters vs expected 2), `update_post_meta` call count (4 vs expected 2), and `enqueue_assets` template guard (style enqueued before template check).
-   - Result: FAIL (expected — confirms tests correctly catch the merge issue)
-   - Resolution: Requires explicit merge of `main` into `develop` to resolve the semantic conflict before the PR merge will pass CI.
-
 ### **3. Verification Evidence**
 
 - Local Run: 195 tests, 407 assertions, 0 failures (PHPUnit 9.6.34, PHP 8.3, 0.145s)
