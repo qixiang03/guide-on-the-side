@@ -36,6 +36,15 @@ if (!is_array($steps)) $steps = [];
 $note  = get_post_meta($page_id, '_pbsg_header_note', true);
 $title = get_the_title($page_id);
 
+
+$intro_raw = get_post_field('post_content', $page_id);
+$intro_html = apply_filters('the_content', $intro_raw);
+$has_intro = trim(wp_strip_all_tags($intro_raw)) !== '';
+
+
+
+
+
 $ajax_url = admin_url('admin-ajax.php');
 
 // Enrich tutorial data
@@ -78,10 +87,31 @@ foreach ($steps as $s) {
     <h1 class="pbsg-title"><?php echo esc_html($title); ?></h1>
   </div>
 
-<?php if (empty($steps_enriched)): ?>
+<?php if (empty($steps_enriched) && !$has_intro): ?>
   <p>No steps configured.</p>
 <?php else: ?>
 
+  <?php if ($has_intro): ?>
+    <div id="pbsgIntroScreen" class="pbsg-intro-screen">
+      <div class="pbsg-intro-card">
+        <div class="pbsg-intro-content">
+          <?php echo $intro_html; ?>
+        </div>
+
+        <div class="pbsg-intro-actions">
+          <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
+            Start Tutorial
+          </button>
+        </div>
+      </div>
+    </div>
+  <?php endif; ?>
+
+<div
+  class="pbsg-main-content"
+  id="pbsgMainContent"
+  <?php if ($has_intro) echo 'style="display:none;"'; ?>
+>
 <div class="pbsg-container">
 
   <!-- LEFT: QUIZ -->
@@ -163,7 +193,7 @@ foreach ($steps as $s) {
       <a id="pbsgFallbackLink" href="#" target="_blank">Open file in new tab</a>
     </div>
 
-    <div class="pbsg-certificate" id="pbsgCertificate" style="display:none;">
+    <!-- <div class="pbsg-certificate" id="pbsgCertificate" style="display:none;">
       <?php if ($is_logged_in): ?>
         <div class="pbsg-certificate-inner">
           <div class="pbsg-certificate-title"><strong>Certificate</strong></div>
@@ -180,7 +210,7 @@ foreach ($steps as $s) {
           <strong>Certificate</strong> — Please log in to download your certificate.
         </div>
       <?php endif; ?>
-    </div>
+    </div> -->
 
   </section>
 
@@ -214,6 +244,44 @@ window.PBSG_CERT = {
   const steps = <?php echo wp_json_encode($steps_enriched); ?>;
   const ajaxUrl = <?php echo wp_json_encode($ajax_url); ?>;
 </script>
+
+</div> <!-- /.pbsg-main-content -->
+
+
+<div id="pbsgSummaryScreen" class="pbsg-summary-screen" style="display:none;">
+  <div class="pbsg-summary-card">
+
+    <h2 class="pbsg-summary-title">Tutorial Summary</h2>
+
+    <div class="pbsg-summary-message">
+      <p>You have completed this tutorial.</p>
+    </div>
+
+    <div id="pbsgAttemptSummary" class="pbsg-attempt-summary"></div>
+
+    <div id="pbsgFinalGrade" class="pbsg-final-grade"></div>
+
+    <?php if ($is_logged_in): ?>
+      <div class="pbsg-summary-actions">
+        <input id="pbsgSummaryCertName" type="text" placeholder="Name on certificate (optional)" />
+        <button type="button" class="button button-primary" id="pbsgSummaryCertDownload">
+          Download Certificate (PDF)
+        </button>
+        <button type="button" class="button" id="pbsgRetakeTutorial">
+          Retake Tutorial
+        </button>
+      </div>
+    <?php else: ?>
+      <div class="pbsg-summary-actions">
+        <p>Please log in to download your certificate.</p>
+        <button type="button" class="button" id="pbsgRetakeTutorial">
+          Retake Tutorial
+        </button>
+      </div>
+    <?php endif; ?>
+
+  </div>
+</div>
 
 <?php endif; ?>
 </div>
