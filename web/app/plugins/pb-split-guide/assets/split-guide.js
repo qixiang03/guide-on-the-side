@@ -87,6 +87,8 @@ window.pbsgGoToStep = function(index){
 // --------------------
 const passedSteps = new Set(); // remember which steps are already correct
 let h5pObs = null;
+let h5pClickHandler = null;
+let h5pBoundDoc = null;
 
 function lockNext(locked){
   if (!nextBtn) return;
@@ -144,6 +146,28 @@ function isH5PCorrect(doc){
   return false;
 }
 
+
+function isCheckButton(el){
+  if (!el) return false;
+
+  const text = (el.innerText || el.textContent || el.value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  const cls = (el.className || '').toString().toLowerCase();
+
+  // Match common H5P check buttons
+  if (cls.includes('check-answer')) return true;
+  if (cls.includes('h5p-question-check-answer')) return true;
+
+  // Match visible button text
+  if (text === 'check') return true;
+  if (text === 'check answer') return true;
+
+  return false;
+}
+
 function attachH5PWatcher(stepIndex){
   // If no quiz in this step, no gating needed
   if (!h5pFrame || !steps[stepIndex]?.h5p_id) {
@@ -155,6 +179,15 @@ function attachH5PWatcher(stepIndex){
   if (h5pObs) {
     try { h5pObs.disconnect(); } catch(e) {}
     h5pObs = null;
+  }
+
+  // Remove old click handler from previous iframe doc
+  if (h5pBoundDoc && h5pClickHandler) {
+    try {
+      h5pBoundDoc.removeEventListener('click', h5pClickHandler, true);
+    } catch (e) {}
+    h5pBoundDoc = null;
+    h5pClickHandler = null;
   }
 
   const tryAttach = () => {
@@ -169,43 +202,55 @@ function attachH5PWatcher(stepIndex){
 
     if (!doc || !doc.body) return false;
 
-    const check = () => {
-
-      // count each attempt
-        attemptCounts[stepIndex] = (attemptCounts[stepIndex] || 0) + 1;
-      // 1) Update pass/fail for THIS step
+    const updatePassState = () => {
       if (isH5PCorrect(doc)) {
         passedSteps.add(stepIndex);
       } else {
         passedSteps.delete(stepIndex);
       }
 
-     
-      const isLast = (i === steps.length - 1);
       lockNext(!passedSteps.has(stepIndex));
-
-      // 3) Update certificate button
       updateCertificateGate();
     };
 
-    // Run once now
-    check();
+    // Initial status only: DO NOT count here
+    updatePassState();
 
-    // Observe changes after "Check"
-    h5pObs = new MutationObserver(check);
+    // Count only real clicks on the H5P Check button
+    h5pClickHandler = (e) => {
+      const btn = e.target && e.target.closest
+        ? e.target.closest('button, input[type="button"], input[type="submit"]')
+        : null;
+
+      if (!btn) return;
+      if (!isCheckButton(btn)) return;
+
+      attemptCounts[stepIndex] = (attemptCounts[stepIndex] || 0) + 1;
+
+      // Wait a moment for H5P to update the result after clicking Check
+      setTimeout(() => {
+        updatePassState();
+      }, 150);
+    };
+
+    doc.addEventListener('click', h5pClickHandler, true);
+    h5pBoundDoc = doc;
+
+    // Keep pass/fail state updated when H5P redraws result UI
+    h5pObs = new MutationObserver(() => {
+      updatePassState();
+    });
     h5pObs.observe(doc.body, { childList: true, subtree: true, attributes: true });
 
     return true;
   };
 
-  // iframe loads async: retry attach
   let tries = 0;
   const timer = setInterval(() => {
     tries++;
     if (tryAttach() || tries > 30) clearInterval(timer);
   }, 300);
 }
-
 
 const titleEl = document.getElementById('pbsgStepTitle');
 const progressEl = document.getElementById('pbsgProgress');
@@ -260,6 +305,13 @@ function resetTutorialToStart(){
   if (summaryScreen) summaryScreen.style.display = 'none';
 
   i = 0;
+
+  certMarked = false;
+
+  steps.forEach((step, idx) => {
+    attemptCounts[idx] = 0;
+    passedSteps.delete(idx);
+  });
 
   if (hasIntroScreen()) {
     if (introScreen) introScreen.style.display = '';
@@ -558,8 +610,13 @@ document.addEventListener('keydown',e=>{
 
 if (startTutorialBtn && introScreen && mainContent) {
   startTutorialBtn.onclick = () => {
+    i = 0;
+    clearFocus();
+
     introScreen.style.display = 'none';
     mainContent.style.display = '';
+
+    render();
   };
 }
 
@@ -570,22 +627,6 @@ function getFinalGradePercent(){
   if (total === 0) return 100;
 
   return ((passed / total) * 100).toFixed(2);
-}
-
-function resetTutorialToStart(){
-  const summaryScreen = document.getElementById('pbsgSummaryScreen');
-
-  if (summaryScreen) summaryScreen.style.display = 'none';
-
-  i = 0;
-
-  if (hasIntroScreen()) {
-    if (introScreen) introScreen.style.display = '';
-    if (mainContent) mainContent.style.display = 'none';
-  } else {
-    if (mainContent) mainContent.style.display = '';
-    render();
-  }
 }
 
 function hasIntroScreen(){
