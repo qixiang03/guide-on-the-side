@@ -362,44 +362,49 @@ steps.forEach((_, idx) => {
   attemptCounts[idx] = 0;
 });
 
-async function markCompletedOnce(){
-  if (!window.PBSG_CERT?.isLoggedIn) return;
-  if (certMarked) return;
-  certMarked = true;
+async function markCompletedOnce() {
+  if (!window.PBSG_CERT?.isLoggedIn) return false;
+  if (certMarked) return true;
 
   const form = new FormData();
   form.append('action', 'pbsg_mark_completed');
   form.append('tutorial_id', String(window.PBSG_CERT.tutorialId));
   form.append('nonce', window.PBSG_CERT.nonce);
 
-  try{
+  try {
     const res = await fetch(window.PBSG_CERT.ajaxUrl, {
       method: 'POST',
       body: form,
       credentials: 'same-origin',
     });
+
     const json = await res.json();
+
     if (!json?.success) {
       if (certHint) certHint.textContent = json?.data?.message || 'Unable to mark completed.';
-      return;
+      return false;
     }
-    if (certHint) certHint.textContent = 'Completion recorded. You can download your certificate.';
-  } catch(e){
+
+    certMarked = true;
+
+    if (certHint) {
+      certHint.textContent = 'Completion recorded. You can download your certificate.';
+    }
+
+    return true;
+  } catch (e) {
     if (certHint) certHint.textContent = 'Network error while saving completion.';
+    return false;
   }
 }
 
 
-async function finalizeCompletionIfReady(){
-  // Only mark completed when:
-  // - logged in
-  // - last step
-  // - all quizzes passed
-  if (!window.PBSG_CERT?.isLoggedIn) return;
-  if (i !== steps.length - 1) return;
-  if (!allQuizzesPassed()) return;
+async function finalizeCompletionIfReady() {
+  if (!window.PBSG_CERT?.isLoggedIn) return false;
+  if (i !== steps.length - 1) return false;
+  if (!allQuizzesPassed()) return false;
 
-  await markCompletedOnce();
+  return await markCompletedOnce();
 }
 
 
@@ -530,11 +535,12 @@ function render(){
 
 prevBtn.onclick = ()=>{ if(i>0){i--;render();} };
 
-nextBtn.onclick = ()=>{
-  if(i < steps.length - 1){
+nextBtn.onclick = async () => {
+  if (i < steps.length - 1) {
     i++;
     render();
   } else {
+    await finalizeCompletionIfReady();
     showSummaryScreen();
   }
 };
@@ -558,8 +564,14 @@ if (certBtn) {
   };
 }
 
-if(summaryCertBtn){
-  summaryCertBtn.onclick = () => {
+if (summaryCertBtn) {
+  summaryCertBtn.onclick = async () => {
+    const ok = await finalizeCompletionIfReady();
+
+    if (!ok) {
+      alert('Tutorial completion has not been recorded yet. Please make sure all quiz steps are passed.');
+      return;
+    }
 
     const name = (summaryCertName?.value || '').trim();
 
@@ -568,11 +580,12 @@ if(summaryCertBtn){
     u.searchParams.set('tutorial_id', String(window.PBSG_CERT.tutorialId));
     u.searchParams.set('nonce', window.PBSG_CERT.nonce);
 
-    if(name) u.searchParams.set('name', name);
+    if (name) u.searchParams.set('name', name);
 
     window.location.href = u.toString();
   };
 }
+
 
 if (retakeBtn) {
   retakeBtn.onclick = () => {
