@@ -38,6 +38,174 @@ class PB_Split_Guide_Plugin {
     add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
 
     add_action('wp_ajax_pbsg_list_h5p', [$this, 'ajax_list_h5p']);
+
+    // Rename "Pages" to "Tutorials" — use gettext filter (like Pressbooks does
+    // for "Sites" → "Books") so it works everywhere regardless of menu rebuild order.
+    if (function_exists('is_admin') && is_admin()) {
+      add_filter('gettext', [$this, 'rename_pages_to_tutorials_gettext'], 20, 3);
+      add_filter('ngettext', [$this, 'rename_pages_to_tutorials_ngettext'], 20, 5);
+    }
+
+    // Also patch the $menu globals after Pressbooks SideBar (priority 999)
+    add_action('admin_menu', [$this, 'rename_pages_menu_globals'], 1001);
+    add_action('network_admin_menu', [$this, 'rename_pages_menu_globals'], 1001);
+
+    // Reorder menu at the very last moment before rendering.
+    // The add_menu_classes filter fires AFTER uksort, usort, and all other
+    // menu processing — right before HTML output. Nothing can override this.
+    add_filter('add_menu_classes', [$this, 'reorder_admin_menu'], 1000);
+
+  }
+
+  /**
+   * Rename "Pages" strings to "Tutorials" via gettext filter.
+   * This mirrors how Pressbooks renames "Sites" to "Books".
+   */
+  public function rename_pages_to_tutorials_gettext($translated, $text, $domain) {
+    if (!is_admin()) return $translated;
+
+    $replacements = [
+      'Pages'                   => 'Tutorials',
+      'Page'                    => 'Tutorial',
+      'Add New Page'            => 'Add New Tutorial',
+      'Add Page'                => 'Add Tutorial',
+      'Edit Page'               => 'Edit Tutorial',
+      'New Page'                => 'New Tutorial',
+      'View Page'               => 'View Tutorial',
+      'View Pages'              => 'View Tutorials',
+      'Search Pages'            => 'Search Tutorials',
+      'All Pages'               => 'All Tutorials',
+      'No pages found.'         => 'No tutorials found.',
+      'No pages found in Trash.'=> 'No tutorials found in Trash.',
+      'Parent Page:'            => 'Parent Tutorial:',
+      'Parent Page'             => 'Parent Tutorial',
+      'Page Attributes'         => 'Tutorial Attributes',
+      'Page published.'         => 'Tutorial published.',
+      'Page updated.'           => 'Tutorial updated.',
+      'Page scheduled.'         => 'Tutorial scheduled.',
+      'Page draft updated.'     => 'Tutorial draft updated.',
+      'Page saved.'             => 'Tutorial saved.',
+      'Page submitted.'         => 'Tutorial submitted.',
+      'Page reverted to draft.' => 'Tutorial reverted to draft.',
+    ];
+
+    if (isset($replacements[$text])) {
+      return $replacements[$text];
+    }
+
+    return $translated;
+  }
+
+  /**
+   * Handle plural forms (ngettext) for Pages → Tutorials.
+   */
+  public function rename_pages_to_tutorials_ngettext($translated, $single, $plural, $number, $domain) {
+    if (!is_admin()) return $translated;
+
+    if ($single === '%s page' || $single === '%s Page') {
+      return sprintf(($number === 1) ? '%s Tutorial' : '%s Tutorials', $number);
+    }
+
+    return $translated;
+  }
+
+  /**
+   * Directly patch the $menu and $submenu globals after Pressbooks SideBar
+   * has finished rebuilding menus (priority 999).
+   * Also repositions Tutorial Analytics immediately after Tutorials.
+   */
+  public function rename_pages_menu_globals() {
+    global $menu, $submenu;
+
+    if (!is_array($menu)) return;
+
+    // Rename "Pages" in the top-level $menu array
+    foreach ($menu as &$item) {
+      if (isset($item[2]) && $item[2] === 'edit.php?post_type=page') {
+        $item[0] = 'Tutorials';
+        break;
+      }
+    }
+    unset($item);
+
+    // Rename submenu items
+    if (isset($submenu['edit.php?post_type=page']) && is_array($submenu['edit.php?post_type=page'])) {
+      foreach ($submenu['edit.php?post_type=page'] as &$sub) {
+        if ($sub[2] === 'edit.php?post_type=page') {
+          $sub[0] = 'All Tutorials';
+        } elseif ($sub[2] === 'post-new.php?post_type=page') {
+          $sub[0] = 'Add Tutorial';
+        }
+      }
+      unset($sub);
+    }
+
+    // Update the post type object labels
+    $post_type = get_post_type_object('page');
+    if ($post_type) {
+      $post_type->labels->name               = 'Tutorials';
+      $post_type->labels->singular_name      = 'Tutorial';
+      $post_type->labels->add_new            = 'Add Tutorial';
+      $post_type->labels->add_new_item       = 'Add New Tutorial';
+      $post_type->labels->edit_item          = 'Edit Tutorial';
+      $post_type->labels->new_item           = 'New Tutorial';
+      $post_type->labels->view_item          = 'View Tutorial';
+      $post_type->labels->view_items         = 'View Tutorials';
+      $post_type->labels->search_items       = 'Search Tutorials';
+      $post_type->labels->not_found          = 'No tutorials found';
+      $post_type->labels->not_found_in_trash = 'No tutorials found in Trash';
+      $post_type->labels->all_items          = 'All Tutorials';
+      $post_type->labels->menu_name          = 'Tutorials';
+      $post_type->labels->name_admin_bar     = 'Tutorial';
+    }
+
+  }
+
+  /**
+   * Reorder admin menu via the add_menu_classes filter.
+   * This fires as the absolute last filter before the sidebar HTML is rendered,
+   * after all uksort/usort processing. Nothing can override this.
+   *
+   * @param array $menu The full $menu array keyed by numeric positions.
+   * @return array Reordered menu array.
+   */
+  public function reorder_admin_menu($menu) {
+    if (!is_array($menu)) return $menu;
+
+    $analytics_slug = 'pbsg-analytics';
+    $pages_slug     = 'edit.php?post_type=page';
+
+    // Find analytics item and its key
+    $analytics_key  = null;
+    $analytics_item = null;
+    $pages_key      = null;
+
+    foreach ($menu as $key => $item) {
+      if (isset($item[2]) && $item[2] === $analytics_slug) {
+        $analytics_key  = $key;
+        $analytics_item = $item;
+      }
+      if (isset($item[2]) && $item[2] === $pages_slug) {
+        $pages_key = $key;
+      }
+    }
+
+    // Only reorder if both exist
+    if ($analytics_key === null || $pages_key === null) return $menu;
+
+    // Remove analytics from current position
+    unset($menu[$analytics_key]);
+
+    // Rebuild as a sequential array, inserting analytics right after pages
+    $new_menu = [];
+    foreach ($menu as $key => $item) {
+      $new_menu[] = $item;
+      if ($key === $pages_key) {
+        $new_menu[] = $analytics_item;
+      }
+    }
+
+    return $new_menu;
   }
 
   public function register_page_template($templates) {
