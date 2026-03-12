@@ -177,6 +177,74 @@ if (!function_exists('delete_post_meta')) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  User stubs (certificate tests)                                     */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('is_user_logged_in')) {
+    function is_user_logged_in(): bool
+    {
+        return (bool) WPStubs::returnFor('is_user_logged_in', false);
+    }
+}
+
+if (!function_exists('get_current_user_id')) {
+    function get_current_user_id(): int
+    {
+        return (int) WPStubs::returnFor('get_current_user_id', 0);
+    }
+}
+
+if (!function_exists('get_user_meta')) {
+    function get_user_meta(int $user_id, string $key = '', bool $single = false)
+    {
+        WPStubs::record('get_user_meta', [$user_id, $key, $single]);
+        $storage = WPStubs::returnFor('user_meta_storage', []);
+        if (!is_array($storage)) {
+            return $single ? '' : [];
+        }
+        $userMap = $storage[$user_id] ?? [];
+        $val     = $userMap[$key] ?? ($single ? '' : []);
+        return $single ? $val : [$val];
+    }
+}
+
+if (!function_exists('update_user_meta')) {
+    function update_user_meta(int $user_id, string $meta_key, $meta_value, $prev_value = '')
+    {
+        WPStubs::record('update_user_meta', [$user_id, $meta_key, $meta_value, $prev_value]);
+        if (!isset(WPStubs::$returns['user_meta_storage'])) {
+            WPStubs::$returns['user_meta_storage'] = [];
+        }
+        if (!isset(WPStubs::$returns['user_meta_storage'][$user_id])) {
+            WPStubs::$returns['user_meta_storage'][$user_id] = [];
+        }
+        WPStubs::$returns['user_meta_storage'][$user_id][$meta_key] = $meta_value;
+        return true;
+    }
+}
+
+if (!function_exists('get_userdata')) {
+    function get_userdata(int $user_id)
+    {
+        WPStubs::record('get_userdata', [$user_id]);
+        $obj = WPStubs::returnFor('get_userdata', null);
+        return $obj;
+    }
+}
+
+if (!function_exists('date_i18n')) {
+    function date_i18n(string $format, $timestamp = false, bool $gmt = false): string
+    {
+        WPStubs::record('date_i18n', [$format, $timestamp, $gmt]);
+        $override = WPStubs::returnFor('date_i18n', null);
+        if ($override !== null) {
+            return (string) $override;
+        }
+        return $timestamp ? date($format, (int) $timestamp) : date($format);
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Nonce / capability stubs                                          */
 /* ------------------------------------------------------------------ */
 
@@ -522,6 +590,13 @@ if (!function_exists('get_post')) {
 /*  Misc stubs (analytics, dashboard, i18n)                           */
 /* ------------------------------------------------------------------ */
 
+if (!function_exists('nocache_headers')) {
+    function nocache_headers(): void
+    {
+        WPStubs::record('nocache_headers', []);
+    }
+}
+
 if (!function_exists('wp_die')) {
     function wp_die($message = '', $title = '', $args = []): void
     {
@@ -546,6 +621,13 @@ if (!function_exists('__')) {
     function __(string $text, string $domain = 'default'): string
     {
         return $text;
+    }
+}
+
+if (!function_exists('esc_html__')) {
+    function esc_html__(string $text, string $domain = 'default'): string
+    {
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 }
 

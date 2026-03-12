@@ -115,6 +115,18 @@ class MockWpdb
     }
 
     /**
+     * Mock get_var() — returns preset single value (e.g. for SHOW TABLES LIKE).
+     */
+    public function get_var(string $query = null, int $x = 0, int $y = 0)
+    {
+        $this->calls[] = ['method' => 'get_var', 'args' => [$query, $x, $y]];
+        if ($query !== null) {
+            $this->queries[] = $query;
+        }
+        return $this->findReturn('get_var', $query ?? '', null);
+    }
+
+    /**
      * Mock insert() — records insert call.
      */
     public function insert(string $table, array $data, $format = null)

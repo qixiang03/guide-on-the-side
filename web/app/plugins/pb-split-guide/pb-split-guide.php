@@ -26,6 +26,7 @@ class PB_Split_Guide_Plugin {
   // Meta keys
   const META_STEPS = '_pbsg_steps_json';
   const META_NOTE  = '_pbsg_header_note';
+  const META_COVER_ID = '_pbsg_cover_image_id';
 
   public function __construct() {
     add_filter('theme_page_templates', [$this, 'register_page_template']);
@@ -206,6 +207,7 @@ class PB_Split_Guide_Plugin {
     }
 
     return $new_menu;
+    add_action('admin_menu', [$this, 'register_admin_menu']);
   }
 
   public function register_page_template($templates) {
@@ -237,6 +239,76 @@ class PB_Split_Guide_Plugin {
     );
   }
 
+    public function register_admin_menu() {
+    add_menu_page(
+      __('My Tutorials', 'pb-split-guide'),
+      __('My Tutorials', 'pb-split-guide'),
+      'read',
+      'pbsg-my-tutorials',
+      [$this, 'render_my_tutorials_page'],
+      'dashicons-welcome-learn-more',
+      3
+    );
+  }
+
+  public function render_my_tutorials_page() {
+    if (!current_user_can('read')) {
+      wp_die(__('You do not have permission to view this page.', 'pb-split-guide'));
+    }
+
+    $tutorials = $this->get_my_tutorials_data();
+
+    $template = plugin_dir_path(__FILE__) . 'templates/admin-my-tutorials.php';
+
+    if (file_exists($template)) {
+      include $template;
+    } else {
+      echo '<div class="wrap"><h1>My Tutorials</h1><p>Template file not found.</p></div>';
+    }
+  }
+
+  private function get_my_tutorials_data() {
+    $tutorials = [];
+
+    $pages = get_posts([
+      'post_type'      => 'page',
+      'post_status'    => 'publish',
+      'posts_per_page' => -1,
+      'orderby'        => 'title',
+      'order'          => 'ASC',
+      'meta_key'       => '_wp_page_template',
+      'meta_value'     => self::TEMPLATE_SLUG,
+    ]);
+
+    if (empty($pages)) {
+      return $tutorials;
+    }
+
+    foreach ($pages as $page) {
+      $post_id = (int) $page->ID;
+
+      $cover_id  = (int) get_post_meta($post_id, self::META_COVER_ID, true);
+      $cover_url = '';
+
+      if ($cover_id) {
+        $cover_url = wp_get_attachment_image_url($cover_id, 'large');
+      }
+
+      if (!$cover_url) {
+        $cover_url = 'https://via.placeholder.com/1200x675?text=Tutorial';
+      }
+
+      $tutorials[] = [
+        'title'     => get_the_title($post_id),
+        'link'      => get_permalink($post_id),
+        'edit_link' => current_user_can('edit_post', $post_id) ? get_edit_post_link($post_id) : '',
+        'cover'     => $cover_url,
+      ];
+    }
+
+    return $tutorials;
+  }
+
   public function render_metabox($post) {
     wp_nonce_field('pbsg_save_meta', 'pbsg_nonce');
 
@@ -250,6 +322,8 @@ class PB_Split_Guide_Plugin {
     }
 
     $note = get_post_meta($post->ID, self::META_NOTE, true);
+    $cover_image_id  = (int) get_post_meta($post->ID, self::META_COVER_ID, true);
+    $cover_image_url = $cover_image_id ? wp_get_attachment_image_url($cover_image_id, 'large') : '';
     ?>
     <div class="pbsg-metabox">
       <p><strong>Steps</strong> (each step = one H5P quiz + one tutorial source)</p>
@@ -276,6 +350,46 @@ class PB_Split_Guide_Plugin {
              value="<?php echo esc_attr($steps_json); ?>" />
 
       <hr style="margin: 14px 0;" />
+
+      <hr style="margin: 14px 0;" />
+
+
+
+
+
+      <div class="pbsg-cover-image-box" style="max-width:560px;">
+  <p><strong>Tutorial Cover Image (optional)</strong></p>
+
+  <div style="margin-bottom:12px;">
+    <img
+      id="pbsg_cover_preview"
+      src="<?php echo esc_url($cover_image_url); ?>"
+      alt=""
+      style="max-width:320px; width:100%; height:auto; border:1px solid #dcdcde; display:<?php echo $cover_image_url ? 'block' : 'none'; ?>;"
+    />
+  </div>
+
+  <input
+    type="hidden"
+    id="pbsg_cover_image_id"
+    name="pbsg_cover_image_id"
+    value="<?php echo esc_attr($cover_image_id); ?>"
+  />
+
+  <input
+    type="hidden"
+    id="pbsg_cover_image_url"
+    value="<?php echo esc_attr($cover_image_url); ?>"
+  />
+
+  <p>
+    <button type="button" class="button" id="pbsg_pick_cover_image">Choose Cover Image</button>
+    <button type="button" class="button" id="pbsg_clear_cover_image">Clear Cover</button>
+  </p>
+
+  <p class="description">This image will be used on the My Tutorials overview page.</p>
+</div>
+
 
       <p>
         <label for="pbsg_header_note"><strong>Header Note (optional)</strong></label><br/>
@@ -309,6 +423,14 @@ class PB_Split_Guide_Plugin {
 
     $note = isset($_POST['pbsg_header_note']) ? sanitize_text_field($_POST['pbsg_header_note']) : '';
     update_post_meta($post_id, self::META_NOTE, $note);
+
+    $cover_image_id = isset($_POST['pbsg_cover_image_id']) ? absint($_POST['pbsg_cover_image_id']) : 0;
+
+    if ($cover_image_id > 0) {
+      update_post_meta($post_id, self::META_COVER_ID, $cover_image_id);
+    } else {
+      delete_post_meta($post_id, self::META_COVER_ID);
+    }
   }
 
   public function enqueue_assets() {

@@ -28,12 +28,18 @@ For each checkbox:
 
 ## Permissions & Stability
 
-- [ ] ✅/❌ Non-admin cannot access admin-only pages (TC-08)
-- [ ] ✅/❌ Invalid/empty inputs do not crash the system (TC-09)
+- [ ] ✅/❌ Non-admin cannot access admin-only pages (TC-07)
+- [ ] ✅/❌ Invalid/empty inputs do not crash the system (TC-08)
 
 ## Smoke Health
 
-- [ ] ✅/❌ Core pages load without fatal errors (TC-10)
+- [ ] ✅/❌ Core pages load without fatal errors (TC-09 / TC-10)
+
+## Analytics & Certificate
+
+- [ ] ✅/❌ Analytics dashboard loads and tabs work (TC-11)
+- [ ] ✅/❌ Tutorial completion is recorded for certificate (TC-12)
+- [ ] ✅/❌ Certificate PDF downloads after completion (TC-13)
 
 ---
 
