@@ -85,8 +85,8 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
 
     public function test_total_hook_count_matches_expected(): void
     {
-        $this->assertCount(2, WPStubs::$hooks['filter'], 'Expected 2 filters');
-        $this->assertCount(5, WPStubs::$hooks['action'], 'Expected 5 actions');
+        $this->assertCount(3, WPStubs::$hooks['filter'], 'Expected 3 filters');
+        $this->assertCount(7, WPStubs::$hooks['action'], 'Expected 7 actions');
     }
 
     /* =============================================================

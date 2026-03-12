@@ -463,11 +463,16 @@
 
 .pbsg-funnel-label {
     font-size: 13px;
-    width: 160px;
-    text-align: right;
+    flex: 0 0 160px;
+    text-align: left;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.pbsg-funnel-track {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .pbsg-funnel-bar {
@@ -487,7 +492,8 @@
 .pbsg-funnel-count {
     font-size: 13px;
     color: #888;
-    margin-left: 8px;
+    flex: 0 0 80px;
+    text-align: right;
     white-space: nowrap;
 }
 

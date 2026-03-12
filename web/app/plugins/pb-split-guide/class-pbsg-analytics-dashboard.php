@@ -26,7 +26,10 @@ class PBSG_Analytics_Dashboard {
      * Initialize admin hooks.
      */
     public static function init() {
-        add_action( 'admin_menu', array( __CLASS__, 'register_admin_menu' ) );
+        // Priority 1001 ensures this fires AFTER Pressbooks SideBar (priority 999)
+        // rebuilds menus, so our menu item isn't removed.
+        add_action( 'admin_menu', array( __CLASS__, 'register_admin_menu' ), 1001 );
+        add_action( 'network_admin_menu', array( __CLASS__, 'register_admin_menu' ), 1001 );
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
     }
 
