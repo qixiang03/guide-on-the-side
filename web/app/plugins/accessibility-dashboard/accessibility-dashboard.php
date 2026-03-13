@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Accessibility Dashboard
  * Description: Adds enhanced accessibility features with per-user customization
- * Version: 0.1.0
+ * Version: 1.0.0
  * Author: Team 8
  */
 
@@ -13,10 +13,19 @@ if (!defined('ABSPATH')) {
 class Pressbooks_Accessibility_Enhancer {
     
     public function __construct() {
+        // Try multiple hooks to register color schemes
+        add_action('after_setup_theme', array($this, 'register_admin_color_schemes'), 999);
+        add_action('admin_init', array($this, 'register_admin_color_schemes'), 999);
+        add_action('admin_head', array($this, 'register_admin_color_schemes'), 1);
+        
         // Standard WordPress hooks
         add_action('wp_head', array($this, 'add_accessibility_styles'), 999);
         add_action('wp_footer', array($this, 'enqueue_frontend_scripts'), 999);
         add_action('admin_head', array($this, 'add_accessibility_styles'), 999);
+        
+        // Enqueue custom fonts if selected
+        add_action('wp_enqueue_scripts', array($this, 'enqueue_custom_fonts'), 10);
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_custom_fonts'), 10);
         
         // Pressbooks-specific hooks
         add_action('pressbooks_head', array($this, 'add_accessibility_styles'), 999);
@@ -34,9 +43,87 @@ class Pressbooks_Accessibility_Enhancer {
         // Enqueue profile CSS and JS
         add_action('admin_enqueue_scripts', array($this, 'enqueue_profile_assets'));
         
+        // Set default color scheme for new users
+        add_action('user_register', array($this, 'set_default_admin_color'));
+        
+        
         // Pressbooks custom CSS filters
         add_filter('pb_pdf_css_override', array($this, 'add_pdf_accessibility'));
         add_filter('pb_epub_css_override', array($this, 'add_epub_accessibility'));
+    }
+    
+    /**
+     * Enqueue custom fonts from Google Fonts if UPEI Library Default is selected
+     */
+    public function enqueue_custom_fonts() {
+        $user_id = get_current_user_id();
+        $font_family = $user_id ? get_user_meta($user_id, 'ae_font_family', true) : 'default';
+        
+        if ($font_family === 'upei-default') {
+            wp_enqueue_style('ae-upei-fonts', 'https://fonts.googleapis.com/css2?family=Lusitana:wght@400;700&family=Roboto+Condensed:wght@400;700&family=Roboto:wght@400;700&display=swap', array(), null);
+        }
+    }
+
+    /**
+     * Register custom admin color schemes
+     */
+    public function register_admin_color_schemes() {
+        global $_wp_admin_css_colors;
+        
+        // Prevent duplicate registration
+        if (isset($_wp_admin_css_colors['upei-library'])) {
+            return;
+        }
+        
+        $plugin_url = plugin_dir_url(__FILE__);
+        $plugin_path = plugin_dir_path(__FILE__);
+        
+        // Check if wp_admin_css_color function exists
+        if (!function_exists('wp_admin_css_color')) {
+            return;
+        }
+        
+        // UPEI Library Theme (Default for new users)
+        $upei_css = $plugin_path . 'styles/admin-colors-upei.css';
+        if (file_exists($upei_css)) {
+            wp_admin_css_color(
+                'upei-library',
+                __('UPEI Library', 'accessibility-enhancer'),
+                $plugin_url . 'styles/admin-colors-upei.css',
+                array('#333333', '#8C2004', '#517E1B', '#f1f1f1'),
+                array(
+                    'base' => '#f5f5f5',
+                    'focus' => '#8C2004',
+                    'current' => '#333333'
+                )
+            );
+        }
+        
+        // Enhanced Contrast - Blue/Orange (for deuteranopia - red-green colorblindness)
+        $colorblind_css = $plugin_path . 'styles/admin-colors-colorblind.css';
+        if (file_exists($colorblind_css)) {
+            wp_admin_css_color(
+                'colorblind-friendly',
+                __('Colorblind Friendly (Blue/Orange)', 'accessibility-enhancer'),
+                $plugin_url . 'styles/admin-colors-colorblind.css',
+                array('#003f87', '#0066cc', '#ff6600', '#f0f0f0'),
+                array(
+                    'base' => '#f0f0f0',
+                    'focus' => '#ff6600',
+                    'current' => '#0066cc'
+                )
+            );
+        }
+        
+        // Force refresh the global array
+        wp_cache_delete('admin_colors', 'admin_color_schemes');
+    }
+    
+    /**
+     * Set default admin color scheme for new users
+     */
+    public function set_default_admin_color($user_id) {
+        update_user_meta($user_id, 'admin_color', 'upei-library');
     }
     
     /**
@@ -86,6 +173,9 @@ class Pressbooks_Accessibility_Enhancer {
         $settings = $this->get_user_focus_settings();
         $focus_color = esc_attr($settings['color']);
         $focus_width = esc_attr($settings['width']);
+        
+        $user_id = get_current_user_id();
+        $font_family = $user_id ? get_user_meta($user_id, 'ae_font_family', true) : 'default';
         
         ob_start();
         ?>
@@ -139,6 +229,26 @@ body.keyboard-navigation *:focus {
     outline-width: calc(<?php echo $focus_width; ?> + 1px) !important;
     box-shadow: 0 0 0 6px <?php echo $this->hex_to_rgba($focus_color, 0.3); ?> !important;
 }
+
+<?php if ($font_family && $font_family !== 'default') : ?>
+    <?php if ($font_family === 'upei-default') : ?>
+/* UPEI Library Default Typography */
+body, p, span, div, td, th, strong, h2, h3, h4, h5, h6, b {
+    font-family: 'Roboto', sans-serif !important;
+}
+h1, .entry-title {
+    font-family: 'Lusitana', serif !important;
+}
+button, input, select, textarea, .nav, .menu, a.button, .page-navigation a, .a11y-skip-link, li {
+    font-family: 'Roboto Condensed', sans-serif !important;
+}
+    <?php else : ?>
+/* Custom Sitewide Font */
+body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select, textarea {
+    font-family: <?php echo esc_attr($font_family); ?> !important;
+}
+    <?php endif; ?>
+<?php endif; ?>
 
 /* High contrast support */
 @media (prefers-contrast: high) {
@@ -221,11 +331,12 @@ body.keyboard-navigation *:focus {
         $enable_custom = get_user_meta($user->ID, 'ae_enable_custom', true);
         $focus_color = get_user_meta($user->ID, 'ae_focus_color', true) ?: '#0066cc';
         $focus_width = get_user_meta($user->ID, 'ae_focus_width', true) ?: '3px';
+        $font_family = get_user_meta($user->ID, 'ae_font_family', true) ?: 'default';
         ?>
         
         <div class="ae-profile-section">
             <h2>Accessibility Settings</h2>
-            <p>Customize keyboard focus indicators to improve navigation visibility.</p>
+            <p>Customize keyboard focus indicators and typography to improve readability and navigation visibility.</p>
             
             <table class="form-table">
                 <tr>
@@ -276,15 +387,41 @@ body.keyboard-navigation *:focus {
                         </p>
                     </td>
                 </tr>
+
+                <tr id="ae_font_row">
+                    <th scope="row">
+                        <label for="ae_font_family">Sitewide Font Family</label>
+                    </th>
+                    <td>
+                        <select name="ae_font_family" id="ae_font_family">
+                            <option value="default" <?php selected($font_family, 'default'); ?>>System Default</option>
+                            <option value="upei-default" <?php selected($font_family, 'upei-default'); ?>>UPEI Library Default</option>
+                            <option value="Arial, Helvetica, sans-serif" <?php selected($font_family, 'Arial, Helvetica, sans-serif'); ?>>Arial</option>
+                            <option value="Verdana, Geneva, sans-serif" <?php selected($font_family, 'Verdana, Geneva, sans-serif'); ?>>Verdana</option>
+                            <option value="Tahoma, Geneva, sans-serif" <?php selected($font_family, 'Tahoma, Geneva, sans-serif'); ?>>Tahoma</option>
+                        </select>
+                        <p class="description">
+                            Select an accessibility-friendly font to override the default site typography.
+                        </p>
+                    </td>
+                </tr>
             </table>
             
+            <?php 
+            $preview_style = '';
+            if ($font_family !== 'default' && $font_family !== 'upei-default') {
+                $preview_style = 'font-family: ' . esc_attr($font_family) . ';';
+            } elseif ($font_family === 'upei-default') {
+                $preview_style = "font-family: 'Roboto', sans-serif;";
+            }
+            ?>
             <div class="ae-preview-box">
                 <p>Test your focus settings (press Tab to navigate):</p>
-                <div class="ae-test-elements">
-                    <button type="button">Test Button</button>
-                    <input type="text" placeholder="Test Input">
+                <div class="ae-test-elements" style="<?php echo $preview_style; ?>">
+                    <button type="button" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>Test Button</button>
+                    <input type="text" placeholder="Test Input" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
                     <a href="#test">Test Link</a>
-                    <select>
+                    <select <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
                         <option>Test Dropdown</option>
                     </select>
                 </div>
@@ -324,6 +461,13 @@ body.keyboard-navigation *:focus {
                 update_user_meta($user_id, 'ae_focus_width', $width);
             }
         }
+
+        // Save font setting
+        if (isset($_POST['ae_font_family'])) {
+            // Because the font family string contains quotes/commas, we use wp_unslash and sanitize_text_field sparingly
+            $font_family = sanitize_text_field(wp_unslash($_POST['ae_font_family']));
+            update_user_meta($user_id, 'ae_font_family', $font_family);
+        }
     }
     
     /**
@@ -346,7 +490,14 @@ body.keyboard-navigation *:focus {
      * Activation
      */
     public static function activate() {
-        // No default options needed since settings are per-user
+        // Set default color scheme for existing users without one
+        $users = get_users(array('fields' => array('ID')));
+        foreach ($users as $user) {
+            $current_color = get_user_meta($user->ID, 'admin_color', true);
+            if (empty($current_color)) {
+                update_user_meta($user->ID, 'admin_color', 'upei-library');
+            }
+        }
     }
     
     public static function deactivate() {

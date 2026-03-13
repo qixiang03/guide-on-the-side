@@ -9,7 +9,7 @@ They are designed to be repeatable by any team member.
 
 - Platform: Pressbooks local dev environment
 - Browser: Chrome (latest)
-- User roles tested: Admin / Author / Viewer (as applicable)
+- User roles tested: Admin / Librain / Student
 
 ## Conventions
 
@@ -301,6 +301,137 @@ They are designed to be repeatable by any team member.
 - All core pages load successfully (no 500/fatal error).
 - Basic UI elements render.
 - No obvious broken navigation.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+---
+
+## TC-10 — Core Pages Load (Smoke Health)
+
+**Preconditions**
+
+- Pressbooks site is running.
+
+**Steps**
+
+1. Load tutorial builder / admin page.
+2. Load tutorial list or analytics dashboard page.
+3. Load a tutorial play/run page.
+
+**Expected Result**
+
+- All core pages load without fatal errors (no 500).
+- Basic UI and navigation render.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+- Alias for regression checklist “Smoke Health”; same intent as TC-09.
+
+---
+
+## TC-11 — Analytics Dashboard (Admin)
+
+**Preconditions**
+
+- Logged in as Admin (or Librarian with `edit_pages`).
+- Pressbooks site is running.
+- Optionally: at least one page uses the Split Guide template (no data shows empty state).
+
+**Steps**
+
+1. In WordPress admin, find and click "Tutorial Analytics" in the sidebar.
+2. Confirm the Overview tab loads and shows the tutorial list or empty state.
+3. Optionally: switch to Tutorial Detail or Compare tab; optionally set date range or device filter and click Apply.
+4. Optionally: click "Export CSV" and confirm the export entry is reachable.
+
+**Expected Result**
+
+- Analytics page opens without 500 errors.
+- Overview, Tutorial Detail, and Compare tabs are switchable.
+- Filters and export do not error (data may be empty).
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+---
+
+## TC-12 — Certificate Completion Marking (Student)
+
+**Preconditions**
+
+- Logged in as Student (or any user who can view the tutorial).
+- A tutorial page exists that uses the Split Guide template and has multiple steps and a completion flow (e.g. reaching the last step or clicking complete).
+
+**Steps**
+
+1. Open that tutorial page and complete all steps (or reach the last step / click complete).
+2. Observe whether a "Certificate" or "Completed" message / button appears.
+3. Refresh the page or re-enter the tutorial and confirm completion state persists (e.g. certificate download still available).
+
+**Expected Result**
+
+- Completion is recorded after finishing the tutorial.
+- Certificate area or download entry appears.
+- State persists after refresh; no errors.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+---
+
+## TC-13 — Certificate PDF Download
+
+**Preconditions**
+
+- Logged in as a user who has completed the target tutorial (i.e. TC-12 or equivalent has been done).
+
+**Steps**
+
+1. Open the completed tutorial page, or reach it from "My Tutorials" or similar.
+2. Click "Download Certificate" or the equivalent PDF download button/link.
+3. Confirm the browser downloads a PDF file; open it and check it shows a certificate (tutorial name, completion date, etc.).
+
+**Expected Result**
+
+- PDF downloads successfully.
+- File opens and content is correct.
+- If testable: a user who has not completed the tutorial gets an error or no download when attempting to download.
 
 **Actual Result**
 

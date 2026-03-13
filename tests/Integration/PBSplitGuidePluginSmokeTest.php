@@ -16,6 +16,10 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
 
     protected function setUp(): void
     {
+        if ($this->getName() === 'test_activation_hook_registered_with_create_tables') {
+            $this->plugin = new PB_Split_Guide_Plugin();
+            return;
+        }
         WPStubs::reset();
 
         // Instantiate a fresh plugin (registers hooks via constructor)
@@ -81,8 +85,8 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
 
     public function test_total_hook_count_matches_expected(): void
     {
-        $this->assertCount(2, WPStubs::$hooks['filter'], 'Expected 2 filters');
-        $this->assertCount(5, WPStubs::$hooks['action'], 'Expected 5 actions');
+        $this->assertCount(3, WPStubs::$hooks['filter'], 'Expected 3 filters');
+        $this->assertCount(7, WPStubs::$hooks['action'], 'Expected 7 actions');
     }
 
     /* =============================================================
@@ -336,5 +340,35 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $args = WPStubs::callArgs('check_ajax_referer', 0);
         $this->assertSame('pbsg_h5p_picker', $args[0]);
         $this->assertSame('nonce', $args[1]);
+    }
+
+    /* =============================================================
+     *  Certificate init & activation hook
+     * ============================================================= */
+
+    public function test_certificate_init_registers_ajax_actions(): void
+    {
+        WPStubs::reset();
+        PBSG_Certificate::init();
+
+        $tags = array_column(WPStubs::$hooks['action'], 'tag');
+        $this->assertContains('wp_ajax_pbsg_mark_completed', $tags);
+        $this->assertContains('wp_ajax_pbsg_download_certificate', $tags);
+    }
+
+    /**
+     * Plugin file registers activation hook at load time; run in separate process
+     * so we see the call before any other test's setUp has reset WPStubs.
+     *
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_activation_hook_registered_with_create_tables(): void
+    {
+        $this->assertTrue(WPStubs::wasCalled('register_activation_hook'));
+        $args = WPStubs::callArgs('register_activation_hook', 0);
+        $this->assertIsArray($args);
+        $this->assertCount(2, $args);
+        $this->assertSame(['PBSG_Analytics', 'create_tables'], $args[1]);
     }
 }

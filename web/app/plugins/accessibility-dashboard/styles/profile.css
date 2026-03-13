@@ -54,6 +54,12 @@
     width: 100px;
 }
 
+/* Font Selection Select Dropdown */
+#ae_font_family {
+    min-width: 250px;
+    max-width: 100%;
+}
+
 /* Description text under inputs */
 .ae-field-row .description,
 .ae-profile-section .description {

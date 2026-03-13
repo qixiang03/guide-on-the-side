@@ -147,7 +147,7 @@
             { label: 'Total Views', value: formatNumber( totals.total_views ), color: 'green' },
             { label: 'Total Completions', value: formatNumber( totals.total_completions ), color: 'blue' },
             { label: 'Avg Completion Rate', value: totals.avg_completion + '%', color: 'amber' },
-            { label: 'Avg Quiz Score', value: totals.avg_score + '%', color: 'red' },
+            { label: 'Avg Tutorial Score', value: totals.avg_score + '%', color: 'red' },
         ] );
 
         // Main content grid
@@ -432,7 +432,7 @@
         let html = '<table class="pbsg-data-table">';
         html += '<thead><tr>';
         html += '<th>Tutorial</th><th>Views</th><th>Completions</th>';
-        html += '<th>Completion Rate</th><th>Avg Score <span class="pbsg-alltime-badge">all-time</span></th><th>Trend</th>';
+        html += '<th>Completion Rate</th><th>Avg Tutorial Score <span class="pbsg-alltime-badge">all-time</span></th><th>Trend</th>';
         html += '</tr></thead><tbody>';
 
         tutorials.forEach( t => {
@@ -474,7 +474,7 @@
             const score = parseFloat( t.avg_score ) || 0;
             const reasons = [];
             if ( rate < 60 ) reasons.push( 'Completion rate below 60%' );
-            if ( score < 50 ) reasons.push( 'Avg quiz score below 50%' );
+            if ( score < 50 ) reasons.push( 'Avg tutorial score below 50%' );
 
             const adminUrl = config.ajaxUrl.replace( 'admin-ajax.php', 'admin.php' );
 
@@ -562,7 +562,7 @@
 
             html += '<div class="pbsg-funnel-step">';
             html += '<span class="pbsg-funnel-label">' + label + '</span>';
-            html += '<div class="pbsg-funnel-bar" style="width:' + Math.max( 10, pct ) + '%;background:' + color + ';">' + pct + '%</div>';
+            html += '<div class="pbsg-funnel-track"><div class="pbsg-funnel-bar" style="width:' + Math.max( 10, pct ) + '%;background:' + color + ';">' + pct + '%</div></div>';
             html += '<span class="pbsg-funnel-count">' + views + ' views</span>';
             html += '</div>';
         } );

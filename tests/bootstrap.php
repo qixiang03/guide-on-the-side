@@ -23,6 +23,9 @@ if (!defined('ABSPATH')) {
 //    for integration tests). Must come before the plugin file is loaded.
 require_once __DIR__ . '/Integration/Helpers/WPStubs.php';
 
+// 3b. Load mock TCPDF before plugin so certificate tests don't emit PDF/headers.
+require_once __DIR__ . '/Integration/Helpers/MockTCPDF.php';
+
 // 4. Load the plugin so PB_Split_Guide_Plugin is available to integration tests.
 //    The plugin's top-level `new PB_Split_Guide_Plugin()` is harmless with stubs.
 //    Some branches may include optional files that emit a benign PHP warning

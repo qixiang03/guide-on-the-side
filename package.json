@@ -1,0 +1,20 @@
+{
+  "name": "guide-on-the-side",
+  "version": "0.5.0",
+  "description": "Guide-on-the-Side Pressbooks plugin",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:js": "jest --testPathPattern=tests/js"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": ["**/tests/js/**/*.test.js"],
+    "moduleFileExtensions": ["js"],
+    "testPathIgnorePatterns": ["/node_modules/", "/web/"]
+  }
+}

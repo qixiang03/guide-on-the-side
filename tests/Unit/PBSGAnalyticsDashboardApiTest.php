@@ -618,4 +618,95 @@ class PBSGAnalyticsDashboardApiTest extends TestCase
         $this->assertArrayHasKey('exportUrl', $l10n);
         $this->assertArrayHasKey('tutorials', $l10n);
     }
+
+    /* ---------------------------------------------------------------
+       Dashboard render_dashboard — $_GET sanitization & data attributes
+       --------------------------------------------------------------- */
+
+    /**
+     * @covers PBSG_Analytics_Dashboard::render_dashboard
+     */
+    public function test_render_dashboard_default_view_is_overview(): void
+    {
+        $_GET = [];
+        ob_start();
+        PBSG_Analytics_Dashboard::render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('data-view="overview"', $html);
+        $this->assertStringContainsString('data-tutorial-id="0"', $html);
+        $this->assertStringContainsString('data-h5p-id="0"', $html);
+        $this->assertStringContainsString('data-q-index="0"', $html);
+    }
+
+    /**
+     * @covers PBSG_Analytics_Dashboard::render_dashboard
+     */
+    public function test_render_dashboard_tab_sanitized_to_view(): void
+    {
+        $_GET = ['tab' => 'tutorial'];
+        ob_start();
+        PBSG_Analytics_Dashboard::render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('data-view="tutorial"', $html);
+    }
+
+    /**
+     * @covers PBSG_Analytics_Dashboard::render_dashboard
+     */
+    public function test_render_dashboard_tab_overview_compare_renders_correctly(): void
+    {
+        $_GET = ['tab' => 'compare'];
+        ob_start();
+        PBSG_Analytics_Dashboard::render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('data-view="compare"', $html);
+    }
+
+    /**
+     * @covers PBSG_Analytics_Dashboard::render_dashboard
+     */
+    public function test_render_dashboard_tutorial_id_absint(): void
+    {
+        $_GET = ['tab' => 'tutorial', 'tutorial_id' => '42'];
+        WPStubs::$returns['get_the_title'] = 'My Tutorial';
+        ob_start();
+        PBSG_Analytics_Dashboard::render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('data-tutorial-id="42"', $html);
+        $this->assertStringContainsString('data-view="tutorial"', $html);
+    }
+
+    /**
+     * @covers PBSG_Analytics_Dashboard::render_dashboard
+     */
+    public function test_render_dashboard_invalid_tutorial_id_sanitized_to_zero(): void
+    {
+        $_GET = ['tutorial_id' => 'abc'];
+        ob_start();
+        PBSG_Analytics_Dashboard::render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('data-tutorial-id="0"', $html);
+    }
+
+    /**
+     * @covers PBSG_Analytics_Dashboard::render_dashboard
+     */
+    public function test_render_dashboard_h5p_id_and_q_index_absint(): void
+    {
+        $_GET = ['tab' => 'question', 'tutorial_id' => '10', 'h5p_id' => '5', 'q_index' => '2'];
+        WPStubs::$returns['get_the_title'] = 'Tutorial Title';
+        ob_start();
+        PBSG_Analytics_Dashboard::render_dashboard();
+        $html = ob_get_clean();
+
+        $this->assertStringContainsString('data-view="question"', $html);
+        $this->assertStringContainsString('data-tutorial-id="10"', $html);
+        $this->assertStringContainsString('data-h5p-id="5"', $html);
+        $this->assertStringContainsString('data-q-index="2"', $html);
+    }
 }
