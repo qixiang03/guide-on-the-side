@@ -199,11 +199,11 @@ foreach ($steps as $s) {
       </div>
     </div>
 
-    <div class="pbsg-iframe-wrap">
-      <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen></iframe>
-    </div>
+   <div class="pbsg-iframe-wrap" id="pbsgTutorialStage">
+    <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen></iframe>
+  </div>
     <div id="pbsgTutorialFallback" class="pbsg-fallback">
       <a id="pbsgFallbackLink" href="#" target="_blank">Open file in new tab</a>
     </div>
