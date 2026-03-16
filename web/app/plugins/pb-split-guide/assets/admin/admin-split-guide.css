@@ -26,4 +26,26 @@
 #pbsg-steps-table th:nth-child(4),
 #pbsg-steps-table td:nth-child(4) { width: 120px; }  /* Remove column */
 
+/* Text mode placeholder for tutorial introduction */
+#content::placeholder {
+  color: #757575;
+  opacity: 1;
+  font-size: 28px;
+}
 
+/* Fake placeholder for the main tutorial introduction editor */
+#wp-content-editor-container {
+  position: relative;
+}
+
+.pbsg-editor-placeholder {
+  position: absolute;
+  top: 86px;
+  left: 24px;
+  z-index: 20;
+  color: #757575;
+  font-size: 24px;
+  line-height: 1.4;
+  pointer-events: auto;
+  user-select: none;
+}

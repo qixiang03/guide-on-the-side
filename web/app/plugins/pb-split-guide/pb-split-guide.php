@@ -71,8 +71,8 @@ class PB_Split_Guide_Plugin {
 
     add_action('admin_menu', [$this, 'pbsg_hide_h5p_menu_for_students'], 999);
     add_action('admin_head', [$this, 'pbsg_hide_h5p_menu_css_for_students']);
-
   }
+  
 
   public function pbsg_hide_h5p_menu_for_students() {
     if (!is_admin()) return;
@@ -526,13 +526,11 @@ class PB_Split_Guide_Plugin {
     if (!isset($_POST['pbsg_nonce']) || !wp_verify_nonce($_POST['pbsg_nonce'], 'pbsg_save_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
     if (!current_user_can('edit_post', $post_id)) return;
-    //Update 
+
     $steps_json = isset($_POST['pbsg_steps_json']) ? wp_unslash($_POST['pbsg_steps_json']) : '[]';
     $steps = json_decode($steps_json, true);
 
-    // Delegate normalization to a pure, unit-testable function
     $clean = PBSG_Steps_Normalizer::normalize($steps);
-
     update_post_meta($post_id, self::META_STEPS, wp_json_encode($clean));
 
     $note = isset($_POST['pbsg_header_note']) ? sanitize_text_field($_POST['pbsg_header_note']) : '';
@@ -544,6 +542,14 @@ class PB_Split_Guide_Plugin {
       update_post_meta($post_id, self::META_COVER_ID, $cover_image_id);
     } else {
       delete_post_meta($post_id, self::META_COVER_ID);
+    }
+
+    // Force Split Guide template if this tutorial is using the PB Split Guide fields
+    $current_template = get_post_meta($post_id, '_wp_page_template', true);
+    $has_split_guide_data = !empty($clean) || !empty($note) || $cover_image_id > 0;
+
+    if (($current_template === '' || $current_template === 'default') && $has_split_guide_data) {
+      update_post_meta($post_id, '_wp_page_template', self::TEMPLATE_SLUG);
     }
   }
 
@@ -573,39 +579,72 @@ class PB_Split_Guide_Plugin {
   }
 
   public function enqueue_admin_assets($hook) {
-    if (!in_array($hook, ['post.php', 'post-new.php'], true)) return;
+  if (!in_array($hook, ['post.php', 'post-new.php'], true)) return;
 
-    $screen = get_current_screen();
-    if (!$screen || $screen->post_type !== 'page') return;
+  $screen = get_current_screen();
+  if (!$screen || $screen->post_type !== 'page') return;
 
-    add_thickbox();
+  add_thickbox();
+  wp_enqueue_media();
 
-    // IMPORTANT: enable WP Media Library uploader
-    wp_enqueue_media();
+  wp_enqueue_script(
+    'pbsg_admin_js',
+    plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
+    ['jquery', 'thickbox'],
+    '0.5.2',
+    true
+  );
 
-    wp_enqueue_script(
-      'pbsg_admin_js',
-      plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
-      ['jquery', 'thickbox'],
-      '0.5.0',
-      true
-    );
+  wp_enqueue_style(
+    'pbsg-admin',
+    plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
+    [],
+    '1.0.2'
+  );
 
-    // Load admin CSS (and JS if needed)
-    wp_enqueue_style(
-        'pbsg-admin',
-        plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
-        [],
-        '1.0.1' // bump version to bust cache
-    );
+  wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
+    'templateSlug' => self::TEMPLATE_SLUG,
+    'metaBoxId'    => 'pbsg_settings',
+    'ajaxUrl'      => admin_url('admin-ajax.php'),
+    'nonce'        => wp_create_nonce('pbsg_h5p_picker'),
+    'isNewPage'    => ($hook === 'post-new.php'),
+  ]);
 
-    wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
-      'templateSlug' => self::TEMPLATE_SLUG,
-      'metaBoxId'    => 'pbsg_settings',
-      'ajaxUrl'      => admin_url('admin-ajax.php'),
-      'nonce'        => wp_create_nonce('pbsg_h5p_picker'),
-    ]);
+  // Extra inline script: force the template on Add New Tutorial page.
+  if ($hook === 'post-new.php') {
+    $template_slug = esc_js(self::TEMPLATE_SLUG);
+
+    wp_add_inline_script('pbsg_admin_js', "
+      jQuery(function($){
+        function pbsgForceTemplateNow() {
+          var \$template = $('#page_template');
+          if (!\$template.length) return false;
+
+          var hasOption = \$template.find('option[value=\"{$template_slug}\"]').length > 0;
+          if (!hasOption) return false;
+
+          if (\$template.val() !== '{$template_slug}') {
+            \$template.val('{$template_slug}').trigger('change');
+          }
+
+          return true;
+        }
+
+        var tries = 0;
+        var timer = setInterval(function() {
+          tries++;
+          if (pbsgForceTemplateNow() || tries >= 40) {
+            clearInterval(timer);
+          }
+        }, 250);
+
+        $(window).on('load', function() {
+          pbsgForceTemplateNow();
+        });
+      });
+    ", 'after');
   }
+}
 
   public function ajax_list_h5p() {
     check_ajax_referer('pbsg_h5p_picker', 'nonce');
