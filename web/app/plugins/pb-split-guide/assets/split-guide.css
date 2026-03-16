@@ -380,35 +380,59 @@ body.pbsg-focus-quiz {
 /* Dim the background side */
 body.pbsg-focus-tutorial .pbsg-left,
 body.pbsg-focus-quiz .pbsg-right {
-  opacity: 0.12 !important;
+  opacity: 0.08 !important;
   pointer-events: none !important;
 }
 
-/* Bring tutorial to front */
+/* Bring tutorial to front - centered 80% modal */
 body.pbsg-focus-tutorial .pbsg-right {
   position: fixed !important;
-  inset: 16px !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 80vw !important;
+  height: 80vh !important;
+  transform: translate(-50%, -50%) !important;
   z-index: 999999 !important;
 
   background: #fff !important;
-  border-radius: 12px !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28) !important;
 
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
+  max-width: 80vw !important;
+  max-height: 80vh !important;
+  overflow: hidden !important;
 }
 
-/* Bring quiz to front */
+/* Bring quiz to front - centered 80% modal */
 body.pbsg-focus-quiz .pbsg-left {
   position: fixed !important;
-  inset: 16px !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 80vw !important;
+  height: 80vh !important;
+  transform: translate(-50%, -50%) !important;
   z-index: 999999 !important;
 
   background: #fff !important;
-  border-radius: 12px !important;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28) !important;
 
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  max-width: 80vw !important;
+  max-height: 80vh !important;
+  overflow: hidden !important;
+}
+
+body.pbsg-focus-quiz .pbsg-left-inner,
+body.pbsg-focus-tutorial .pbsg-right-inner,
+body.pbsg-focus-tutorial .pbsg-iframe-wrap,
+body.pbsg-focus-quiz .pbsg-iframe-wrap {
+  height: 100% !important;
   min-height: 0 !important;
 }
 
