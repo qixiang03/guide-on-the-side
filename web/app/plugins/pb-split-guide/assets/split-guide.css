@@ -371,6 +371,29 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   display: block !important;
 }
 
+.pbsg-inline-video,
+.pbsg-inline-audio-wrap {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  background: #000 !important;
+}
+
+.pbsg-inline-video {
+  object-fit: contain !important;
+}
+
+.pbsg-inline-audio-wrap {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #f7f7f7 !important;
+}
+
+.pbsg-inline-audio {
+  width: min(640px, 90%) !important;
+}
+
 /* ---------- 8) Focus modes (bring one side to front) ---------- */
 body.pbsg-focus-tutorial,
 body.pbsg-focus-quiz {

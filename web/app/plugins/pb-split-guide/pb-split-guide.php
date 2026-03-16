@@ -517,7 +517,7 @@ class PB_Split_Guide_Plugin {
         />
       </p>
 
-      <p><em>Tip: Click “Add H5P” to pick a quiz. Click “Set Tutorial” to choose URL or upload PDF/slides.</em></p>
+      <p><em>Tip: Click “Add H5P” to pick a quiz. Click “Set Tutorial” to choose URL or upload PDF/video.</em></p>
     </div>
     <?php
   }
