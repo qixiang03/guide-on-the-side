@@ -1,6 +1,21 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+if (post_password_required() ) {
+    echo get_the_password_form();
+    return;
+}
+
+
+// Block access if tutorial is private
+if ( get_post_status() === 'private' && !current_user_can('read_private_pages') ) {
+    wp_die(
+        '<h2>This tutorial is private.</h2><p>You do not have permission to access it.</p>',
+        'Access Denied',
+        ['response' => 403]
+    );
+}
+
 // Enqueue assets directly in template — ensures they load on Multisite subsites
 wp_enqueue_style(
     'pbsg_split_guide_css',
