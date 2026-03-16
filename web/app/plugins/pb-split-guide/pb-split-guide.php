@@ -56,6 +56,54 @@ class PB_Split_Guide_Plugin {
     // menu processing — right before HTML output. Nothing can override this.
     add_filter('add_menu_classes', [$this, 'reorder_admin_menu'], 1000);
 
+    //Change Trash to Delete
+    add_filter('page_row_actions', [$this, 'pbsg_change_trash_to_delete'], 10, 2);
+
+    add_action('network_admin_menu', [$this, 'pbsg_hide_network_menus'], 999);
+    add_action('admin_head', [$this, 'pbsg_hide_admin_ui_css']);
+    add_action('network_admin_head', [$this, 'pbsg_hide_admin_ui_css']);
+    add_action('admin_footer', [$this, 'pbsg_hide_network_menu_js']);
+    add_action('network_admin_footer', [$this, 'pbsg_hide_network_menu_js']);
+
+    add_action('admin_menu', [$this, 'register_admin_menu']);
+    add_action('admin_init', [$this, 'redirect_my_books_to_my_tutorials']);
+    add_action('admin_bar_menu', [$this, 'change_my_books_admin_bar_link'], 999);
+
+    add_action('admin_menu', [$this, 'pbsg_hide_h5p_menu_for_students'], 999);
+    add_action('admin_head', [$this, 'pbsg_hide_h5p_menu_css_for_students']);
+
+  }
+
+  public function pbsg_hide_h5p_menu_for_students() {
+    if (!is_admin()) return;
+
+    $user = wp_get_current_user();
+    $roles = (array) $user->roles;
+
+    if (in_array('student', $roles, true)) {
+        remove_menu_page('h5p');
+        remove_menu_page('h5p_new');
+        remove_menu_page('h5p_libraries');
+        remove_menu_page('h5p_content');
+    }
+  }
+
+  public function pbsg_hide_h5p_menu_css_for_students() {
+      if (!is_admin()) return;
+
+      $user = wp_get_current_user();
+      $roles = (array) $user->roles;
+
+      if (!in_array('student', $roles, true)) return;
+      ?>
+      <style>
+          #adminmenu a[href*="h5p"],
+          #adminmenu .toplevel_page_h5p,
+          #adminmenu .menu-top.toplevel_page_h5p {
+              display: none !important;
+          }
+      </style>
+      <?php
   }
 
   /**
@@ -110,6 +158,44 @@ class PB_Split_Guide_Plugin {
     return $translated;
   }
 
+  public function change_my_books_admin_bar_link($wp_admin_bar) {
+    if (!is_admin()) return;
+
+    $node = $wp_admin_bar->get_node('my-sites');
+
+    if ($node) {
+        $node->href = admin_url('admin.php?page=pbsg-my-tutorials');
+        $wp_admin_bar->add_node($node);
+    }
+  }
+
+  public function pbsg_change_trash_to_delete($actions, $post) {
+
+    if ($post->post_type === 'page') {
+
+        if (isset($actions['trash'])) {
+            $actions['trash'] = str_replace('Trash', 'Delete', $actions['trash']);
+        }
+
+    }
+
+    return $actions;
+  }
+
+  public function redirect_my_books_to_my_tutorials() {
+    if (!is_admin()) return;
+
+    if (!current_user_can('read')) return;
+
+    $page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : '';
+
+    // Pressbooks dashboard / My Books landing page
+    if ($page === 'pb_home_page') {
+        wp_safe_redirect(admin_url('admin.php?page=pbsg-my-tutorials'));
+        exit;
+    }
+  }
+
   /**
    * Directly patch the $menu and $submenu globals after Pressbooks SideBar
    * has finished rebuilding menus (priority 999).
@@ -160,6 +246,34 @@ class PB_Split_Guide_Plugin {
       $post_type->labels->name_admin_bar     = 'Tutorial';
     }
 
+  }
+
+  public function pbsg_hide_network_menus() {
+    remove_menu_page('pb_network_integrations');
+  }
+
+  public function pbsg_hide_admin_ui_css() {
+      ?>
+      <style>
+          #adminmenu a[href*="page=pb_network_integrations"] {
+              display: none !important;
+          }
+      </style>
+      <?php
+  }
+
+  public function pbsg_hide_network_menu_js() {
+      ?>
+      <script>
+      document.addEventListener('DOMContentLoaded', function () {
+          var link = document.querySelector('#adminmenu a[href*="page=pb_network_integrations"]');
+          if (link) {
+              var li = link.closest('li');
+              if (li) li.style.display = 'none';
+          }
+      });
+      </script>
+      <?php
   }
 
   /**
