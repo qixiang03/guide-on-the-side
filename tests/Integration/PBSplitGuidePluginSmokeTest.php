@@ -85,8 +85,8 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
 
     public function test_total_hook_count_matches_expected(): void
     {
-        $this->assertCount(3, WPStubs::$hooks['filter'], 'Expected 3 filters');
-        $this->assertCount(7, WPStubs::$hooks['action'], 'Expected 7 actions');
+        $this->assertCount(4, WPStubs::$hooks['filter'], 'Expected 4 filters');
+        $this->assertCount(17, WPStubs::$hooks['action'], 'Expected 17 actions');
     }
 
     /* =============================================================
@@ -220,7 +220,7 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->plugin->save_meta(99, (object) ['ID' => 99]);
 
         $this->assertTrue(WPStubs::wasCalled('update_post_meta'));
-        $this->assertSame(2, WPStubs::callCount('update_post_meta'));
+        $this->assertSame(3, WPStubs::callCount('update_post_meta'));
 
         $stepsCall = WPStubs::callArgs('update_post_meta', 0);
         $this->assertSame(99, $stepsCall[0]);
@@ -235,6 +235,11 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $noteCall = WPStubs::callArgs('update_post_meta', 1);
         $this->assertSame('_pbsg_header_note', $noteCall[1]);
         $this->assertSame('Welcome note', $noteCall[2]);
+
+        $templateCall = WPStubs::callArgs('update_post_meta', 2);
+        $this->assertSame(99, $templateCall[0]);
+        $this->assertSame('_wp_page_template', $templateCall[1]);
+        $this->assertSame('split-guide-template.php', $templateCall[2]);
     }
 
     /* =============================================================

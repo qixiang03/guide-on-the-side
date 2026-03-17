@@ -1,6 +1,21 @@
 <?php
 if (!defined('ABSPATH')) exit;
 
+if (post_password_required() ) {
+    echo get_the_password_form();
+    return;
+}
+
+
+// Block access if tutorial is private
+if ( get_post_status() === 'private' && !current_user_can('read_private_pages') ) {
+    wp_die(
+        '<h2>This tutorial is private.</h2><p>You do not have permission to access it.</p>',
+        'Access Denied',
+        ['response' => 403]
+    );
+}
+
 // Enqueue assets directly in template — ensures they load on Multisite subsites
 wp_enqueue_style(
     'pbsg_split_guide_css',
@@ -184,11 +199,11 @@ foreach ($steps as $s) {
       </div>
     </div>
 
-    <div class="pbsg-iframe-wrap">
-      <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen></iframe>
-    </div>
+   <div class="pbsg-iframe-wrap" id="pbsgTutorialStage">
+    <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen></iframe>
+  </div>
     <div id="pbsgTutorialFallback" class="pbsg-fallback">
       <a id="pbsgFallbackLink" href="#" target="_blank">Open file in new tab</a>
     </div>

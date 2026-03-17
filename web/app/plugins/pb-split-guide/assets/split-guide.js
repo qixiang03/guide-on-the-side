@@ -462,27 +462,75 @@ function toEmbeddableUrl(rawUrl){
 }
 
 function renderTutorial(step){
-  const t = step.tutorial;
+  const t = step.tutorial || {};
+  const tutorialStage = document.getElementById('pbsgTutorialStage');
 
-  if (t.type === 'file' && t.file_url){
-    if ((t.mime || '').includes('pdf')){
-      tutFrame.src = t.file_url;
-      fallback.style.display='none';
-    } else {
-      fallback.style.display='block';
-      fallbackLink.href = t.file_url;
-      tutFrame.src='';
+  if (!tutorialStage) return;
+
+  // Reset stage to iframe by default
+  tutorialStage.innerHTML = `
+    <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+      allowfullscreen></iframe>
+  `;
+
+  const freshFrame = document.getElementById('pbsgTutorialFrame');
+
+  if (t.type === 'file' && t.file_url) {
+    const mime = (t.mime || '').toLowerCase();
+
+    // PDF inline
+    if (mime.includes('pdf')) {
+      freshFrame.src = t.file_url;
+      fallback.style.display = 'none';
+      openLink.href = t.file_url;
+      return;
     }
+
+    // Video inline
+    if (mime.startsWith('video/')) {
+      tutorialStage.innerHTML = `
+        <video class="pbsg-inline-video" controls preload="metadata">
+          <source src="${t.file_url}" type="${mime}">
+          Your browser does not support video playback.
+        </video>
+      `;
+      fallback.style.display = 'none';
+      openLink.href = t.file_url;
+      return;
+    }
+
+    // Audio inline
+    if (mime.startsWith('audio/')) {
+      tutorialStage.innerHTML = `
+        <div class="pbsg-inline-audio-wrap">
+          <audio class="pbsg-inline-audio" controls preload="metadata">
+            <source src="${t.file_url}" type="${mime}">
+            Your browser does not support audio playback.
+          </audio>
+        </div>
+      `;
+      fallback.style.display = 'none';
+      openLink.href = t.file_url;
+      return;
+    }
+
+    // Other files fallback
+    fallback.style.display = 'block';
+    fallbackLink.href = t.file_url;
+    freshFrame.src = '';
     openLink.href = t.file_url;
     return;
   }
 
-  if (t.url){
-    tutFrame.src = toEmbeddableUrl(t.url); 
+  if (t.url) {
+    freshFrame.src = toEmbeddableUrl(t.url);
     openLink.href = t.url;
-    fallback.style.display='none';
+    fallback.style.display = 'none';
   } else {
-    tutFrame.src='';
+    freshFrame.src = '';
+    fallback.style.display = 'none';
+    openLink.href = '#';
   }
 }
 
