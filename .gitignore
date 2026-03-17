@@ -23,4 +23,5 @@ node_modules/
 build/
 .history/
 CLAUDE.local.md
+.claude/commands/*
 .cursor/

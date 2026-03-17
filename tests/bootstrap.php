@@ -49,4 +49,11 @@ if ($previous_error_handler !== null) {
     restore_error_handler();
 }
 
+// 5. Load RBAC classes (not yet wired into pb-split-guide.php via require_once,
+//    but needed by unit tests that reference their constants and source code).
+$plugin_dir = $root_dir . '/web/app/plugins/pb-split-guide/';
+require_once $plugin_dir . 'includes/class-pbsg-roles.php';
+require_once $plugin_dir . 'includes/class-pbsg-admin-menu-filter.php';
+require_once $plugin_dir . 'includes/class-pbsg-librarian-manager.php';
+
 echo "UPEI Project Test Bootstrap: Initialized successfully.\n";
