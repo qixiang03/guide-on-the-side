@@ -23,20 +23,84 @@ jQuery(function ($) {
     $('#pbsg_steps_json').val(JSON.stringify(steps || []));
   }
 
+    function getTemplateSelect() {
+    return $('#page_template');
+  }
+
   function isSplitGuideTemplateSelected() {
-    return $('#page_template').val() === PBSG_ADMIN.templateSlug;
+    const $template = getTemplateSelect();
+    return $template.length > 0 && $template.val() === PBSG_ADMIN.templateSlug;
   }
 
   function toggleMetaBox() {
     const $box = $('#' + PBSG_ADMIN.metaBoxId).closest('.postbox');
     if ($box.length === 0) return;
 
-    if (isSplitGuideTemplateSelected()) $box.show();
-    else $box.hide();
+    if (isSplitGuideTemplateSelected()) {
+      $box.show();
+    } else {
+      $box.hide();
+    }
   }
 
-  toggleMetaBox();
-  $('#page_template').on('change', toggleMetaBox);
+  function forceDefaultSplitGuideTemplate() {
+    if (!PBSG_ADMIN.isNewPage) return false;
+
+    const $template = getTemplateSelect();
+    if ($template.length === 0) return false;
+
+    const hasTargetOption = $template.find('option[value="' + PBSG_ADMIN.templateSlug + '"]').length > 0;
+    if (!hasTargetOption) return false;
+
+    if ($template.val() !== PBSG_ADMIN.templateSlug) {
+      $template.val(PBSG_ADMIN.templateSlug).trigger('change');
+    }
+
+    toggleMetaBox();
+    return true;
+  }
+
+  function setupDefaultTemplateWatcher() {
+    $(document).on('change', '#page_template', function () {
+      toggleMetaBox();
+    });
+
+    if (!PBSG_ADMIN.isNewPage) {
+      toggleMetaBox();
+      return;
+    }
+
+    let tries = 0;
+    const maxTries = 40;
+
+    const timer = setInterval(function () {
+      tries++;
+      const done = forceDefaultSplitGuideTemplate();
+
+      if (done || tries >= maxTries) {
+        clearInterval(timer);
+        toggleMetaBox();
+      }
+    }, 250);
+
+    $(window).on('load', function () {
+      forceDefaultSplitGuideTemplate();
+      toggleMetaBox();
+    });
+
+    // In case Pressbooks rebuilds the sidebar/dropdown later
+    const observer = new MutationObserver(function () {
+      forceDefaultSplitGuideTemplate();
+      toggleMetaBox();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  setupDefaultTemplateWatcher();
 
   // Normalize older data
   function normalizeStep(s) {
@@ -453,7 +517,138 @@ jQuery(function ($) {
   });
 
 
+    // --- Introduction placeholder for the main editor ---
+  function setupIntroductionPlaceholder() {
+    const placeholderText = 'Add introduction';
 
+    function getEditorWrap() {
+      return $('#wp-content-wrap');
+    }
+
+    function getEditorContainer() {
+      return $('#wp-content-editor-container');
+    }
+
+    function getTextarea() {
+      return $('#content');
+    }
+
+    function ensurePlaceholderEl() {
+      const $container = getEditorContainer();
+      if (!$container.length) return $();
+
+      if (!$container.find('.pbsg-editor-placeholder').length) {
+        $container.css('position', 'relative');
+        $container.append(
+          '<div class="pbsg-editor-placeholder">' + placeholderText + '</div>'
+        );
+      }
+
+      return $container.find('.pbsg-editor-placeholder');
+    }
+
+    function editorIsEmpty() {
+      if (typeof tinymce !== 'undefined') {
+        const editor = tinymce.get('content');
+        if (editor && !editor.isHidden()) {
+          const text = (editor.getContent({ format: 'text' }) || '')
+            .replace(/\u00a0/g, ' ')
+            .trim();
+
+          const html = (editor.getContent() || '')
+            .replace(/<p>(?:\s|&nbsp;|<br[^>]*\/?>)*<\/p>/gi, '')
+            .replace(/&nbsp;/gi, '')
+            .trim();
+
+          return text === '' && html === '';
+        }
+      }
+
+      const val = (getTextarea().val() || '').trim();
+      return val === '';
+    }
+
+    function updatePlaceholder() {
+      const $ph = ensurePlaceholderEl();
+      if (!$ph.length) return;
+
+      const isVisual = getEditorWrap().hasClass('tmce-active');
+      const empty = editorIsEmpty();
+
+      if (isVisual && empty) {
+        $ph.show();
+      } else {
+        $ph.hide();
+      }
+    }
+
+    function bindEvents() {
+      const $container = getEditorContainer();
+      if (!$container.length) return;
+
+      ensurePlaceholderEl();
+
+      // click placeholder -> focus editor
+      $container.off('click.pbsgPlaceholder').on('click.pbsgPlaceholder', '.pbsg-editor-placeholder', function () {
+        const editor = (typeof tinymce !== 'undefined') ? tinymce.get('content') : null;
+        if (editor) {
+          editor.focus();
+        } else {
+          getTextarea().trigger('focus');
+        }
+      });
+
+      // switch Visual / Code tabs
+      $(document).on('click.pbsgPlaceholder', '#content-tmce, #content-html', function () {
+        setTimeout(updatePlaceholder, 100);
+      });
+
+      // textarea mode
+      getTextarea().on('input.pbsgPlaceholder change.pbsgPlaceholder', function () {
+        updatePlaceholder();
+      });
+
+      // TinyMCE mode
+      const tryBindTinyMCE = function () {
+        if (typeof tinymce === 'undefined') return false;
+        const editor = tinymce.get('content');
+        if (!editor) return false;
+
+        if (!editor._pbsgPlaceholderBound) {
+          editor._pbsgPlaceholderBound = true;
+
+          editor.on('init', updatePlaceholder);
+          editor.on('focus', function () {
+            ensurePlaceholderEl().hide();
+          });
+          editor.on('blur', updatePlaceholder);
+          editor.on('keyup change SetContent input NodeChange Undo Redo', updatePlaceholder);
+        }
+
+        return true;
+      };
+
+      let tries = 0;
+      const timer = setInterval(function () {
+        tries++;
+        const ok = tryBindTinyMCE();
+        updatePlaceholder();
+
+        if (ok || tries >= 40) {
+          clearInterval(timer);
+        }
+      }, 300);
+
+      $(window).on('load', function () {
+        setTimeout(updatePlaceholder, 300);
+      });
+    }
+
+    bindEvents();
+    setTimeout(updatePlaceholder, 300);
+  }
+
+  setupIntroductionPlaceholder();
 
 });
 

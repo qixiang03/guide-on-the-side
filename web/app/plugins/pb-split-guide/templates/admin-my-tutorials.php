@@ -13,7 +13,6 @@ $tutorials = isset($tutorials) && is_array($tutorials) ? $tutorials : [];
 
 <div class="wrap pbsg-admin-tutorials-page">
   <h1 style="margin-bottom:6px;">My Tutorials</h1>
-  <p style="margin-top:0;color:#646970;">Browse all Guide on the Side tutorials.</p>
 
   <div class="nav-tab-wrapper" style="margin-bottom:20px;">
     <a href="#" class="nav-tab nav-tab-active">Overview</a>

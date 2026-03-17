@@ -24,3 +24,4 @@ build/
 .history/
 CLAUDE.local.md
 .claude/commands/*
+.cursor/
