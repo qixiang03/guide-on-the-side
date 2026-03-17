@@ -516,10 +516,10 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
             <div class="ae-preview-box">
                 <p>Test your focus settings (press Tab to navigate):</p>
                 <div class="ae-test-elements" style="<?php echo $preview_style; ?>">
-                    <button type="button" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>Test Button</button>
-                    <input type="text" placeholder="Test Input" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
-                    <a href="#test">Test Link</a>
-                    <select <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
+                    <button aria-label="Button Focus Test Element" type="button" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>Test Button</button>
+                    <input aria-label="Text Focus Test Element" type="text" placeholder="Test Input" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
+                    <a aria-label="Link Focus Test Element" href="#test">Test Link</a>
+                    <select aria-label="Dropdown Focus Test Element"<?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
                         <option>Test Dropdown</option>
                     </select>
                 </div>
