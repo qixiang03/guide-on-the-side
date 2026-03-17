@@ -232,6 +232,13 @@ if (!function_exists('get_userdata')) {
     }
 }
 
+if (!function_exists('is_super_admin')) {
+    function is_super_admin($user_id = false): bool
+    {
+        return (bool) WPStubs::returnFor('is_super_admin', false);
+    }
+}
+
 if (!function_exists('date_i18n')) {
     function date_i18n(string $format, $timestamp = false, bool $gmt = false): string
     {
@@ -657,5 +664,23 @@ if (!function_exists('add_menu_page')) {
     {
         WPStubs::record('add_menu_page', [$page_title, $menu_title, $capability, $menu_slug, $callback, $icon_url, $position]);
         return $menu_slug;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  WP_User stub (for PBSG_Admin_Menu_Filter::librarian_login_redirect) */
+/* ------------------------------------------------------------------ */
+
+if (!class_exists('WP_User')) {
+    class WP_User
+    {
+        /** @var array<int, string> */
+        public $roles;
+
+        /** @param array<int, string> $roles */
+        public function __construct(array $roles = [])
+        {
+            $this->roles = $roles;
+        }
     }
 }
