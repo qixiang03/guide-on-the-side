@@ -13,11 +13,19 @@
 }
 
 /* Section heading */
-.ae-profile-section h2 {
+.ae-profile-section h2, .ae-profile-section h3 {
     margin-top: 0;
+    color: #23282d;
+}
+
+.ae-profile-section h2 {
     border-bottom: 2px solid #0073aa;
     padding-bottom: 10px;
-    color: #23282d;
+}
+
+.ae-profile-section h3 {
+    margin-top: 15px;
+    margin-bottom: 10px;
 }
 
 /* Description paragraph */
@@ -48,9 +56,10 @@
     vertical-align: middle;
 }
 
-/* Text input for width */
+/* Text input for width and keys */
 .ae-field-row input[type="text"],
-#ae_focus_width {
+#ae_focus_width,
+.ae-shortcut-row input[type="text"] {
     width: 100px;
 }
 
@@ -139,7 +148,8 @@
 }
 
 /* Checkbox label styling */
-#ae_enable_custom + label {
+#ae_enable_custom + label,
+#ae_enable_shortcuts + label {
     font-weight: normal;
 }
 
@@ -196,8 +206,11 @@
         border-color: #3c3c3c;
     }
     
-    .ae-profile-section h2 {
+    .ae-profile-section h2, .ae-profile-section h3 {
         color: #e0e0e0;
+    }
+    
+    .ae-profile-section h2 {
         border-bottom-color: #2271b1;
     }
     

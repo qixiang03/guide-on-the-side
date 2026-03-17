@@ -827,3 +827,10 @@ body.pbsg-standalone .pbsg-wrap{
   justify-content: center;
   flex-wrap: wrap;
 }
+
+/* When the tutorial is active, completely hide the footer */
+body.tutorial-active footer,
+body.tutorial-active .site-footer,
+body.tutorial-active #colophon {
+    display: none !important;
+}

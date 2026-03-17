@@ -27,6 +27,9 @@ class Pressbooks_Accessibility_Enhancer {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_custom_fonts'), 10);
         add_action('admin_enqueue_scripts', array($this, 'enqueue_custom_fonts'), 10);
         
+        // Expose custom shortcuts to frontend
+        add_action('wp_enqueue_scripts', array($this, 'localize_shortcuts_script'), 10);
+        
         // Pressbooks-specific hooks
         add_action('pressbooks_head', array($this, 'add_accessibility_styles'), 999);
         add_action('pb_head', array($this, 'add_accessibility_styles'), 999);
@@ -46,7 +49,6 @@ class Pressbooks_Accessibility_Enhancer {
         // Set default color scheme for new users
         add_action('user_register', array($this, 'set_default_admin_color'));
         
-        
         // Pressbooks custom CSS filters
         add_filter('pb_pdf_css_override', array($this, 'add_pdf_accessibility'));
         add_filter('pb_epub_css_override', array($this, 'add_epub_accessibility'));
@@ -61,6 +63,29 @@ class Pressbooks_Accessibility_Enhancer {
         
         if ($font_family === 'upei-default') {
             wp_enqueue_style('ae-upei-fonts', 'https://fonts.googleapis.com/css2?family=Lusitana:wght@400;700&family=Roboto+Condensed:wght@400;700&family=Roboto:wght@400;700&display=swap', array(), null);
+        }
+    }
+
+    /**
+     * Pass shortcut configuration to the frontend javascript
+     */
+    public function localize_shortcuts_script() {
+        $user_id = get_current_user_id();
+        if (!$user_id) return;
+        
+        $enable_shortcuts = get_user_meta($user_id, 'ae_enable_shortcuts', true);
+        
+        if ($enable_shortcuts) {
+            $shortcuts = array(
+                'prev' => get_user_meta($user_id, 'ae_shortcut_prev', true) ?: 'ArrowLeft',
+                'next' => get_user_meta($user_id, 'ae_shortcut_next', true) ?: 'ArrowRight',
+                'focus_quiz' => get_user_meta($user_id, 'ae_shortcut_quiz', true) ?: 'q',
+                'focus_tutorial' => get_user_meta($user_id, 'ae_shortcut_tutorial', true) ?: 't',
+            );
+            
+            wp_register_script('accessibility-enhancer-shortcuts', false);
+            wp_enqueue_script('accessibility-enhancer-shortcuts');
+            wp_add_inline_script('accessibility-enhancer-shortcuts', 'window.aeShortcuts = ' . wp_json_encode($shortcuts) . ';');
         }
     }
 
@@ -233,13 +258,13 @@ body.keyboard-navigation *:focus {
 <?php if ($font_family && $font_family !== 'default') : ?>
     <?php if ($font_family === 'upei-default') : ?>
 /* UPEI Library Default Typography */
-body, p, span, div, td, th, strong, h2, h3, h4, h5, h6, b {
+body, p, span, div, li, td, th {
     font-family: 'Roboto', sans-serif !important;
 }
-h1, .entry-title {
+h1, h2, h3, h4, h5, h6, strong, b, .entry-title {
     font-family: 'Lusitana', serif !important;
 }
-button, input, select, textarea, .nav, .menu, a.button, .page-navigation a, .a11y-skip-link, li {
+button, input, select, textarea, .nav, .menu, a.button, .page-navigation a, .a11y-skip-link {
     font-family: 'Roboto Condensed', sans-serif !important;
 }
     <?php else : ?>
@@ -332,11 +357,18 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
         $focus_color = get_user_meta($user->ID, 'ae_focus_color', true) ?: '#0066cc';
         $focus_width = get_user_meta($user->ID, 'ae_focus_width', true) ?: '3px';
         $font_family = get_user_meta($user->ID, 'ae_font_family', true) ?: 'default';
+        
+        // Shortcut Settings
+        $enable_shortcuts = get_user_meta($user->ID, 'ae_enable_shortcuts', true);
+        $shortcut_prev = get_user_meta($user->ID, 'ae_shortcut_prev', true) ?: 'ArrowLeft';
+        $shortcut_next = get_user_meta($user->ID, 'ae_shortcut_next', true) ?: 'ArrowRight';
+        $shortcut_quiz = get_user_meta($user->ID, 'ae_shortcut_quiz', true) ?: 'q';
+        $shortcut_tutorial = get_user_meta($user->ID, 'ae_shortcut_tutorial', true) ?: 't';
         ?>
         
         <div class="ae-profile-section">
             <h2>Accessibility Settings</h2>
-            <p>Customize keyboard focus indicators and typography to improve readability and navigation visibility.</p>
+            <p>Customize keyboard focus indicators, typography, and keyboard shortcuts to improve readability and navigation.</p>
             
             <table class="form-table">
                 <tr>
@@ -365,9 +397,6 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
                                name="ae_focus_color" 
                                id="ae_focus_color"
                                value="<?php echo esc_attr($focus_color); ?>" />
-                        <p class="description">
-                            Choose the color for keyboard focus outlines (default: #0066cc - blue)
-                        </p>
                     </td>
                 </tr>
                 
@@ -382,9 +411,6 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
                                value="<?php echo esc_attr($focus_width); ?>" 
                                class="small-text"
                                placeholder="3px" />
-                        <p class="description">
-                            Enter a CSS width value (e.g., 2px, 3px, 4px, 5px)
-                        </p>
                     </td>
                 </tr>
 
@@ -406,13 +432,85 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
                     </td>
                 </tr>
             </table>
+
+            <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;" />
+            <h3>Custom Keyboard Shortcuts</h3>
+            <p>Define custom keys to control tutorial pages efficiently. Use character keys (e.g. 'q') or key names (e.g. 'ArrowLeft').</p>
+
+            <table class="form-table">
+                <tr>
+                    <th scope="row">Enable Custom Shortcuts</th>
+                    <td>
+                        <label>
+                            <input type="checkbox" 
+                                   name="ae_enable_shortcuts" 
+                                   id="ae_enable_shortcuts"
+                                   value="1" 
+                                   <?php checked($enable_shortcuts, '1'); ?> />
+                            Use custom keyboard shortcuts on tutorial pages
+                        </label>
+                    </td>
+                </tr>
+
+                <tr class="ae-shortcut-row">
+                    <th scope="row">
+                        <label for="ae_shortcut_prev">Previous Button Key</label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="ae_shortcut_prev" 
+                               id="ae_shortcut_prev"
+                               value="<?php echo esc_attr($shortcut_prev); ?>" 
+                               class="regular-text" />
+                    </td>
+                </tr>
+
+                <tr class="ae-shortcut-row">
+                    <th scope="row">
+                        <label for="ae_shortcut_next">Next Button Key</label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="ae_shortcut_next" 
+                               id="ae_shortcut_next"
+                               value="<?php echo esc_attr($shortcut_next); ?>" 
+                               class="regular-text" />
+                    </td>
+                </tr>
+
+                <tr class="ae-shortcut-row">
+                    <th scope="row">
+                        <label for="ae_shortcut_quiz">Focus Quiz Button Key</label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="ae_shortcut_quiz" 
+                               id="ae_shortcut_quiz"
+                               value="<?php echo esc_attr($shortcut_quiz); ?>" 
+                               class="regular-text" />
+                    </td>
+                </tr>
+
+                <tr class="ae-shortcut-row">
+                    <th scope="row">
+                        <label for="ae_shortcut_tutorial">Focus Tutorial Button Key</label>
+                    </th>
+                    <td>
+                        <input type="text" 
+                               name="ae_shortcut_tutorial" 
+                               id="ae_shortcut_tutorial"
+                               value="<?php echo esc_attr($shortcut_tutorial); ?>" 
+                               class="regular-text" />
+                    </td>
+                </tr>
+            </table>
             
             <?php 
             $preview_style = '';
             if ($font_family !== 'default' && $font_family !== 'upei-default') {
-                $preview_style = 'font-family: ' . esc_attr($font_family) . ';';
+                $preview_style .= 'font-family: ' . esc_attr($font_family) . '; ';
             } elseif ($font_family === 'upei-default') {
-                $preview_style = "font-family: 'Roboto', sans-serif;";
+                $preview_style .= "font-family: 'Roboto', sans-serif; ";
             }
             ?>
             <div class="ae-preview-box">
@@ -438,14 +536,13 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
             return false;
         }
         
-        // Save enable/disable setting
+        // Save focus custom settings
         if (isset($_POST['ae_enable_custom'])) {
             update_user_meta($user_id, 'ae_enable_custom', '1');
         } else {
             delete_user_meta($user_id, 'ae_enable_custom');
         }
         
-        // Save color setting
         if (isset($_POST['ae_focus_color'])) {
             $color = sanitize_hex_color($_POST['ae_focus_color']);
             if ($color) {
@@ -453,10 +550,8 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
             }
         }
         
-        // Save width setting
         if (isset($_POST['ae_focus_width'])) {
             $width = sanitize_text_field($_POST['ae_focus_width']);
-            // Validate CSS width format
             if (preg_match('/^\d+\.?\d*(px|em|rem|%)$/', $width)) {
                 update_user_meta($user_id, 'ae_focus_width', $width);
             }
@@ -464,9 +559,24 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
 
         // Save font setting
         if (isset($_POST['ae_font_family'])) {
-            // Because the font family string contains quotes/commas, we use wp_unslash and sanitize_text_field sparingly
             $font_family = sanitize_text_field(wp_unslash($_POST['ae_font_family']));
             update_user_meta($user_id, 'ae_font_family', $font_family);
+        }
+
+        // Save Custom Shortcuts settings
+        if (isset($_POST['ae_enable_shortcuts'])) {
+            update_user_meta($user_id, 'ae_enable_shortcuts', '1');
+        } else {
+            delete_user_meta($user_id, 'ae_enable_shortcuts');
+        }
+
+        $shortcut_fields = ['ae_shortcut_prev', 'ae_shortcut_next', 'ae_shortcut_quiz', 'ae_shortcut_tutorial'];
+        foreach ($shortcut_fields as $field) {
+            if (isset($_POST[$field])) {
+                // Keep the raw string (allowing 'ArrowLeft', 'a', etc) but remove potentially dangerous characters.
+                $key = sanitize_text_field(wp_unslash($_POST[$field]));
+                update_user_meta($user_id, $field, $key);
+            }
         }
     }
     

@@ -13,6 +13,78 @@ const introScreen = document.getElementById('pbsgIntroScreen');
 const mainContent = document.getElementById('pbsgMainContent');
 const startTutorialBtn = document.getElementById('pbsgStartTutorial');
 
+// Add a class to the body when the tutorial is active
+document.body.classList.add('tutorial-active');
+
+document.addEventListener('DOMContentLoaded', function() {    
+
+    /**
+     * Accessibility Dashboard: Custom Shortcuts Listener
+     */
+    function initCustomShortcuts() {
+        // Check if the user has shortcuts enabled and defined (passed from PHP)
+        if (typeof window.aeShortcuts === 'undefined') {
+            return; // Shortcuts not enabled for this user
+        }
+
+        const shortcuts = window.aeShortcuts;
+
+        document.addEventListener('keydown', function(event) {
+            // Ignore keypresses if the user is typing inside an input, textarea, or contenteditable
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) || event.target.isContentEditable) {
+                return;
+            }
+            // Map the pressed key to the corresponding action
+            switch (event.key) {
+                case shortcuts.prev:
+                    event.preventDefault(); // Prevent default browser scrolling if using arrow keys
+                    triggerPreviousAction();
+                    break;
+                    
+                case shortcuts.next:
+                    event.preventDefault();
+                    triggerNextAction();
+                    break;
+                    
+                case shortcuts.focus_quiz:
+                    event.preventDefault();
+                    triggerFocusQuiz();
+                    break;
+                    
+                case shortcuts.focus_tutorial:
+                    event.preventDefault();
+                    triggerFocusTutorial();
+                    break;
+            }
+        });
+    }
+
+    // Helper functions to trigger the actions.
+    
+    function triggerPreviousAction() {
+        if (prevBtn && !prevBtn.disabled) {
+            prevBtn.click();
+        }
+    }
+
+    function triggerNextAction() {
+        if (nextBtn && !nextBtn.disabled) {
+            nextBtn.click();
+        }
+    }
+
+    function triggerFocusQuiz() {
+        toggleFocus('quiz');        
+    }
+
+    function triggerFocusTutorial() {
+        toggleFocus('tutorial');        
+
+    }
+
+    // Initialize the listener
+    initCustomShortcuts();
+});
 
 // --------------------
 // Menu (step list) in quiz pane

@@ -19,12 +19,15 @@ Many users can face difficulties navigating and operating online web application
 
 ## Key Features
 
-- Custom, per-user, focus indicators which can be changed in the 'Accessibility Settings' section of a users profile
+- Colorblind friendly color scheme alongside a default UPEI Library color scheme
+- Custom focus indicators 
+- Sitewide font selection with choices from the UPEI Library Default (consisting of Lusitana, Roboto, and Roboto Condensed), Arial, Verdana, and Tahoma
+- Custom keyboard shortcuts for Guide-on-the-Side tutorials allowing for easy forward and backward navigation or focus changes
 
 ---
 
 ## How It Works
-
+Defines custom user metadata values which contain user accessibility preferences for color schemes, focus indication, font families, and tutorial keyboard shortcuts.
 
 ### Installation
 
@@ -44,7 +47,10 @@ Admin → Plugins
 3. Modify User Profile:
 
 ```
+Profile → Administration Color Scheme
 Profile → Accessibility Settings → Enable Custom Focus Indicators
+Profile → Accessibility Settings → Sitewide Font Family
+Profile → Accessibility Settings → Custom Keyboard Shortcuts
 
 ```
 
@@ -52,3 +58,6 @@ Profile → Accessibility Settings → Enable Custom Focus Indicators
 ### Usage
 
 - Adjust focus indicators across the site with custom outline color and width
+- Enable colorblind friendly administration color schemes
+- Select preferred font family
+- Define custom shortcuts for use within Guide-on-the-Side tutorials
