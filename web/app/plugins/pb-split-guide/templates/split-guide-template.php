@@ -174,7 +174,7 @@ foreach ($steps as $s) {
 </div>
 
       <div class="pbsg-iframe-wrap">
-        <iframe id="pbsgH5PFrame" class="pbsg-iframe"></iframe>
+        <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe"></iframe>
       </div>
 
       <div class="pbsg-nav">
@@ -192,7 +192,7 @@ foreach ($steps as $s) {
     <div class="pbsg-banner">
       <div class="pbsg-banner-text">
         <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
-        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window ↗</a>
+        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank" style="text-decoration: underline;">Open in new window ↗</a>
       </div>
       <div class="pbsg-banner-actions">
         <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>
@@ -200,9 +200,9 @@ foreach ($steps as $s) {
     </div>
 
    <div class="pbsg-iframe-wrap" id="pbsgTutorialStage">
-    <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
+    <iframe aria-label="Tutorial Frame" id="pbsgTutorialFrame" class="pbsg-iframe"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-      allowfullscreen></iframe>
+      allowfullscreen ></iframe>
   </div>
     <div id="pbsgTutorialFallback" class="pbsg-fallback">
       <a id="pbsgFallbackLink" href="#" target="_blank">Open file in new tab</a>
