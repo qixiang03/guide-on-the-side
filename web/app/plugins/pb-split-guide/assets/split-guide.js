@@ -530,6 +530,101 @@ function toEmbeddableUrl(rawUrl){
     return embed.toString();
   }
 
+
+    // vimeo.com/<id> or player.vimeo.com/video/<id>
+  if (host === 'vimeo.com' || host === 'player.vimeo.com') {
+    let id = '';
+
+    // Normal Vimeo URL: /123456789
+    const parts = u.pathname.split('/').filter(Boolean);
+
+    if (host === 'vimeo.com') {
+      // Examples:
+      // /123456789
+      // /channels/staffpicks/123456789
+      // /ondemand/xyz/123456789
+      for (let j = parts.length - 1; j >= 0; j--) {
+        if (/^\d+$/.test(parts[j])) {
+          id = parts[j];
+          break;
+        }
+      }
+    }
+
+    if (host === 'player.vimeo.com') {
+      // Example: /video/123456789
+      const videoIndex = parts.indexOf('video');
+      if (videoIndex !== -1 && parts[videoIndex + 1] && /^\d+$/.test(parts[videoIndex + 1])) {
+        id = parts[videoIndex + 1];
+      }
+    }
+
+    if (!id) return rawUrl;
+
+    const embed = new URL(`https://player.vimeo.com/video/${id}`);
+
+    // Keep optional timestamp if present
+    const t = u.searchParams.get('t') || u.searchParams.get('#t');
+    if (t) {
+      embed.searchParams.set('t', t);
+    }
+
+    return embed.toString();
+  }
+
+    // dailymotion.com/video/<id> or dai.ly/<id>
+  if (host === 'dailymotion.com' || host === 'www.dailymotion.com' || host === 'dai.ly') {
+    let id = '';
+
+    if (host === 'dai.ly') {
+      // Short link: dai.ly/x8abcde
+      id = u.pathname.replace(/^\//, '').split('/')[0];
+    }
+
+    if (host.includes('dailymotion.com')) {
+      // Example: /video/x8abcde
+      const parts = u.pathname.split('/').filter(Boolean);
+      const videoIndex = parts.indexOf('video');
+      if (videoIndex !== -1 && parts[videoIndex + 1]) {
+        id = parts[videoIndex + 1];
+      }
+    }
+
+    if (!id) return rawUrl;
+
+    const embed = new URL(`https://www.dailymotion.com/embed/video/${id}`);
+
+    // Optional: start time support
+    const start = u.searchParams.get('start');
+    if (start) embed.searchParams.set('start', start);
+
+    return embed.toString();
+  }
+
+
+    // TED talk URLs -> embed.ted.com
+  if (host === 'ted.com' || host === 'www.ted.com' || host === 'embed.ted.com') {
+    const parts = u.pathname.split('/').filter(Boolean);
+
+    // Already embed URL
+    if (host === 'embed.ted.com') {
+      return rawUrl;
+    }
+
+    // Example: /talks/sir_ken_robinson_do_schools_kill_creativity
+    if (parts[0] === 'talks' && parts[1]) {
+      let path = `/talks/${parts[1]}`;
+
+      // Preserve language when present
+      const lang = u.searchParams.get('language');
+      if (lang) {
+        path = `/talks/lang/${lang}/${parts[1]}`;
+      }
+
+      return `https://embed.ted.com${path}`;
+    }
+  }
+
   return rawUrl;
 }
 
