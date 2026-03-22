@@ -88,6 +88,29 @@ foreach ($steps as $s) {
     $tutorial['mime'] = get_post_mime_type($tutorial_attachment_id);
   }
 
+  $branch_tutorial_type = isset($s['branch_tutorial_type']) ? $s['branch_tutorial_type'] : '';
+  $branch_tutorial_url  = isset($s['branch_tutorial_url']) ? $s['branch_tutorial_url'] : '';
+  $branch_tutorial_attachment_id = isset($s['branch_tutorial_attachment_id']) ? absint($s['branch_tutorial_attachment_id']) : 0;
+
+  $branch = [
+    'mode' => !empty($s['branch_mode']) ? $s['branch_mode'] : 'none',
+    'trigger_attempts' => !empty($s['branch_trigger_attempts']) ? (int)$s['branch_trigger_attempts'] : 1,
+    'title' => !empty($s['branch_title']) ? $s['branch_title'] : '',
+    'intro' => !empty($s['branch_intro']) ? $s['branch_intro'] : '',
+    'tutorial' => [
+      'type' => $branch_tutorial_type,
+      'url' => $branch_tutorial_url,
+      'file_url' => '',
+      'mime' => ''
+    ]
+  ];
+
+  if ($branch_tutorial_type === 'file' && $branch_tutorial_attachment_id > 0) {
+    $branch['tutorial']['file_url'] = wp_get_attachment_url($branch_tutorial_attachment_id);
+    $branch['tutorial']['mime'] = get_post_mime_type($branch_tutorial_attachment_id);
+  }
+
+  $s['branch'] = $branch;
   $s['tutorial'] = $tutorial;
   $steps_enriched[] = $s;
 }
@@ -198,6 +221,27 @@ foreach ($steps as $s) {
         <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>
       </div>
     </div>
+
+
+  <div id="pbsgBranchModal" class="pbsg-branch-modal" style="display:none;" aria-hidden="true">
+    <div class="pbsg-branch-modal-backdrop"></div>
+
+    <div class="pbsg-branch-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgBranchModalTitle">
+      <button type="button" class="pbsg-branch-modal-close" id="pbsgBranchClose" aria-label="Close" style="display:none;">&times;</button>
+
+      <h3 id="pbsgBranchModalTitle" class="pbsg-branch-modal-title">Branch Review</h3>
+
+      <div id="pbsgBranchText" class="pbsg-branch-text"></div>
+
+      <div class="pbsg-branch-actions">
+        <button type="button" class="button button-primary" id="pbsgBranchOpen">Start</button>
+        <button type="button" class="button" id="pbsgBranchSkip" style="display:none;">Skip</button>
+        <button type="button" class="button button-primary" id="pbsgBranchComplete" style="display:none;">I Finished This Sub-Tutorial</button>
+        <button type="button" class="button" id="pbsgBranchReturn" style="display:none;">Back to Main Tutorial</button>
+      </div>
+    </div>
+  </div>
+
 
    <div class="pbsg-iframe-wrap" id="pbsgTutorialStage">
     <iframe aria-label="Tutorial Frame" id="pbsgTutorialFrame" class="pbsg-iframe"

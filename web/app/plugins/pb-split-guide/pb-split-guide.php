@@ -445,11 +445,12 @@ class PB_Split_Guide_Plugin {
       <table class="widefat striped" id="pbsg-steps-table" style="margin-top:8px;">
         <thead>
           <tr>
-            <th style="width: 25%;">Step title (optional)</th>
-            <th style="width: 22%;">H5P</th>
-            <th>Tutorial Source</th>
-            <th style="width: 10%;">Actions</th>
-          </tr>
+          <th style="width: 22%;">Step title (optional)</th>
+          <th style="width: 20%;">H5P</th>
+          <th style="width: 24%;">Tutorial Source</th>
+          <th style="width: 24%;">Branch Review</th>
+          <th style="width: 10%;">Actions</th>
+        </tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -465,44 +466,38 @@ class PB_Split_Guide_Plugin {
 
       <hr style="margin: 14px 0;" />
 
-      <hr style="margin: 14px 0;" />
-
-
-
-
-
       <div class="pbsg-cover-image-box" style="max-width:560px;">
-  <p><strong>Tutorial Cover Image (optional)</strong></p>
+        <p><strong>Tutorial Cover Image (optional)</strong></p>
 
-  <div style="margin-bottom:12px;">
-    <img
-      id="pbsg_cover_preview"
-      src="<?php echo esc_url($cover_image_url); ?>"
-      alt=""
-      style="max-width:320px; width:100%; height:auto; border:1px solid #dcdcde; display:<?php echo $cover_image_url ? 'block' : 'none'; ?>;"
-    />
-  </div>
+        <div style="margin-bottom:12px;">
+          <img
+            id="pbsg_cover_preview"
+            src="<?php echo esc_url($cover_image_url); ?>"
+            alt=""
+            style="max-width:320px; width:100%; height:auto; border:1px solid #dcdcde; display:<?php echo $cover_image_url ? 'block' : 'none'; ?>;"
+          />
+        </div>
 
-  <input
-    type="hidden"
-    id="pbsg_cover_image_id"
-    name="pbsg_cover_image_id"
-    value="<?php echo esc_attr($cover_image_id); ?>"
-  />
+        <input
+          type="hidden"
+          id="pbsg_cover_image_id"
+          name="pbsg_cover_image_id"
+          value="<?php echo esc_attr($cover_image_id); ?>"
+        />
 
-  <input
-    type="hidden"
-    id="pbsg_cover_image_url"
-    value="<?php echo esc_attr($cover_image_url); ?>"
-  />
+        <input
+          type="hidden"
+          id="pbsg_cover_image_url"
+          value="<?php echo esc_attr($cover_image_url); ?>"
+        />
 
-  <p>
-    <button type="button" class="button" id="pbsg_pick_cover_image">Choose Cover Image</button>
-    <button type="button" class="button" id="pbsg_clear_cover_image">Clear Cover</button>
-  </p>
+        <p>
+          <button type="button" class="button" id="pbsg_pick_cover_image">Choose Cover Image</button>
+          <button type="button" class="button" id="pbsg_clear_cover_image">Clear Cover</button>
+        </p>
 
-  <p class="description">This image will be used on the My Tutorials overview page.</p>
-</div>
+        <p class="description">This image will be used on the My Tutorials overview page.</p>
+      </div>
 
 
       <p>
