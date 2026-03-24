@@ -15,6 +15,8 @@ if (file_exists($autoload)) {
 }
 
 require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-template-manager.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-export-import.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
@@ -39,6 +41,16 @@ class PB_Split_Guide_Plugin {
     add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
 
     add_action('wp_ajax_pbsg_list_h5p', [$this, 'ajax_list_h5p']);
+
+    // Template picker
+    add_action('load-post-new.php',             [$this, 'maybe_redirect_to_template_picker']);
+    add_action('admin_menu',                    [$this, 'register_template_picker_page']);
+    add_action('wp_ajax_pbsg_get_templates',    [$this, 'ajax_get_templates']);
+    add_action('wp_ajax_pbsg_save_as_template', [$this, 'ajax_save_as_template']);
+    add_action('wp_ajax_pbsg_create_from_template', [$this, 'ajax_create_from_template']);
+
+    // Table creation (handles already-active installs)
+    add_action('admin_init', ['PBSG_Template_Manager', 'maybe_create_tables'], 1);
 
     // Rename "Pages" to "Tutorials" — use gettext filter (like Pressbooks does
     // for "Sites" → "Books") so it works everywhere regardless of menu rebuild order.
@@ -413,6 +425,7 @@ class PB_Split_Guide_Plugin {
       }
 
       $tutorials[] = [
+        'post_id'   => $post_id,
         'title'     => get_the_title($post_id),
         'link'      => get_permalink($post_id),
         'edit_link' => current_user_can('edit_post', $post_id) ? get_edit_post_link($post_id) : '',
@@ -457,6 +470,7 @@ class PB_Split_Guide_Plugin {
 
       <p style="margin-top:10px;">
         <button type="button" class="button" id="pbsg-add-step">Add Step</button>
+        <button type="button" class="button" id="pbsg-save-as-template" style="margin-left:8px;">Save as Template</button>
       </p>
 
       <input type="hidden"
@@ -597,12 +611,18 @@ class PB_Split_Guide_Plugin {
     '1.0.2'
   );
 
+  $post_id          = isset($_GET['post']) ? absint($_GET['post']) : 0;
+  $current_template = $post_id ? get_post_meta($post_id, '_wp_page_template', true) : '';
+
   wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
-    'templateSlug' => self::TEMPLATE_SLUG,
-    'metaBoxId'    => 'pbsg_settings',
-    'ajaxUrl'      => admin_url('admin-ajax.php'),
-    'nonce'        => wp_create_nonce('pbsg_h5p_picker'),
-    'isNewPage'    => ($hook === 'post-new.php'),
+    'templateSlug'    => self::TEMPLATE_SLUG,
+    'metaBoxId'       => 'pbsg_settings',
+    'ajaxUrl'         => admin_url('admin-ajax.php'),
+    'nonce'           => wp_create_nonce('pbsg_h5p_picker'),
+    'templateNonce'   => wp_create_nonce('pbsg_template_picker'),
+    'exportNonce'     => wp_create_nonce('pbsg_export_import'),
+    'isNewPage'       => ($hook === 'post-new.php'),
+    'currentTemplate' => $current_template,
   ]);
 
   // Extra inline script: force the template on Add New Tutorial page.
@@ -641,6 +661,92 @@ class PB_Split_Guide_Plugin {
   }
 }
 
+  // ── Template Picker ────────────────────────────────────────────────────────
+
+  /**
+   * Redirect post-new.php?post_type=page → template picker page.
+   */
+  public function maybe_redirect_to_template_picker() {
+    $post_type = isset($_GET['post_type']) ? sanitize_key($_GET['post_type']) : 'post';
+    if ($post_type !== 'page') return;
+    if (!current_user_can('edit_pages')) return;
+
+    wp_safe_redirect(admin_url('admin.php?page=pbsg-new-tutorial'));
+    exit;
+  }
+
+  public function register_template_picker_page() {
+    add_submenu_page(
+      null,               // hidden — no parent
+      'New Tutorial',
+      'New Tutorial',
+      'edit_pages',
+      'pbsg-new-tutorial',
+      [$this, 'render_template_picker_page']
+    );
+  }
+
+  public function render_template_picker_page() {
+    if (!current_user_can('edit_pages')) {
+      wp_die(__('You do not have permission to access this page.'));
+    }
+    require plugin_dir_path(__FILE__) . 'templates/admin-new-tutorial.php';
+  }
+
+  public function ajax_get_templates() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    wp_send_json_success(['templates' => PBSG_Template_Manager::get_templates()]);
+  }
+
+  public function ajax_save_as_template() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    $post_id     = isset($_POST['post_id'])     ? absint($_POST['post_id'])                                          : 0;
+    $name        = isset($_POST['name'])        ? sanitize_text_field(wp_unslash($_POST['name']))                   : '';
+    $description = isset($_POST['description']) ? sanitize_textarea_field(wp_unslash($_POST['description']))        : '';
+    $category    = isset($_POST['category'])    ? sanitize_text_field(wp_unslash($_POST['category']))               : '';
+
+    if (!$post_id || !$name) {
+      wp_send_json_error(['message' => 'Name and post_id are required.']);
+    }
+
+    if (!current_user_can('edit_post', $post_id)) {
+      wp_send_json_error(['message' => 'You cannot edit this post.'], 403);
+    }
+
+    $steps_json  = isset($_POST['steps_json'])  ? wp_unslash($_POST['steps_json'])                              : null;
+    $header_note = isset($_POST['header_note']) ? sanitize_text_field(wp_unslash($_POST['header_note']))        : null;
+
+    $id = PBSG_Template_Manager::save_as_template($post_id, $name, $description, $category, $steps_json, $header_note);
+    if (!$id) wp_send_json_error(['message' => 'Could not save template.']);
+
+    wp_send_json_success(['id' => $id, 'message' => 'Template saved successfully.']);
+  }
+
+  public function ajax_create_from_template() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
+    $title       = isset($_POST['title'])       ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
+
+    $post_id = PBSG_Template_Manager::create_from_template($template_id, $title);
+
+    if (is_wp_error($post_id)) {
+      wp_send_json_error(['message' => $post_id->get_error_message()]);
+    }
+
+    wp_send_json_success([
+      'post_id'  => $post_id,
+      'edit_url' => get_edit_post_link($post_id, 'url'),
+    ]);
+  }
+
+  // ── H5P ───────────────────────────────────────────────────────────────────
+
   public function ajax_list_h5p() {
     check_ajax_referer('pbsg_h5p_picker', 'nonce');
 
@@ -666,8 +772,12 @@ class PB_Split_Guide_Plugin {
 
 new PB_Split_Guide_Plugin();
 
-register_activation_hook( __FILE__, array( 'PBSG_Analytics', 'create_tables' ) );
+register_activation_hook( __FILE__, function() {
+  PBSG_Analytics::create_tables();
+  PBSG_Template_Manager::create_tables();
+} );
 
 PBSG_Analytics::init();
 PBSG_Analytics_Dashboard::init();
 PBSG_Certificate::init();
+PBSG_Export_Import::init();

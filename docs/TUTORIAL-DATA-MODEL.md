@@ -1,22 +1,25 @@
 # Guide on the Side - Tutorial Data Model
 
-**Author:** Daniel McGrath (Tech Lead)  
-**Date:** February 2, 2026  
-**Sprint:** 3  
-**Status:** Draft Schema for Team Review
+**Author:** Daniel McGrath (Tech Lead)
+**Date:** February 2, 2026 — Updated March 23, 2026
+**Sprint:** 3 (original) / 7 (updated)
+**Status:** Updated to reflect actual implementation
 
 ---
 
 ## Overview
 
-This document defines the database schema for the Guide on the Side tutorial system. The schema supports:
+This document defines the data model for the Guide on the Side tutorial system as implemented. The system supports:
 
 - Tutorial creation and management by librarians
-- Draft/publish workflow
-- Reusable templates
+- Draft/publish workflow (WordPress native)
+- Reusable templates (custom DB table, Sprint 7)
 - Multi-step tutorials with H5P quizzes and embedded resources
 - Simple branching for remediation
 - Anonymous student usage (no tracking)
+- Export/import of tutorials as portable `.json` files (Sprint 7)
+
+> **Implementation note:** The Sprint 3 draft proposed custom `tutorials` and `tutorial_steps` tables. The final implementation chose the **postmeta approach** instead — tutorial content and steps are stored as WordPress page post meta (JSON). This integrates better with the WordPress admin, draft/publish, and revision system. The custom table approach is used only for the templates feature (Sprint 7). See the Integration Notes section for the full rationale.
 
 ---
 
@@ -199,20 +202,94 @@ Step 4 (order_index: 4)  ← Remediation step
 
 ---
 
+## Actual Implementation (Sprint 3 onwards)
+
+Tutorials are stored as standard WordPress **pages** with the `split-guide-template.php` page template assigned. All step data lives in post meta.
+
+### Post Meta Keys
+
+| Meta Key | Type | Description |
+|----------|------|-------------|
+| `_wp_page_template` | string | `split-guide-template.php` — identifies page as a split guide tutorial |
+| `_pbsg_steps_json` | JSON string | Array of step objects (see Step Object below) |
+| `_pbsg_header_note` | string | Optional text shown at the top of the tutorial |
+
+### Step Object (inside `_pbsg_steps_json`)
+
+Each element of the steps array:
+
+```json
+{
+  "title": "Step title",
+  "tutorial_type": "url | h5p | attachment",
+  "tutorial_url": "https://...",
+  "h5p_id": 0,
+  "tutorial_attachment_id": 0,
+  "tutorial_file_name": "",
+  "tutorial_file_url": "",
+  "url": "https://...",
+  "branch_mode": "none | review",
+  "branch_trigger_attempts": 1,
+  "branch_title": "",
+  "branch_intro": "",
+  "branch_tutorial_type": "",
+  "branch_tutorial_url": "",
+  "branch_tutorial_attachment_id": 0,
+  "branch_tutorial_file_name": "",
+  "branch_tutorial_file_url": ""
+}
+```
+
+---
+
+## wp_pbsg_tutorial_templates (Sprint 7)
+
+Custom table for saved tutorial templates. Created on plugin activation and on `admin_init` if missing.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| id | BIGINT UNSIGNED | Auto increment primary key |
+| name | VARCHAR(200) | Template display name |
+| description | TEXT | Optional description shown on picker card |
+| category | VARCHAR(100) | e.g. "General", "Research" |
+| is_system | TINYINT(1) | 1 = built-in (undeletable), 0 = user-created |
+| steps_json | LONGTEXT | Full step configuration copied from source tutorial |
+| header_note | VARCHAR(500) | Header note from source tutorial |
+| created_by | BIGINT UNSIGNED | User ID of creator |
+| created_at | DATETIME | Auto-set on insert |
+
+**SQL:**
+```sql
+CREATE TABLE IF NOT EXISTS wp_pbsg_tutorial_templates (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(200)    NOT NULL,
+    description TEXT,
+    category    VARCHAR(100)    DEFAULT '',
+    is_system   TINYINT(1)      DEFAULT 0,
+    steps_json  LONGTEXT        NOT NULL DEFAULT '[]',
+    header_note VARCHAR(500)    DEFAULT '',
+    created_by  BIGINT UNSIGNED DEFAULT 0,
+    created_at  DATETIME        DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id)
+);
+```
+
+Seeded on install with one built-in template: **"Split Guide (Default)"** — one empty step. The built-in template has `is_system = 1` and cannot be deleted.
+
+---
+
 ## Integration Notes
 
 ### WordPress Integration
 
-These tables would be prefixed with `wp_` when created (e.g., `wp_tutorials`, `wp_tutorial_steps`) to follow WordPress conventions.
-
-**Alternative approach:** Use WordPress custom post types and postmeta instead of custom tables. This integrates better with WordPress admin but makes complex queries harder.
+The final implementation uses the **postmeta approach** rather than custom tables for tutorial content:
 
 | Approach | Pros | Cons |
 |----------|------|------|
 | Custom tables | Clean schema, easy queries, clear relationships | More work to integrate with WP admin |
-| Postmeta | Native WP integration, works with existing plugins | Data spread across tables, complex joins |
+| Postmeta (chosen) | Native WP integration, draft/publish/revisions for free, works with existing plugins | Step data is denormalized JSON blob |
 
-**Recommendation:** Start with custom tables for cleaner data structure. We can add WordPress admin integration via a custom plugin.
+The postmeta approach was chosen because WordPress handles draft/publish, revisions, author, and page routing automatically. The only custom table is `wp_pbsg_tutorial_templates` for the reusable templates feature, where rows need to be listed independently of any post.
 
 ### H5P Integration
 
@@ -235,14 +312,11 @@ We only store `h5p_content_id` which references `wp_h5p_contents.id`.
 
 ---
 
-## Open Questions for Client
+## Previously Open Questions (Resolved)
 
-| Question | Options | Impact |
-|----------|---------|--------|
-| **Media storage** | A) Always use iframe/embed (YouTube, external URLs) | No additional tables needed |
-| | B) Allow uploading media (images, PDFs, videos) to server | May need `tutorial_media` table or use WordPress Media Library |
-
-**Recommendation:** Clarify with client whether librarians need to upload files or if embedding external content (YouTube, library resources) is sufficient. This affects storage requirements and complexity.
+| Question | Resolution |
+|----------|------------|
+| **Media storage** | Both approaches are supported. Steps can embed URLs (YouTube, catalog sites) or attach files uploaded to the WordPress Media Library. Attachment IDs are stored in `tutorial_attachment_id`; file URLs are cached in `tutorial_file_url`. No separate media table is needed. |
 
 ---
 
