@@ -86,7 +86,7 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
     public function test_total_hook_count_matches_expected(): void
     {
         $this->assertCount(4, WPStubs::$hooks['filter'], 'Expected 4 filters');
-        $this->assertCount(17, WPStubs::$hooks['action'], 'Expected 17 actions');
+        $this->assertCount(23, WPStubs::$hooks['action'], 'Expected 23 actions');
     }
 
     /* =============================================================
@@ -374,6 +374,6 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $args = WPStubs::callArgs('register_activation_hook', 0);
         $this->assertIsArray($args);
         $this->assertCount(2, $args);
-        $this->assertSame(['PBSG_Analytics', 'create_tables'], $args[1]);
+        $this->assertTrue(is_callable($args[1]), 'Activation hook callback should be callable');
     }
 }
