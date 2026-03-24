@@ -645,6 +645,24 @@ if (!function_exists('esc_url')) {
     }
 }
 
+if (!function_exists('wp_max_upload_size')) {
+    function wp_max_upload_size(): int
+    {
+        return (int) WPStubs::returnFor('wp_max_upload_size', 2097152); // 2 MB default
+    }
+}
+
+if (!function_exists('size_format')) {
+    function size_format($bytes, int $decimals = 0): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $bytes = max((int) $bytes, 0);
+        $pow   = $bytes ? floor(log($bytes, 1024)) : 0;
+        $pow   = min($pow, count($units) - 1);
+        return round($bytes / (1024 ** $pow), $decimals) . ' ' . $units[$pow];
+    }
+}
+
 if (!function_exists('add_shortcode')) {
     function add_shortcode(string $tag, callable $callback): void
     {

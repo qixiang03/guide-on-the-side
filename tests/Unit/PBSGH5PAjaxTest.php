@@ -20,6 +20,9 @@ class PBSGH5PAjaxTest extends TestCase
         WPStubs::reset();
         $this->wpdb = new MockWpdb();
         $GLOBALS['wpdb'] = $this->wpdb;
+
+        // Grant the RBAC capability so the handler reaches DB logic
+        WPStubs::$returns['current_user_can'] = true;
     }
 
     protected function tearDown(): void
