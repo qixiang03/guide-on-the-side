@@ -43,6 +43,16 @@ For each checkbox:
 
 ---
 
+## Template Picker & Export/Import (Sprint 7)
+
+- [ ] ✅/❌ Template picker blocks create when no card is selected (TC-20)
+- [ ] ✅/❌ Template picker blocks create when title is empty (TC-21)
+- [ ] ✅/❌ Import rejects non-PBSG JSON with clear error (TC-22)
+- [ ] ✅/❌ Import blocks submission when no file is selected (TC-23)
+- [ ] ✅/❌ Imported tutorial is draft-only and appears on My Tutorials after publish (TC-24)
+
+---
+
 ## Run Log
 
 - Date:

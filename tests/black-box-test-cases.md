@@ -9,7 +9,7 @@ They are designed to be repeatable by any team member.
 
 - Platform: Pressbooks local dev environment
 - Browser: Chrome (latest)
-- User roles tested: Admin / Librain / Student
+- User roles tested: Admin / Librarian / Student
 
 ## Conventions
 
@@ -432,6 +432,166 @@ They are designed to be repeatable by any team member.
 - PDF downloads successfully.
 - File opens and content is correct.
 - If testable: a user who has not completed the tutorial gets an error or no download when attempting to download.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+
+---
+
+## TC-20 — Template Picker Requires Card Selection
+
+**Preconditions**
+
+- Logged in as Admin/Librarian with tutorial authoring access.
+- Open Tutorials → Add Tutorial from `.../development/wp-admin/`.
+
+**Steps**
+
+1. On the template picker page, do not select any template card.
+2. Enter a valid tutorial title.
+3. Click “Create Tutorial”.
+
+**Expected Result**
+
+- Inline validation error appears: "Please choose a starting point".
+- No tutorial page is created.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+---
+
+## TC-21 — Template Picker Requires Non-Empty Title
+
+**Preconditions**
+
+- Logged in as Admin/Librarian with tutorial authoring access.
+- Open Tutorials → Add Tutorial.
+
+**Steps**
+
+1. Select any template card.
+2. Leave title empty.
+3. Click “Create Tutorial”.
+
+**Expected Result**
+
+- Validation error is shown for missing title.
+- No tutorial page is created.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+---
+
+## TC-22 — Import Rejects Non-PBSG JSON
+
+**Preconditions**
+
+- Logged in as Admin/Librarian.
+- Open My Tutorials page.
+
+**Steps**
+
+1. In "Import Tutorial", choose a random/non-PBSG `.json` file.
+2. Click Import.
+
+**Expected Result**
+
+- Import fails with an error message indicating invalid export file format.
+- No new tutorial draft is created.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+---
+
+## TC-23 — Import Requires File Selection
+
+**Preconditions**
+
+- Logged in as Admin/Librarian.
+- Open My Tutorials page.
+
+**Steps**
+
+1. In "Import Tutorial", do not select any file.
+2. Click Import.
+
+**Expected Result**
+
+- UI/API returns an error indicating upload/file selection is required.
+- No tutorial draft is created.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+-
+
+---
+
+## TC-24 — Imported Tutorial Is Draft and Hidden Until Published
+
+**Preconditions**
+
+- Logged in as Admin/Librarian.
+- A valid exported PBSG tutorial `.json` is available.
+
+**Steps**
+
+1. Import the tutorial from My Tutorials.
+2. Open the imported tutorial edit page from the success link.
+3. Return to My Tutorials before publishing it.
+4. Publish the imported tutorial and refresh My Tutorials.
+
+**Expected Result**
+
+- Immediately after import, tutorial exists as draft and is not shown in My Tutorials list.
+- After publishing, the tutorial appears in My Tutorials and can be exported.
 
 **Actual Result**
 
