@@ -41,16 +41,6 @@ For each checkbox:
 - [ ] ✅/❌ Tutorial completion is recorded for certificate (TC-12)
 - [ ] ✅/❌ Certificate PDF downloads after completion (TC-13)
 
-## Librarian & Manage Librarians
-
-- [ ] ✅/❌ Librarian login redirects to My Tutorials (TC-14)
-- [ ] ✅/❌ Librarian sees only allowed menu items (TC-15)
-- [ ] ✅/❌ Librarian direct URL access to restricted pages is redirected to My Tutorials (TC-16)
-- [ ] ✅/❌ Admin can register new Librarian in Manage Librarians (TC-17)
-- [ ] ✅/❌ Admin can deactivate Librarian and optionally reassign tutorials (TC-17)
-- [ ] ✅/❌ Native Add User shows Assign Librarian prompt and role can be assigned (TC-18)
-- [ ] ✅/❌ Network Users list shows GOTS Role column (TC-19)
-
 ---
 
 ## Run Log

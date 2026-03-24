@@ -40,9 +40,8 @@
             const idsParam  = urlParams.get( 'ids' ) || '';
             compareIds = idsParam ? idsParam.split( ',' ).map( Number ).filter( Boolean ) : [];
 
-            // Hide KPI stats row and device filter for compare view
+            // Hide KPI stats row for compare view (device filter already absent in PHP for compare)
             $( '#pbsg-stats-row' ).hide();
-            $( '.pbsg-filter-device-label, #pbsg-device-filter' ).hide();
         }
 
         loadView( view, tutorialId, h5pId, qIndex );
@@ -102,7 +101,7 @@
             date_to:   $( '#pbsg-date-to' ).val(),
         };
 
-        if ( view === 'overview' ) {
+        if ( view === 'overview' || view === 'tutorial' ) {
             params.device = $( '#pbsg-device-filter' ).val() || '';
         }
         if ( tutorialId ) params.tutorial_id = tutorialId;
@@ -136,18 +135,19 @@
         const tutorials = data.tutorials || [];
         const trend     = data.daily_trend || [];
         const devices   = data.device_breakdown || [];
+        const bench     = data.benchmarks || {};
 
         if ( ! tutorials.length ) {
             showEmpty();
             return;
         }
 
-        // KPIs
+        // KPIs (use site-wide benchmarks for overview aggregates)
         renderKPIs( [
-            { label: 'Total Views', value: formatNumber( totals.total_views ), color: 'green' },
+            { label: 'Total Views', value: formatNumber( totals.total_views ), color: 'blue' },
             { label: 'Total Completions', value: formatNumber( totals.total_completions ), color: 'blue' },
-            { label: 'Avg Completion Rate', value: totals.avg_completion + '%', color: 'amber' },
-            { label: 'Avg Tutorial Score', value: totals.avg_score + '%', color: 'red' },
+            { label: 'Avg Completion Rate', value: totals.avg_completion + '%', color: getBadgeColor( totals.avg_completion, bench.completion_rate_green, bench.completion_rate_amber ) },
+            { label: 'Avg Tutorial Score', value: totals.avg_score + '%', color: getBadgeColor( totals.avg_score, bench.score_green, bench.score_amber ), badge: 'all-time' },
         ] );
 
         // Main content grid
@@ -206,13 +206,15 @@
         const stepDwell  = data.step_dwell || {};
         const stepNames  = data.step_names || {};
         const questions  = data.questions || [];
+        const deviceNote = data.device_note || '';
+        const bench      = data.benchmarks || {};
 
-        // KPIs for this tutorial
+        // KPIs for this tutorial (use per-tutorial benchmarks)
         renderKPIs( [
-            { label: 'Total Views', value: formatNumber( stats.view_count ), color: 'green' },
+            { label: 'Total Views', value: formatNumber( stats.view_count ), color: 'blue' },
             { label: 'Completions', value: formatNumber( stats.completion_count ), color: 'blue' },
-            { label: 'Completion Rate', value: stats.completion_rate + '%', color: 'amber' },
-            { label: 'Avg Time', value: formatTime( stats.avg_time_seconds ), color: 'red' },
+            { label: 'Completion Rate', value: stats.completion_rate + '%', color: getBadgeColor( stats.completion_rate, bench.completion_rate_green, bench.completion_rate_amber ) },
+            { label: 'Avg Time', value: formatTime( stats.avg_time_seconds ), color: 'blue' },
         ] );
 
         // Update export button
@@ -223,7 +225,14 @@
             ? dateScope.date_from + ' to ' + dateScope.date_to
             : '';
 
-        let html = '<div class="pbsg-grid-2">';
+        let html = '';
+
+        // Show device context notice if the detail view received a device filter
+        if ( deviceNote ) {
+            html += '<div class="pbsg-annotation pbsg-annotation-info"><strong>Device filter active:</strong> ' + escapeHtml( deviceNote ) + '</div>';
+        }
+
+        html += '<div class="pbsg-grid-2">';
 
         // Daily views bar chart
         html += '<div class="pbsg-card">';
@@ -252,7 +261,7 @@
             html += 'Quiz Questions <span class="pbsg-alltime-badge">all-time</span>';
             html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">↓ Export CSV</a>';
             html += '</div>';
-            html += renderQuestionsTable( questions, stats.tutorial_page_id );
+            html += renderQuestionsTable( questions, stats.tutorial_page_id, bench );
             html += '</div>';
         }
 
@@ -267,16 +276,20 @@
         if ( data.error ) { showEmpty(); return; }
 
         const q = data;
-        const dist = q.attempt_distribution || {};
+        const dist  = q.attempt_distribution || {};
+        const retry = q.retry_stats || {};
+        const bench = q.benchmarks || {};
 
         $( '#pbsg-export-btn' ).attr( 'href',
             getExportUrl( 'question_detail', q.tutorial_page_id, q.h5p_content_id, q.question_index ) );
 
         renderKPIs( [
-            { label: 'Total Attempts', value: formatNumber( q.total_attempts ), color: 'green' },
-            { label: 'Correct Rate', value: q.correct_rate + '%', color: getBadgeColor( q.correct_rate ) },
-            { label: 'Give-ups', value: formatNumber( q.giveup_count ), color: 'red' },
-            { label: 'Avg Time', value: formatTime( q.avg_time_seconds ), color: 'blue' },
+            { label: 'Total Attempts', value: formatNumber( q.total_attempts ), color: 'blue', badge: 'all-time' },
+            { label: 'Correct Rate', value: q.correct_rate + '%', color: getBadgeColor( q.correct_rate, bench.correct_rate_green, bench.correct_rate_amber ), badge: 'all-time' },
+            { label: 'Give-ups', value: formatNumber( q.giveup_count ), color: getBadgeColorInverse( q.giveup_count, bench.giveup_low, bench.giveup_high ), badge: 'all-time' },
+            { label: 'Avg Time', value: formatTime( q.avg_time_seconds ), color: 'blue', badge: 'all-time' },
+            { label: 'Total Retries', value: formatNumber( retry.total_retries || 0 ), color: 'blue', badge: 'all-time' },
+            { label: 'Max Retries', value: formatNumber( retry.max_retries_single_session || 0 ), color: getBadgeColorInverse( retry.max_retries_single_session || 0, bench.retries_low, bench.retries_high ), badge: 'all-time' },
         ] );
 
         let html = '<div class="pbsg-annotation"><strong>Note</strong><br>Question statistics are aggregated across all time. The date range filter does not apply to this view.</div>';
@@ -329,9 +342,11 @@
         let viewsFill = '', compFill = '';
 
         data.forEach( ( d, i ) => {
-            const x = padL + i * scaleX;
-            const yv = padT + chartH - ( d.views || 0 ) * scaleY;
-            const yc = padT + chartH - ( d.completions || 0 ) * scaleY;
+            const x  = padL + i * scaleX;
+            const v  = d.views || 0;
+            const c  = Math.min( d.completions || 0, v ); // clamp: completions <= views
+            const yv = padT + chartH - v * scaleY;
+            const yc = padT + chartH - c * scaleY;
             viewsPoints += x + ',' + yv + ' ';
             compPoints  += x + ',' + yc + ' ';
         } );
@@ -438,14 +453,15 @@
         tutorials.forEach( t => {
             const rate  = parseFloat( t.completion_rate ) || 0;
             const score = parseFloat( t.avg_score ) || 0;
+            const b     = t.benchmarks || {};
             const adminUrl = config.ajaxUrl.replace( 'admin-ajax.php', 'admin.php' );
 
             html += '<tr>';
             html += '<td><a class="pbsg-tutorial-link" href="' + adminUrl + '?page=pbsg-analytics&tab=tutorial&tutorial_id=' + t.tutorial_page_id + '">' + escapeHtml( t.tutorial_name || 'Tutorial #' + t.tutorial_page_id ) + '</a></td>';
             html += '<td>' + formatNumber( t.view_count ) + '</td>';
             html += '<td>' + formatNumber( t.completion_count ) + '</td>';
-            html += '<td><span class="pbsg-badge ' + getBadgeColor( rate ) + '">' + rate + '%</span></td>';
-            html += '<td><span class="pbsg-badge ' + getBadgeColor( score ) + '">' + score + '%</span></td>';
+            html += '<td><span class="pbsg-badge ' + getBadgeColor( rate, b.completion_rate_green, b.completion_rate_amber ) + '">' + rate + '%</span></td>';
+            html += '<td><span class="pbsg-badge ' + getBadgeColor( score, b.score_green, b.score_amber ) + '">' + score + '%</span></td>';
             html += '<td>' + renderSparkline( trend, 8 ) + '</td>';
             html += '</tr>';
         } );
@@ -461,7 +477,10 @@
         const flagged = tutorials.filter( t => {
             const rate  = parseFloat( t.completion_rate ) || 0;
             const score = parseFloat( t.avg_score ) || 0;
-            return rate < 60 || score < 50;
+            const b     = t.benchmarks || {};
+            const attComp  = ( b.attention_completion !== undefined ) ? b.attention_completion : 60;
+            const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
+            return rate < attComp || score < attScore;
         } );
 
         if ( ! flagged.length ) {
@@ -472,9 +491,12 @@
         flagged.forEach( t => {
             const rate  = parseFloat( t.completion_rate ) || 0;
             const score = parseFloat( t.avg_score ) || 0;
+            const b     = t.benchmarks || {};
+            const attComp  = ( b.attention_completion !== undefined ) ? b.attention_completion : 60;
+            const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
             const reasons = [];
-            if ( rate < 60 ) reasons.push( 'Completion rate below 60%' );
-            if ( score < 50 ) reasons.push( 'Avg tutorial score below 50%' );
+            if ( rate < attComp ) reasons.push( 'Completion rate below ' + attComp + '%' );
+            if ( score < attScore ) reasons.push( 'Avg tutorial score below ' + attScore + '%' );
 
             const adminUrl = config.ajaxUrl.replace( 'admin-ajax.php', 'admin.php' );
 
@@ -545,18 +567,20 @@
 
         if ( ! keys.length ) return '<p style="color:#888;padding:20px;">No step data yet</p>';
 
-        const maxViews = Math.max( totalViews || 1, ...keys.map( k => stepDwell[k].views || 0 ) );
+        // Funnel baseline: Step 1 views = 100%. Each subsequent step is
+        // the fraction of users who reached it relative to Step 1.
+        const baselineViews = stepDwell[ keys[0] ].views || 1;
         const names = stepNames || {};
 
         let html = '';
         keys.forEach( ( key, i ) => {
             const views   = stepDwell[ key ].views || 0;
-            const pct     = Math.round( ( views / maxViews ) * 100 );
+            const pct     = Math.round( ( views / baselineViews ) * 100 );
             const stepNum = parseInt( key.replace( 'step_', '' ), 10 ) + 1;
             const name    = names[ key ] || '';
             const label   = name ? stepNum + '. ' + name : 'Step ' + stepNum;
 
-            // Color gradient: green → amber → red
+            // Color gradient: green → amber → red based on dropout
             const ratio = keys.length > 1 ? i / ( keys.length - 1 ) : 0;
             const color = ratio < 0.5 ? '#517E1B' : ( ratio < 0.8 ? '#C4820B' : '#8C2004' );
 
@@ -610,11 +634,12 @@
     /**
      * Questions table for tutorial detail view.
      */
-    function renderQuestionsTable( questions, tutorialId ) {
+    function renderQuestionsTable( questions, tutorialId, bench ) {
+        bench = bench || {};
         let html = '<table class="pbsg-data-table">';
         html += '<thead><tr>';
         html += '<th>#</th><th>Question</th><th>Attempts</th>';
-        html += '<th>Correct Rate</th><th>Give-ups</th><th>Avg Attempts</th>';
+        html += '<th>Correct Rate</th><th>Give-ups</th><th>Retries</th><th>Avg Attempts</th>';
         html += '</tr></thead><tbody>';
 
         const adminUrl = config.ajaxUrl.replace( 'admin-ajax.php', 'admin.php' );
@@ -628,8 +653,9 @@
             html += '<td>' + ( i + 1 ) + '</td>';
             html += '<td><a class="pbsg-tutorial-link" href="' + link + '">' + escapeHtml( q.question_text || 'Q' + ( i + 1 ) ) + '</a></td>';
             html += '<td>' + formatNumber( q.total_attempts ) + '</td>';
-            html += '<td><span class="pbsg-badge ' + getBadgeColor( rate ) + '">' + rate + '%</span></td>';
+            html += '<td><span class="pbsg-badge ' + getBadgeColor( rate, bench.correct_rate_green, bench.correct_rate_amber ) + '">' + rate + '%</span></td>';
             html += '<td>' + ( q.giveup_count || 0 ) + '</td>';
+            html += '<td>' + ( q.total_retries || 0 ) + '</td>';
             html += '<td>' + ( q.avg_attempts || '—' ) + '</td>';
             html += '</tr>';
         } );
@@ -732,6 +758,7 @@
             ids:       compareIds.join( ',' ),
             date_from: $( '#pbsg-date-from' ).val(),
             date_to:   $( '#pbsg-date-to' ).val(),
+            device:    $( '#pbsg-device-filter' ).val() || '',
         };
 
         $.get( config.ajaxUrl, params )
@@ -859,31 +886,32 @@
                 if ( t && t.funnel ) maxSteps = Math.max( maxSteps, t.funnel.length );
             } );
 
+            // Pre-compute each tutorial's Step 1 views as its funnel baseline
+            const funnelBaselines = {};
+            tids.forEach( function( tid ) {
+                const t = tutorials[ tid ];
+                if ( t && t.funnel && t.funnel[0] ) {
+                    funnelBaselines[ tid ] = t.funnel[0].views || 1;
+                }
+            } );
+
             if ( maxSteps > 0 ) {
                 for ( let s = 0; s < maxSteps; s++ ) {
                     html += '<div class="pbsg-compare-row">';
                     html += '<div class="row-label">Step ' + ( s + 1 ) + '</div>';
 
-                    // Find max views for this step across tutorials for scaling
-                    let stepMax = 0;
-                    tids.forEach( function( tid ) {
-                        const t = tutorials[ tid ];
-                        if ( t && t.funnel && t.funnel[ s ] ) {
-                            stepMax = Math.max( stepMax, t.funnel[ s ].views );
-                        }
-                    } );
-
                     for ( let i = 0; i < cols; i++ ) {
                         const tid = compareIds[ i ] || 0;
                         const t   = tid ? tutorials[ tid ] : null;
                         if ( t && t.funnel && t.funnel[ s ] ) {
-                            const views = t.funnel[ s ].views;
-                            const pct   = stepMax > 0 ? Math.round( views / stepMax * 100 ) : 0;
+                            const views    = t.funnel[ s ].views;
+                            const baseline = funnelBaselines[ tid ] || 1;
+                            const pct      = Math.round( views / baseline * 100 );
                             html += '<div class="row-value">';
                             html += '<div class="funnel-step">';
                             html += '<div class="funnel-step-bar" style="width:' + Math.max( 5, pct ) + '%;"></div>';
                             html += '</div>';
-                            html += '<span class="metric-unit">' + views + ' views</span>';
+                            html += '<span class="metric-unit">' + views + ' views (' + pct + '%)</span>';
                             html += '</div>';
                         } else {
                             html += '<div class="row-value"><span class="metric-unit">—</span></div>';
@@ -1071,7 +1099,11 @@
         let html = '';
         items.forEach( item => {
             html += '<div class="pbsg-stat-box ' + item.color + '">';
-            html += '<div class="pbsg-stat-label">' + item.label + '</div>';
+            html += '<div class="pbsg-stat-label">' + item.label;
+            if ( item.badge ) {
+                html += ' <span class="pbsg-alltime-badge">' + escapeHtml( item.badge ) + '</span>';
+            }
+            html += '</div>';
             html += '<div class="pbsg-stat-value">' + item.value + '</div>';
             html += '</div>';
         } );
@@ -1081,19 +1113,23 @@
     function showLoading() {
         $( '#pbsg-loading' ).show();
         $( '#pbsg-empty-state' ).hide();
-        $( '#pbsg-stats-row' ).hide();
-        $( '#pbsg-main-content' ).hide();
+        // Dim existing KPI cards and content instead of hiding — prevents layout jump
+        // and signals staleness while new data loads
+        $( '#pbsg-stats-row' ).addClass( 'pbsg-stale' );
+        $( '#pbsg-main-content' ).addClass( 'pbsg-stale' );
     }
 
     function hideLoading() {
         $( '#pbsg-loading' ).hide();
+        $( '#pbsg-stats-row' ).removeClass( 'pbsg-stale' );
+        $( '#pbsg-main-content' ).removeClass( 'pbsg-stale' );
     }
 
     function showEmpty() {
         $( '#pbsg-loading' ).hide();
         $( '#pbsg-empty-state' ).show();
-        $( '#pbsg-stats-row' ).hide();
-        $( '#pbsg-main-content' ).hide();
+        $( '#pbsg-stats-row' ).removeClass( 'pbsg-stale' ).hide();
+        $( '#pbsg-main-content' ).removeClass( 'pbsg-stale' ).hide();
     }
 
     // =========================================================================
@@ -1113,10 +1149,33 @@
         return m + 'm ' + ( s < 10 ? '0' : '' ) + s + 's';
     }
 
-    function getBadgeColor( rate ) {
+    /**
+     * Badge color for rate metrics (higher is better).
+     * @param {number} rate       - The metric value (0–100)
+     * @param {number} greenMin   - Green threshold (>= this = green). Default 70.
+     * @param {number} amberMin   - Amber threshold (>= this = amber). Default 50.
+     */
+    function getBadgeColor( rate, greenMin, amberMin ) {
         rate = parseFloat( rate ) || 0;
-        if ( rate >= 70 ) return 'green';
-        if ( rate >= 50 ) return 'amber';
+        greenMin = ( greenMin !== undefined && greenMin !== null ) ? greenMin : 70;
+        amberMin = ( amberMin !== undefined && amberMin !== null ) ? amberMin : 50;
+        if ( rate >= greenMin ) return 'green';
+        if ( rate >= amberMin ) return 'amber';
+        return 'red';
+    }
+
+    /**
+     * Badge color for metrics where lower is better (e.g. give-ups, retries).
+     * @param {number} value          - The metric value
+     * @param {number} lowThreshold   - Green threshold (<= this = green). Default 2.
+     * @param {number} highThreshold  - Red threshold (> this = red). Default 10.
+     */
+    function getBadgeColorInverse( value, lowThreshold, highThreshold ) {
+        value = parseFloat( value ) || 0;
+        lowThreshold  = ( lowThreshold  !== undefined && lowThreshold  !== null ) ? lowThreshold  : 2;
+        highThreshold = ( highThreshold !== undefined && highThreshold !== null ) ? highThreshold : 10;
+        if ( value <= lowThreshold ) return 'green';
+        if ( value <= highThreshold ) return 'amber';
         return 'red';
     }
 

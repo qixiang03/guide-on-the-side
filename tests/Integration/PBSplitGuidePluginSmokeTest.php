@@ -86,7 +86,7 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
     public function test_total_hook_count_matches_expected(): void
     {
         $this->assertCount(4, WPStubs::$hooks['filter'], 'Expected 4 filters');
-        $this->assertCount(23, WPStubs::$hooks['action'], 'Expected 23 actions');
+        $this->assertCount(29, WPStubs::$hooks['action'], 'Expected 29 actions');
     }
 
     /* =============================================================
@@ -220,7 +220,8 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->plugin->save_meta(99, (object) ['ID' => 99]);
 
         $this->assertTrue(WPStubs::wasCalled('update_post_meta'));
-        $this->assertSame(3, WPStubs::callCount('update_post_meta'));
+        // 7 calls: steps + note + intro_desc + intro_obj + intro_duration + intro_prereqs + template
+        $this->assertSame(7, WPStubs::callCount('update_post_meta'));
 
         $stepsCall = WPStubs::callArgs('update_post_meta', 0);
         $this->assertSame(99, $stepsCall[0]);
@@ -236,7 +237,20 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->assertSame('_pbsg_header_note', $noteCall[1]);
         $this->assertSame('Welcome note', $noteCall[2]);
 
-        $templateCall = WPStubs::callArgs('update_post_meta', 2);
+        // Intro fields (empty since not in POST)
+        $introDescCall = WPStubs::callArgs('update_post_meta', 2);
+        $this->assertSame('_pbsg_intro_description', $introDescCall[1]);
+
+        $introObjCall = WPStubs::callArgs('update_post_meta', 3);
+        $this->assertSame('_pbsg_intro_objectives', $introObjCall[1]);
+
+        $introDurCall = WPStubs::callArgs('update_post_meta', 4);
+        $this->assertSame('_pbsg_intro_duration', $introDurCall[1]);
+
+        $introPrereqCall = WPStubs::callArgs('update_post_meta', 5);
+        $this->assertSame('_pbsg_intro_prerequisites', $introPrereqCall[1]);
+
+        $templateCall = WPStubs::callArgs('update_post_meta', 6);
         $this->assertSame(99, $templateCall[0]);
         $this->assertSame('_wp_page_template', $templateCall[1]);
         $this->assertSame('split-guide-template.php', $templateCall[2]);
@@ -371,6 +385,9 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
     public function test_activation_hook_registered_with_create_tables(): void
     {
         $this->assertTrue(WPStubs::wasCalled('register_activation_hook'));
+
+        // Combined activation hook: closure calling Roles::activate,
+        // Analytics::create_tables, and Template_Manager::create_tables
         $args = WPStubs::callArgs('register_activation_hook', 0);
         $this->assertIsArray($args);
         $this->assertCount(2, $args);

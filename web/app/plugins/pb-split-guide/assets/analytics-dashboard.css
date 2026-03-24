@@ -633,6 +633,13 @@
     color: #888;
 }
 
+/* Dim existing content while new data is loading — prevents layout jump */
+.pbsg-stale {
+    opacity: 0.35;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
 .pbsg-spinner {
     display: inline-block;
     width: 32px;
@@ -733,6 +740,16 @@
     text-transform: uppercase;
     font-size: 11px;
     letter-spacing: 0.3px;
+}
+
+/* Info variant (blue) — used for device filter context notices */
+.pbsg-annotation.pbsg-annotation-info {
+    border-left-color: var(--pbsg-blue);
+    background: #f0f6fb;
+}
+
+.pbsg-annotation.pbsg-annotation-info strong {
+    color: var(--pbsg-blue);
 }
 
 /* =========================================================================

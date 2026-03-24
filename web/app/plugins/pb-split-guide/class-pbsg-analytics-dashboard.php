@@ -40,7 +40,7 @@ class PBSG_Analytics_Dashboard {
         add_menu_page(
             __( 'Tutorial Analytics', 'pb-split-guide' ),
             __( 'Tutorial Analytics', 'pb-split-guide' ),
-            'edit_pages', // Capability — librarians/admins
+            'pbsg_view_analytics', // Capability — librarians/admins (custom)
             'pbsg-analytics',
             array( __CLASS__, 'render_dashboard' ),
             'dashicons-chart-bar',
@@ -58,19 +58,19 @@ class PBSG_Analytics_Dashboard {
 
         $plugin_url = plugin_dir_url( __FILE__ );
 
-        // Google Fonts
+        // Local fonts (UPEI Design System — no external CDN)
         wp_enqueue_style(
-            'pbsg-google-fonts',
-            'https://fonts.googleapis.com/css2?family=Lusitana:wght@400;700&family=Roboto:wght@300;400;500;700&family=Roboto+Condensed:wght@400;700&display=swap',
+            'pbsg-fonts',
+            $plugin_url . 'assets/admin/pbsg-fonts.css',
             array(),
-            null
+            '1.0.0'
         );
 
         // Dashboard styles
         wp_enqueue_style(
             'pbsg-analytics-dashboard',
             $plugin_url . 'assets/analytics-dashboard.css',
-            array(),
+            array( 'pbsg-fonts' ),
             '1.3.0'
         );
 
@@ -184,7 +184,7 @@ class PBSG_Analytics_Dashboard {
                 <span class="pbsg-filter-sep"><?php esc_html_e( 'to', 'pb-split-guide' ); ?></span>
                 <input type="date" id="pbsg-date-to" value="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
 
-                <?php if ( 'overview' === $current_view ) : ?>
+                <?php if ( in_array( $current_view, array( 'overview', 'tutorial', 'compare' ), true ) ) : ?>
                 <label for="pbsg-device-filter" class="pbsg-filter-device-label">
                     <?php esc_html_e( 'Device', 'pb-split-guide' ); ?>
                 </label>

@@ -9,90 +9,10 @@ const fallbackLink = document.getElementById('pbsgFallbackLink');
 const prevBtn = document.getElementById('pbsgPrev');
 const nextBtn = document.getElementById('pbsgNext');
 
-const branchModal = document.getElementById('pbsgBranchModal');
-const branchText = document.getElementById('pbsgBranchText');
-const branchOpenBtn = document.getElementById('pbsgBranchOpen');
-const branchReturnBtn = document.getElementById('pbsgBranchReturn');
-const branchCompleteBtn = document.getElementById('pbsgBranchComplete');
-const branchSkipBtn = document.getElementById('pbsgBranchSkip');
-const branchCloseBtn = document.getElementById('pbsgBranchClose');
-
 const introScreen = document.getElementById('pbsgIntroScreen');
 const mainContent = document.getElementById('pbsgMainContent');
 const startTutorialBtn = document.getElementById('pbsgStartTutorial');
 
-// Add a class to the body when the tutorial is active
-document.body.classList.add('tutorial-active');
-
-document.addEventListener('DOMContentLoaded', function() {    
-
-    /**
-     * Accessibility Dashboard: Custom Shortcuts Listener
-     */
-    function initCustomShortcuts() {
-        // Check if the user has shortcuts enabled and defined (passed from PHP)
-        if (typeof window.aeShortcuts === 'undefined') {
-            return; // Shortcuts not enabled for this user
-        }
-
-        const shortcuts = window.aeShortcuts;
-
-        document.addEventListener('keydown', function(event) {
-            // Ignore keypresses if the user is typing inside an input, textarea, or contenteditable
-            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName) || event.target.isContentEditable) {
-                return;
-            }
-            // Map the pressed key to the corresponding action
-            switch (event.key) {
-                case shortcuts.prev:
-                    event.preventDefault(); // Prevent default browser scrolling if using arrow keys
-                    triggerPreviousAction();
-                    break;
-                    
-                case shortcuts.next:
-                    event.preventDefault();
-                    triggerNextAction();
-                    break;
-                    
-                case shortcuts.focus_quiz:
-                    event.preventDefault();
-                    triggerFocusQuiz();
-                    break;
-                    
-                case shortcuts.focus_tutorial:
-                    event.preventDefault();
-                    triggerFocusTutorial();
-                    break;
-            }
-        });
-    }
-
-    // Helper functions to trigger the actions.
-    
-    function triggerPreviousAction() {
-        if (prevBtn && !prevBtn.disabled) {
-            prevBtn.click();
-        }
-    }
-
-    function triggerNextAction() {
-        if (nextBtn && !nextBtn.disabled) {
-            nextBtn.click();
-        }
-    }
-
-    function triggerFocusQuiz() {
-        toggleFocus('quiz');        
-    }
-
-    function triggerFocusTutorial() {
-        toggleFocus('tutorial');        
-
-    }
-
-    // Initialize the listener
-    initCustomShortcuts();
-});
 
 // --------------------
 // Menu (step list) in quiz pane
@@ -166,13 +86,6 @@ window.pbsgGoToStep = function(index){
 // Gate NEXT by quiz correctness (H5P)
 // --------------------
 const passedSteps = new Set(); // remember which steps are already correct
-
-const triggeredBranchSteps = new Set();
-const completedBranchSteps = new Set();
-
-let activeBranchStep = null;
-let branchReturnTarget = null;
-
 let h5pObs = null;
 let h5pClickHandler = null;
 let h5pBoundDoc = null;
@@ -182,162 +95,6 @@ function lockNext(locked){
   nextBtn.disabled = !!locked;
   nextBtn.classList.toggle('pbsg-locked', !!locked);
 }
-
-function openBranchModal() {
-  if (!branchModal) return;
-  branchModal.style.display = '';
-  branchModal.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('pbsg-branch-modal-open');
-}
-
-function closeBranchModal() {
-  if (!branchModal) return;
-  branchModal.style.display = 'none';
-  branchModal.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('pbsg-branch-modal-open');
-}
-
-
-function hasBranch(step) {
-  return !!(
-    step &&
-    step.branch &&
-    step.branch.mode !== 'none' &&
-    step.branch.tutorial &&
-    (
-      (step.branch.tutorial.type === 'url' && step.branch.tutorial.url) ||
-      (step.branch.tutorial.type === 'file' && step.branch.tutorial.file_url)
-    )
-  );
-}
-
-function shouldTriggerBranch(stepIndex) {
-  const step = steps[stepIndex];
-  if (!hasBranch(step)) return false;
-
-  const required = step.branch.trigger_attempts || 1;
-  const attempts = attemptCounts[stepIndex] || 0;
-
-  return attempts >= required;
-}
-
-function isMandatoryBranch(step) {
-  return hasBranch(step) && step.branch.mode === 'mandatory';
-}
-
-function resetBranchUI() {
-  activeBranchStep = null;
-  branchReturnTarget = null;
-
-  closeBranchModal();
-
-  if (branchText) branchText.innerHTML = '';
-
-  if (branchReturnBtn) branchReturnBtn.style.display = 'none';
-  if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
-  if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-  if (branchOpenBtn) {
-    branchOpenBtn.style.display = 'inline-block';
-    branchOpenBtn.textContent = 'Start';
-  }
-  if (branchCloseBtn) branchCloseBtn.style.display = 'none';
-}
-
-function showBranchPrompt(stepIndex) {
-  const step = steps[stepIndex];
-  if (!hasBranch(step) || !branchText) return;
-
-  activeBranchStep = stepIndex;
-  branchReturnTarget = stepIndex;
-
-  const required = Math.max(1, parseInt(step.branch.trigger_attempts, 10) || 1);
-  const attempts = Math.max(required, parseInt(attemptCounts[stepIndex], 10) || required);
-  const title = step.branch.title || 'Branch Review';
-
-  let intro = step.branch.intro || '';
-  if (!intro) {
-    if (step.branch.mode === 'mandatory') {
-      intro = `You answered this question incorrectly ${attempts} ${attempts === 1 ? 'time' : 'times'}. You must complete this sub-tutorial before continuing.`;
-    } else {
-      intro = `You answered this question incorrectly ${attempts} ${attempts === 1 ? 'time' : 'times'}. Practicing this sub-tutorial may help you learn better.`;
-    }
-  }
-
-  const modeText = step.branch.mode === 'mandatory'
-    ? 'You can continue only after you finish this sub-tutorial and answer the main quiz correctly.'
-    : 'You may start the sub-tutorial now or skip it and return to the main tutorial.';
-
-  const modalTitle = document.getElementById('pbsgBranchModalTitle');
-  if (modalTitle) modalTitle.textContent = title;
-
-  branchText.innerHTML = `
-    ${intro}<br>
-    <span class="pbsg-branch-mode">${modeText}</span>
-  `;
-
-  if (branchOpenBtn) {
-    branchOpenBtn.textContent = 'Start';
-    branchOpenBtn.style.display = 'inline-block';
-  }
-
-  if (branchReturnBtn) branchReturnBtn.style.display = 'none';
-
-  if (step.branch.mode === 'mandatory') {
-    if (branchCompleteBtn) {
-      branchCompleteBtn.textContent = 'I Finished This Sub-Tutorial';
-      branchCompleteBtn.style.display = 'inline-block';
-    }
-    if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-    if (branchCloseBtn) branchCloseBtn.style.display = 'none';
-  } else {
-    if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
-    if (branchSkipBtn) {
-      branchSkipBtn.textContent = 'Skip';
-      branchSkipBtn.style.display = 'inline-block';
-    }
-    if (branchCloseBtn) branchCloseBtn.style.display = 'inline-block';
-  }
-
-  openBranchModal();
-}
-
-function renderBranchTutorial(stepIndex) {
-  const step = steps[stepIndex];
-  if (!hasBranch(step)) return;
-
-  let url = '';
-  if (step.branch.tutorial.type === 'url') {
-    url = step.branch.tutorial.url || '';
-  } else if (step.branch.tutorial.type === 'file') {
-    url = step.branch.tutorial.file_url || '';
-  }
-
-  if (!url) return;
-
-  window.open(url, '_blank', 'noopener,noreferrer');
-
-  if (step.branch.mode === 'mandatory') {
-    if (branchOpenBtn) branchOpenBtn.style.display = 'none';
-    if (branchCompleteBtn) branchCompleteBtn.style.display = 'inline-block';
-    if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-  } else {
-    closeBranchModal();
-  }
-}
-
-function returnToMainTutorial() {
-  if (branchReturnTarget === null || !steps[branchReturnTarget]) return;
-  renderTutorial(steps[branchReturnTarget]);
-}
-
-function isCurrentStepBlockedByMandatoryBranch() {
-  const step = steps[i];
-  if (!step || !isMandatoryBranch(step)) return false;
-  if (!triggeredBranchSteps.has(i)) return false;
-  return !completedBranchSteps.has(i);
-}
-
-
 
 // Heuristics to detect "correct" in H5P iframe document.
 // Works across common H5P content types.
@@ -445,35 +202,16 @@ function attachH5PWatcher(stepIndex){
 
     if (!doc || !doc.body) return false;
 
-  const updatePassState = () => {
-    const correct = isH5PCorrect(doc);
-    const step = steps[stepIndex];
-
-    if (correct) {
-      passedSteps.add(stepIndex);
-      resetBranchUI();
-      lockNext(false);
-      updateCertificateGate();
-      return;
-    }
-    
-    passedSteps.delete(stepIndex);
-
-   if (shouldTriggerBranch(stepIndex)) {
-      triggeredBranchSteps.add(stepIndex);
-      showBranchPrompt(stepIndex);
-
-      if (step.branch.mode === 'mandatory' && !completedBranchSteps.has(stepIndex)) {
-        lockNext(true);
+    const updatePassState = () => {
+      if (isH5PCorrect(doc)) {
+        passedSteps.add(stepIndex);
       } else {
-        lockNext(true);
+        passedSteps.delete(stepIndex);
       }
-    } else {
-      lockNext(true);
-    }
 
-    updateCertificateGate();
-  };
+      lockNext(!passedSteps.has(stepIndex));
+      updateCertificateGate();
+    };
 
     // Initial status only: DO NOT count here
     updatePassState();
@@ -492,7 +230,7 @@ function attachH5PWatcher(stepIndex){
       // Wait a moment for H5P to update the result after clicking Check
       setTimeout(() => {
         updatePassState();
-      }, 250);
+      }, 150);
     };
 
     doc.addEventListener('click', h5pClickHandler, true);
@@ -569,10 +307,6 @@ function resetTutorialToStart(){
   i = 0;
 
   certMarked = false;
-
-  triggeredBranchSteps.clear();
-  completedBranchSteps.clear();
-  resetBranchUI();
 
   steps.forEach((step, idx) => {
     attemptCounts[idx] = 0;
@@ -724,101 +458,6 @@ function toEmbeddableUrl(rawUrl){
     return embed.toString();
   }
 
-
-    // vimeo.com/<id> or player.vimeo.com/video/<id>
-  if (host === 'vimeo.com' || host === 'player.vimeo.com') {
-    let id = '';
-
-    // Normal Vimeo URL: /123456789
-    const parts = u.pathname.split('/').filter(Boolean);
-
-    if (host === 'vimeo.com') {
-      // Examples:
-      // /123456789
-      // /channels/staffpicks/123456789
-      // /ondemand/xyz/123456789
-      for (let j = parts.length - 1; j >= 0; j--) {
-        if (/^\d+$/.test(parts[j])) {
-          id = parts[j];
-          break;
-        }
-      }
-    }
-
-    if (host === 'player.vimeo.com') {
-      // Example: /video/123456789
-      const videoIndex = parts.indexOf('video');
-      if (videoIndex !== -1 && parts[videoIndex + 1] && /^\d+$/.test(parts[videoIndex + 1])) {
-        id = parts[videoIndex + 1];
-      }
-    }
-
-    if (!id) return rawUrl;
-
-    const embed = new URL(`https://player.vimeo.com/video/${id}`);
-
-    // Keep optional timestamp if present
-    const t = u.searchParams.get('t') || u.searchParams.get('#t');
-    if (t) {
-      embed.searchParams.set('t', t);
-    }
-
-    return embed.toString();
-  }
-
-    // dailymotion.com/video/<id> or dai.ly/<id>
-  if (host === 'dailymotion.com' || host === 'www.dailymotion.com' || host === 'dai.ly') {
-    let id = '';
-
-    if (host === 'dai.ly') {
-      // Short link: dai.ly/x8abcde
-      id = u.pathname.replace(/^\//, '').split('/')[0];
-    }
-
-    if (host.includes('dailymotion.com')) {
-      // Example: /video/x8abcde
-      const parts = u.pathname.split('/').filter(Boolean);
-      const videoIndex = parts.indexOf('video');
-      if (videoIndex !== -1 && parts[videoIndex + 1]) {
-        id = parts[videoIndex + 1];
-      }
-    }
-
-    if (!id) return rawUrl;
-
-    const embed = new URL(`https://www.dailymotion.com/embed/video/${id}`);
-
-    // Optional: start time support
-    const start = u.searchParams.get('start');
-    if (start) embed.searchParams.set('start', start);
-
-    return embed.toString();
-  }
-
-
-    // TED talk URLs -> embed.ted.com
-  if (host === 'ted.com' || host === 'www.ted.com' || host === 'embed.ted.com') {
-    const parts = u.pathname.split('/').filter(Boolean);
-
-    // Already embed URL
-    if (host === 'embed.ted.com') {
-      return rawUrl;
-    }
-
-    // Example: /talks/sir_ken_robinson_do_schools_kill_creativity
-    if (parts[0] === 'talks' && parts[1]) {
-      let path = `/talks/${parts[1]}`;
-
-      // Preserve language when present
-      const lang = u.searchParams.get('language');
-      if (lang) {
-        path = `/talks/lang/${lang}/${parts[1]}`;
-      }
-
-      return `https://embed.ted.com${path}`;
-    }
-  }
-
   return rawUrl;
 }
 
@@ -896,9 +535,6 @@ function renderTutorial(step){
 }
 
 function render(){
-
-  resetBranchUI();
-
   const step = steps[i];
   if (!step) return;
 
@@ -922,11 +558,7 @@ function render(){
   prevBtn.disabled = i === 0;
 
   if (step.h5p_id) {
-    if (isCurrentStepBlockedByMandatoryBranch()) {
-      lockNext(true);
-    } else {
-      lockNext(!passedSteps.has(i));
-    }
+    lockNext(!passedSteps.has(i));
   } else {
     lockNext(false);
   }
@@ -960,65 +592,6 @@ nextBtn.onclick = async () => {
     showSummaryScreen();
   }
 };
-
-
-  if (branchOpenBtn) {
-    branchOpenBtn.onclick = () => {
-      if (activeBranchStep === null) return;
-      renderBranchTutorial(activeBranchStep);
-    };
-  }
-
-  if (branchReturnBtn) {
-    branchReturnBtn.onclick = () => {
-      returnToMainTutorial();
-    };
-  }
-
-  if (branchSkipBtn) {
-    branchSkipBtn.onclick = () => {
-      if (activeBranchStep === null) return;
-
-      const step = steps[activeBranchStep];
-      if (step.branch.mode === 'mandatory') return;
-
-      resetBranchUI();
-
-      if (step.h5p_id) {
-        lockNext(true);
-      } else {
-        lockNext(false);
-      }
-    };
-  }
-
-  if (branchCompleteBtn) {
-    branchCompleteBtn.onclick = () => {
-      if (activeBranchStep === null) return;
-
-      completedBranchSteps.add(activeBranchStep);
-      const completedStep = activeBranchStep;
-      const step = steps[completedStep];
-
-      resetBranchUI();
-
-      if (completedStep === i) {
-        if (step.branch.mode === 'mandatory') {
-          if (passedSteps.has(i)) {
-            lockNext(false);
-          } else {
-            lockNext(true);
-          }
-        } else {
-          if (passedSteps.has(i)) {
-            lockNext(false);
-          } else {
-            lockNext(true);
-          }
-        }
-      }
-    };
-  }
 
 if (certBtn) {
   certBtn.onclick = () => {
@@ -1058,23 +631,6 @@ if (summaryCertBtn) {
     if (name) u.searchParams.set('name', name);
 
     window.location.href = u.toString();
-  };
-}
-
-if (branchCloseBtn) {
-  branchCloseBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-
-    const step = steps[activeBranchStep];
-    if (step.branch.mode === 'mandatory') return;
-
-    resetBranchUI();
-
-    if (step.h5p_id) {
-      lockNext(true);
-    } else {
-      lockNext(false);
-    }
   };
 }
 
@@ -1166,6 +722,79 @@ function showSummaryScreen(){
   }
 }
 
+// ===== Resize Handle (Stretch Goal 5b) =====
+function initResizer() {
+  const handle = document.getElementById('pbsgResizeHandle');
+  if (!handle) return;  // not enabled for this guide
+
+  const container = document.querySelector('.pbsg-container');
+  if (!container) return;
+
+  const minPct = parseInt(handle.getAttribute('aria-valuemin'), 10) || 10;
+  const maxPct = parseInt(handle.getAttribute('aria-valuemax'), 10) || 50;
+
+  let dragging = false;
+
+  handle.addEventListener('pointerdown', function(e) {
+    dragging = true;
+    handle.setPointerCapture(e.pointerId);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    // Disable iframe pointer events during drag (iframes swallow pointer events)
+    container.querySelectorAll('iframe').forEach(function(f) {
+      f.style.pointerEvents = 'none';
+    });
+  });
+
+  document.addEventListener('pointermove', function(e) {
+    if (!dragging) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0) return;  // guard against hidden/zero-width container
+    let pct = ((e.clientX - rect.left) / rect.width) * 100;
+    pct = Math.max(minPct, Math.min(maxPct, pct));
+
+    container.style.setProperty('--pbsg-left-ratio', pct.toFixed(1));
+    container.style.setProperty('--pbsg-right-ratio', (100 - pct).toFixed(1));
+    handle.setAttribute('aria-valuenow', Math.round(pct));
+  });
+
+  document.addEventListener('pointerup', function() {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    container.querySelectorAll('iframe').forEach(function(f) {
+      f.style.pointerEvents = '';
+    });
+  });
+
+  // Keyboard accessibility: left/right arrow keys
+  handle.addEventListener('keydown', function(e) {
+    var currentStr = container.style.getPropertyValue('--pbsg-left-ratio');
+    var parsed = parseFloat(currentStr);
+    var current = isNaN(parsed)
+      ? (parseInt(handle.getAttribute('aria-valuenow'), 10) || 40)
+      : parsed;
+    var next = current;
+
+    if (e.key === 'ArrowLeft' || e.key === 'Left') {
+      next = Math.max(minPct, current - 1);
+    } else if (e.key === 'ArrowRight' || e.key === 'Right') {
+      next = Math.min(maxPct, current + 1);
+    } else {
+      return;  // not an arrow key, don't intercept
+    }
+
+    if (next !== current) {
+      container.style.setProperty('--pbsg-left-ratio', next);
+      container.style.setProperty('--pbsg-right-ratio', 100 - next);
+      handle.setAttribute('aria-valuenow', Math.round(next));
+      e.preventDefault();
+    }
+  });
+}
+
+initResizer();
 bindMenu();
 render();
 

@@ -148,6 +148,10 @@
     font-weight: 700;
 }
 
+.pbsg-badge--muted {
+    background: #646970;
+}
+
 /* ========================================================================
    Forms
    ======================================================================== */
@@ -302,6 +306,14 @@
     margin-top: 32px;
     padding-top: 24px;
     border-top: 2px solid #F1F1F1;
+}
+
+.pbsg-card-subtitle {
+    font-family: 'Lusitana', Georgia, serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: #333333;
+    margin: 0 0 8px;
 }
 
 .pbsg-deactivate-title {

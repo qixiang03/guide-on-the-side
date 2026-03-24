@@ -1,69 +1,8 @@
 # Guide on the Side - Development Environment Setup Guide
 
-**Project**: Guide on the Side - Interactive Tutorial System for UPEI Library
-**Tech Stack**: Pressbooks (WordPress-based) + H5P for interactivity
-**Last Updated**: January 27, 2026 — Lando section added March 23, 2026
-
----
-
-> **Note:** The Docker setup below is the original guide from Sprint 1 and is kept here for reference only. **Disregard it for active development.** The project now uses Lando. Follow the Lando setup below.
-
----
-
-## Current Setup — Lando
-
-### Prerequisites
-
-- [Lando](https://lando.dev/) installed
-- Git
-
-### First-Time Setup
-
-```bash
-# Clone the repo
-git clone <repo-url>
-cd guide-on-the-side
-
-# Start the Lando environment (starts all services, sets up pressbooks.test)
-lando start
-
-# Install PHP dependencies (H5P plugin and others managed via Composer)
-lando composer install
-
-# Install pressbooks-book theme dependencies (required for /development/ subsite)
-lando composer install --working-dir=web/app/themes/pressbooks-book
-```
-
-### H5P Setup (run once on a fresh DB)
-
-H5P requires a few database fixes after a fresh start. See `docs/H5P-TROUBLESHOOTING.md` for full root cause analysis, or follow the condensed steps in `docs/H5P-LOCAL-DEV-SETUP.md`.
-
-### Daily Usage
-
-```bash
-lando start    # start environment
-lando stop     # stop environment
-lando wp ...   # run WP-CLI commands (e.g. lando wp plugin list)
-```
-
-### Access URLs
-
-| What | URL |
-|------|-----|
-| Tutorial editing (use this) | `https://pressbooks.test/development/wp-admin/` |
-| Network admin | `https://pressbooks.test/wp/wp-admin/network/` |
-
-> **Always use `/development/wp-admin/`** for tutorial editing — not `/wp/wp-admin/`. The `/wp/` root site is Pressbooks's network hub and strips plugin scripts and metaboxes.
-
-### AI Disclosure
-
-This section was added with assistance from Claude Code (Anthropic). Per course policy, all AI-assisted work is disclosed.
-
----
-
-## Legacy Setup — Docker (Sprint 1, disregard)
-
-The following steps describe the original Docker Compose setup. This is no longer the active workflow and is kept here for historical reference only.
+**Project**: Guide on the Side - Interactive Tutorial System for UPEI Library  
+**Tech Stack**: Pressbooks (WordPress-based) + H5P for interactivity  
+**Last Updated**: January 27, 2026
 
 ---
 

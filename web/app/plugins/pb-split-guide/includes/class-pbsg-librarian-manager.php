@@ -84,17 +84,18 @@ class PBSG_Librarian_Manager {
             return;
         }
 
+        // Local fonts (UPEI Design System — no external CDN)
         wp_enqueue_style(
-            'pbsg-google-fonts',
-            'https://fonts.googleapis.com/css2?family=Lusitana:wght@400;700&family=Roboto:wght@300;400;500;700&family=Roboto+Condensed:wght@400;700&display=swap',
+            'pbsg-fonts',
+            $plugin_url . 'assets/admin/pbsg-fonts.css',
             array(),
-            null
+            '1.0.0'
         );
 
         wp_enqueue_style(
             'pbsg-librarian-manager',
             $plugin_url . 'assets/admin/admin-librarians.css',
-            array(),
+            array( 'pbsg-fonts' ),
             '1.1.0'
         );
 
@@ -131,6 +132,9 @@ class PBSG_Librarian_Manager {
                 break;
             case 'deactivate':
                 self::handle_deactivate();
+                break;
+            case 'reactivate':
+                self::handle_reactivate();
                 break;
         }
     }
@@ -244,9 +248,46 @@ class PBSG_Librarian_Manager {
         // Set role to subscriber (no admin access)
         $user->set_role( 'subscriber' );
 
+        // Mark as former librarian so we can show them in the deactivated list
+        update_user_meta( $user_id, 'pbsg_deactivated', current_time( 'mysql' ) );
+
         self::redirect_with_notice( 'success', sprintf(
             /* translators: %s: display name */
             __( 'Librarian "%s" has been deactivated.', 'pb-split-guide' ),
+            $user->display_name
+        ) );
+    }
+
+    /**
+     * Handle librarian reactivation — restore pbsg_librarian role.
+     */
+    private static function handle_reactivate() {
+        if ( ! wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'pbsg_reactivate_librarian' ) ) {
+            wp_die( __( 'Security check failed.', 'pb-split-guide' ) );
+        }
+
+        $user_id = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
+
+        if ( ! $user_id ) {
+            self::redirect_with_notice( 'error', __( 'Invalid user.', 'pb-split-guide' ) );
+            return;
+        }
+
+        $user = get_userdata( $user_id );
+        if ( ! $user ) {
+            self::redirect_with_notice( 'error', __( 'User not found.', 'pb-split-guide' ) );
+            return;
+        }
+
+        // Restore librarian role
+        $user->set_role( PBSG_Roles::LIBRARIAN_ROLE );
+
+        // Remove deactivated marker
+        delete_user_meta( $user_id, 'pbsg_deactivated' );
+
+        self::redirect_with_notice( 'success', sprintf(
+            /* translators: %s: display name */
+            __( 'Librarian "%s" has been reactivated.', 'pb-split-guide' ),
             $user->display_name
         ) );
     }
@@ -262,8 +303,9 @@ class PBSG_Librarian_Manager {
         $sub_action = isset( $_GET['sub_action'] ) ? sanitize_text_field( $_GET['sub_action'] ) : 'list';
         $edit_id    = isset( $_GET['edit_id'] ) ? absint( $_GET['edit_id'] ) : 0;
 
-        // Get all librarians
-        $librarians = self::get_librarians();
+        // Get all librarians (active + deactivated)
+        $librarians  = self::get_librarians();
+        $deactivated = self::get_deactivated_librarians();
 
         // Get notice from redirect
         $notice_type = isset( $_GET['notice_type'] ) ? sanitize_text_field( $_GET['notice_type'] ) : '';
@@ -306,6 +348,35 @@ class PBSG_Librarian_Manager {
         }
 
         return $librarians;
+    }
+
+    /**
+     * Get deactivated (former) librarians — subscribers with the pbsg_deactivated meta.
+     *
+     * @return array
+     */
+    public static function get_deactivated_librarians(): array {
+        $users = get_users( array(
+            'role'       => 'subscriber',
+            'meta_key'   => 'pbsg_deactivated',
+            'orderby'    => 'display_name',
+            'order'      => 'ASC',
+        ) );
+
+        $deactivated = array();
+        foreach ( $users as $user ) {
+            $deactivated_date = get_user_meta( $user->ID, 'pbsg_deactivated', true );
+
+            $deactivated[] = array(
+                'ID'              => $user->ID,
+                'user_login'      => $user->user_login,
+                'display_name'    => $user->display_name,
+                'user_email'      => $user->user_email,
+                'deactivated_on'  => $deactivated_date,
+            );
+        }
+
+        return $deactivated;
     }
 
     /**

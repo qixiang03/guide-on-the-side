@@ -90,18 +90,21 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 
 /* ---------- 5) Split layout sizing ---------- */
 .pbsg-container {
+  /* CSS custom properties — set by PHP template or JS resizer */
+  --pbsg-left-ratio: 40;
+  --pbsg-right-ratio: 60;
+
   display: flex !important;
   align-items: stretch !important;
   gap: 0 !important;
 
-
   overflow: hidden !important; /* panes manage their own overflow */
 }
 
-/* Left / right widths */
+/* Left / right widths — driven by flex-grow ratio (respects gap correctly) */
 .pbsg-left {
-  width: 35% !important;
-  min-width: 360px !important;
+  flex: var(--pbsg-left-ratio) 1 0% !important;
+  min-width: 200px !important;
   background: #fff !important;
 
   /* Allow inner flex children to size properly */
@@ -109,7 +112,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 }
 
 .pbsg-right {
-  width: 65% !important;
+  flex: var(--pbsg-right-ratio) 1 0% !important;
   min-width: 0 !important;
 
   display: flex !important;
@@ -469,6 +472,7 @@ body.pbsg-focus-quiz .pbsg-iframe-wrap {
 
   .pbsg-left,
   .pbsg-right {
+    flex: 0 0 auto !important;
     width: 100% !important;
     min-width: 0 !important;
   }
@@ -508,7 +512,7 @@ body.pbsg-standalone .pbsg-container {
   overflow: hidden !important;
   margin: 0 auto;
   padding: 0 20px 20px 20px;   /* left/right + bottom space */
-  gap: 20px
+  gap: 20px;
 }
 
 /* ==========================================
@@ -779,6 +783,91 @@ body.pbsg-standalone .pbsg-wrap{
   opacity: 0.92;
 }
 
+/* ── Structured Intro Card (Phase 7) ──────────────────────── */
+.pbsg-intro-card--structured {
+  max-width: 640px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.pbsg-intro-cover {
+  margin-bottom: 24px;
+}
+
+.pbsg-intro-cover img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  object-fit: cover;
+  max-height: 300px;
+}
+
+.pbsg-intro-description {
+  font-size: 16px;
+  line-height: 1.6;
+  color: #333;
+  margin: 0 0 24px;
+}
+
+.pbsg-intro-objectives h3 {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+.pbsg-intro-objectives ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+.pbsg-intro-objectives li {
+  padding: 8px 0 8px 28px;
+  position: relative;
+  font-size: 15px;
+  border-bottom: 1px solid #F1F1F1;
+}
+
+.pbsg-intro-objectives li:last-child {
+  border-bottom: none;
+}
+
+.pbsg-intro-objectives li::before {
+  content: '\2713';
+  position: absolute;
+  left: 0;
+  color: #517E1B;
+  font-weight: 700;
+}
+
+.pbsg-intro-meta {
+  display: flex;
+  gap: 20px;
+  margin: 20px 0;
+  font-size: 14px;
+  color: #646970;
+}
+
+.pbsg-intro-prereqs {
+  background: #F8F8F8;
+  border: 1px solid #E0E0E0;
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+}
+
+.pbsg-intro-prereqs h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.pbsg-intro-prereqs p {
+  margin: 0;
+  font-size: 14px;
+  color: #646970;
+}
+
 .pbsg-summary-screen {
   width: min(1000px, 92vw);
   margin: 40px auto;
@@ -828,13 +917,69 @@ body.pbsg-standalone .pbsg-wrap{
   flex-wrap: wrap;
 }
 
-/* When the tutorial is active, completely hide the footer */
+/* ==========================================
+   Resize Handle (Stretch Goal 5b)
+   Draggable divider between left/right panes
+   ========================================== */
+
+.pbsg-resize-handle {
+  flex: 0 0 8px;
+  cursor: col-resize;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  transition: background 0.15s ease;
+  position: relative;
+  touch-action: none;  /* prevent scroll on touch drag */
+}
+
+.pbsg-resize-handle:hover,
+.pbsg-resize-handle:active {
+  background: rgba(81, 126, 27, 0.06);
+}
+
+.pbsg-resize-handle:focus-visible {
+  outline: 2px solid #517E1B;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.pbsg-resize-grip {
+  width: 4px;
+  height: 40px;
+  border-radius: 2px;
+  background: rgba(0,0,0,0.18);
+  transition: background 0.15s ease, height 0.15s ease;
+}
+
+.pbsg-resize-handle:hover .pbsg-resize-grip,
+.pbsg-resize-handle:active .pbsg-resize-grip {
+  background: #517E1B;
+  height: 52px;
+}
+
+/* Hide resize handle on mobile (layout stacks vertically) */
+@media (max-width: 980px) {
+  .pbsg-resize-handle {
+    display: none !important;
+  }
+}
+
+/* ==========================================
+   When the tutorial is active, hide footer
+   ========================================== */
 body.tutorial-active footer,
 body.tutorial-active .site-footer,
 body.tutorial-active #colophon {
     display: none !important;
 }
 
+/* ==========================================
+   Branch Review Banner & Modal
+   (Sprint 7 — wrong-answer sub-tutorials)
+   ========================================== */
 .pbsg-branch-banner {
   margin: 12px 0;
   border: 1px solid #d0d7de;
@@ -843,42 +988,35 @@ body.tutorial-active #colophon {
   border-radius: 8px;
   padding: 12px 14px;
 }
-
 .pbsg-branch-banner-inner {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-
 .pbsg-branch-text {
   font-size: 14px;
   line-height: 1.5;
 }
-
 .pbsg-branch-mode {
   display: inline-block;
   margin-top: 4px;
   color: #555;
 }
-
 .pbsg-branch-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
-
 .pbsg-branch-modal {
   position: fixed;
   inset: 0;
   z-index: 99999;
 }
-
 .pbsg-branch-modal-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.45);
 }
-
 .pbsg-branch-modal-dialog {
   position: relative;
   z-index: 1;
@@ -891,13 +1029,11 @@ body.tutorial-active #colophon {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.22);
   padding: 24px;
 }
-
 .pbsg-branch-modal-title {
   margin: 0 0 12px;
   font-size: 24px;
   line-height: 1.25;
 }
-
 .pbsg-branch-modal-close {
   position: absolute;
   top: 12px;
@@ -907,22 +1043,4 @@ body.tutorial-active #colophon {
   font-size: 28px;
   line-height: 1;
   cursor: pointer;
-}
-
-.pbsg-branch-text {
-  font-size: 16px;
-  line-height: 1.6;
-  margin-bottom: 18px;
-}
-
-.pbsg-branch-mode {
-  display: inline-block;
-  margin-top: 8px;
-  color: #555;
-}
-
-.pbsg-branch-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
 }

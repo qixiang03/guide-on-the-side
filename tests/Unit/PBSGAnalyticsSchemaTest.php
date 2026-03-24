@@ -162,6 +162,9 @@ class PBSGAnalyticsSchemaTest extends TestCase
             'second_attempt_correct BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
             'total_time_seconds BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
             'total_answered BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
+            'incorrect_attempts BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
+            'total_retries BIGINT(20) UNSIGNED NOT NULL DEFAULT 0',
+            'max_retries_single_session INT UNSIGNED NOT NULL DEFAULT 0',
         ];
 
         foreach ($columns as $col) {
@@ -249,7 +252,7 @@ class PBSGAnalyticsSchemaTest extends TestCase
     {
         $info = $this->getCreateTablesSql();
         // Verify the source code calls update_option with the correct version
-        $this->assertStringContainsString("update_option( 'pbsg_analytics_db_version', '1.0.0' )", $info['source']);
+        $this->assertStringContainsString("update_option( 'pbsg_analytics_db_version', '1.1.0' )", $info['source']);
     }
 
     /* ---------------------------------------------------------------

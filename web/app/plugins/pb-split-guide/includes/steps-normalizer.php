@@ -66,34 +66,41 @@ final class PBSG_Steps_Normalizer
                 if (!$tutorial_url) $tutorial_type = '';
             }
 
+            // ── Branch / sub-tutorial fields (wrong-answer remediation) ──
+            $branch_mode = isset($s['branch_mode']) ? self::sanitize_key((string)$s['branch_mode']) : 'none';
+            if (!in_array($branch_mode, ['none', 'optional', 'mandatory'], true)) {
+                $branch_mode = 'none';
+            }
+            $branch_trigger_attempts = isset($s['branch_trigger_attempts']) ? (int)$s['branch_trigger_attempts'] : 1;
+            if ($branch_trigger_attempts < 1) $branch_trigger_attempts = 1;
+            $branch_title = isset($s['branch_title']) ? self::sanitize_text((string)$s['branch_title']) : '';
+            $branch_intro = isset($s['branch_intro']) ? self::sanitize_text((string)$s['branch_intro']) : '';
 
             $branch_tutorial_type = isset($s['branch_tutorial_type']) ? self::sanitize_key((string)$s['branch_tutorial_type']) : '';
             $branch_tutorial_url  = isset($s['branch_tutorial_url']) ? self::sanitize_url((string)$s['branch_tutorial_url']) : '';
             $branch_tutorial_attachment_id = isset($s['branch_tutorial_attachment_id']) ? (int)$s['branch_tutorial_attachment_id'] : 0;
             if ($branch_tutorial_attachment_id < 0) $branch_tutorial_attachment_id = 0;
-
             if (!in_array($branch_tutorial_type, ['url', 'file'], true)) {
                 $branch_tutorial_type = ($branch_tutorial_attachment_id > 0)
                     ? 'file'
                     : ($branch_tutorial_url ? 'url' : '');
             }
-
             if ($branch_tutorial_type === 'file' && $branch_tutorial_attachment_id <= 0) {
                 $branch_tutorial_type = $branch_tutorial_url ? 'url' : '';
             }
-
             if ($branch_tutorial_type === 'url' && !$branch_tutorial_url) {
                 $branch_tutorial_type = '';
             }
 
+            // Pre-check: does this step have quiz data? (peek at raw data before full normalization)
+            $raw_quiz = isset($s['quiz']) && is_array($s['quiz']) ? $s['quiz'] : null;
+            $has_quiz = $raw_quiz && !empty(self::sanitize_key($raw_quiz['type'] ?? ''));
+
             // Skip empty rows
-            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '');
+            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '') || $has_quiz;
             if (!$has_any) continue;
 
-            $branch_trigger_attempts = isset($s['branch_trigger_attempts']) ? (int)$s['branch_trigger_attempts'] : 1;
-            if ($branch_trigger_attempts < 1) $branch_trigger_attempts = 1;
-
-            $clean[] = [
+            $clean_step = [
                 'title' => $title,
                 'h5p_id' => $h5p_id,
 
@@ -105,22 +112,99 @@ final class PBSG_Steps_Normalizer
                 // Legacy key (optional)
                 'url' => $tutorial_type === 'url' ? $tutorial_url : '',
 
-                // Branch remediation
-                'branch_mode' => in_array(($s['branch_mode'] ?? ''), ['none', 'optional', 'mandatory'], true)
-                    ? $s['branch_mode']
-                    : 'none',
-
-                'branch_trigger_attempts' => $branch_trigger_attempts,
-                'branch_title' => isset($s['branch_title']) ? self::sanitize_text((string)$s['branch_title']) : '',
-                'branch_intro' => isset($s['branch_intro']) ? self::sanitize_text((string)$s['branch_intro']) : '',
-
-                'branch_tutorial_type' => $branch_tutorial_type,
-                'branch_tutorial_url' => $branch_tutorial_type === 'url' ? $branch_tutorial_url : '',
+                // Branch / sub-tutorial fields
+                'branch_mode'                  => $branch_mode,
+                'branch_trigger_attempts'      => $branch_trigger_attempts,
+                'branch_title'                 => $branch_title,
+                'branch_intro'                 => $branch_intro,
+                'branch_tutorial_type'         => $branch_tutorial_type,
+                'branch_tutorial_url'          => $branch_tutorial_type === 'url' ? $branch_tutorial_url : '',
                 'branch_tutorial_attachment_id' => $branch_tutorial_type === 'file' ? $branch_tutorial_attachment_id : 0,
+                'branch_tutorial_file_name'    => isset($s['branch_tutorial_file_name']) ? self::sanitize_text((string)$s['branch_tutorial_file_name']) : '',
+                'branch_tutorial_file_url'     => isset($s['branch_tutorial_file_url']) ? self::sanitize_url((string)$s['branch_tutorial_file_url']) : '',
             ];
+
+            // Preserve quiz data for H5P creation (consumed by save_meta, not stored long-term)
+            $quiz = isset($s['quiz']) && is_array($s['quiz']) ? $s['quiz'] : null;
+            if ($quiz) {
+                $quiz_type = self::sanitize_key($quiz['type'] ?? '');
+                $clean_quiz = ['type' => $quiz_type];
+
+                switch ($quiz_type) {
+                    case 'multichoice':
+                        $clean_quiz['question'] = self::sanitize_text($quiz['question'] ?? '');
+                        $clean_quiz['answers']  = self::sanitize_mc_answers($quiz['answers'] ?? []);
+                        break;
+
+                    case 'blanks':
+                        $clean_quiz['sentence']       = self::sanitize_blanks_sentence($quiz['sentence'] ?? '');
+                        $clean_quiz['case_sensitive']  = (bool) ($quiz['case_sensitive'] ?? true);
+                        $clean_quiz['accept_typos']    = (bool) ($quiz['accept_typos'] ?? false);
+                        break;
+
+                    case 'singlechoice':
+                        $clean_quiz['question']       = self::sanitize_text($quiz['question'] ?? '');
+                        $clean_quiz['correct_answer'] = self::sanitize_text($quiz['correct_answer'] ?? '');
+                        $clean_quiz['wrong_answers']  = array_map(
+                            [self::class, 'sanitize_text'],
+                            is_array($quiz['wrong_answers'] ?? null) ? $quiz['wrong_answers'] : []
+                        );
+                        break;
+
+                    default:
+                        $clean_quiz = null;
+                        break;
+                }
+
+                if ($clean_quiz && !empty($clean_quiz['type'])) {
+                    $clean_step['quiz'] = $clean_quiz;
+                }
+            }
+
+            $clean[] = $clean_step;
         }
 
         return $clean;
+    }
+
+    /**
+     * Sanitize multiple-choice answers array.
+     *
+     * @param mixed $answers
+     * @return array
+     */
+    private static function sanitize_mc_answers($answers): array
+    {
+        if (!is_array($answers)) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($answers as $a) {
+            if (!is_array($a)) continue;
+            $text = self::sanitize_text($a['text'] ?? '');
+            if ($text === '') continue;
+            $clean[] = [
+                'text'    => $text,
+                'correct' => !empty($a['correct']),
+            ];
+        }
+        return $clean;
+    }
+
+    /**
+     * Sanitize a fill-in-the-blanks sentence.
+     * Preserves *asterisk* markers but strips dangerous content.
+     *
+     * @param string $sentence
+     * @return string
+     */
+    private static function sanitize_blanks_sentence(string $sentence): string
+    {
+        $sentence = trim($sentence);
+        // Strip HTML tags but preserve asterisks, slashes, colons (used for blanks syntax)
+        $sentence = strip_tags($sentence);
+        return $sentence;
     }
 
     private static function sanitize_text(string $text): string

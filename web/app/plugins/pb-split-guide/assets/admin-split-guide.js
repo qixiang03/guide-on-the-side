@@ -1,643 +1,1168 @@
 jQuery(function ($) {
-  // --- Utilities ---
-  function escapeHtml(str) {
-    return String(str || '').replace(/[&<>"']/g, function (m) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]);
-    });
+  'use strict';
+
+  // ═══════════════════════════════════════════════════════════
+  //  Utilities
+  // ═══════════════════════════════════════════════════════════
+  function esc(str) {
+    return String(str || '').replace(/[&<>"']/g, m =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
   }
 
-  function safeParseJson(text, fallback) {
-    try {
-      const v = JSON.parse(text || '');
-      return (v && Array.isArray(v)) ? v : (fallback || []);
-    } catch (e) {
-      return fallback || [];
-    }
+  /**
+   * Return an appropriate emoji icon for a filename based on its extension.
+   */
+  function filePreviewIcon(filename) {
+    const ext = String(filename || '').split('.').pop().toLowerCase();
+    const map = {
+      pdf: '&#x1F4D1;',                                          // 📑
+      doc: '&#x1F4DD;', docx: '&#x1F4DD;',                      // 📝
+      xls: '&#x1F4CA;', xlsx: '&#x1F4CA;', csv: '&#x1F4CA;',   // 📊
+      ppt: '&#x1F4BD;', pptx: '&#x1F4BD;',                      // 💽
+      jpg: '&#x1F5BC;', jpeg: '&#x1F5BC;', png: '&#x1F5BC;',
+      gif: '&#x1F5BC;', webp: '&#x1F5BC;', svg: '&#x1F5BC;',   // 🖼
+      mp4: '&#x1F3AC;', mov: '&#x1F3AC;', avi: '&#x1F3AC;',
+      webm: '&#x1F3AC;', mkv: '&#x1F3AC;',                      // 🎬
+      mp3: '&#x1F3B5;', wav: '&#x1F3B5;', ogg: '&#x1F3B5;',    // 🎵
+      zip: '&#x1F4E6;', rar: '&#x1F4E6;', gz: '&#x1F4E6;',     // 📦
+    };
+    return map[ext] || '&#x1F4C4;';  // default 📄
+  }
+
+  /**
+   * Return a human-readable preview label for a filename based on its extension.
+   */
+  function filePreviewLabel(filename) {
+    const ext = String(filename || '').split('.').pop().toLowerCase();
+    const labels = {
+      pdf:  'PDF will be embedded in the right pane',
+      doc:  'Document will be available for download',
+      docx: 'Document will be available for download',
+      xls:  'Spreadsheet will be available for download',
+      xlsx: 'Spreadsheet will be available for download',
+      csv:  'Spreadsheet will be available for download',
+      ppt:  'Presentation will be available for download',
+      pptx: 'Presentation will be available for download',
+      jpg:  'Image will be displayed in the right pane',
+      jpeg: 'Image will be displayed in the right pane',
+      png:  'Image will be displayed in the right pane',
+      gif:  'Image will be displayed in the right pane',
+      webp: 'Image will be displayed in the right pane',
+      svg:  'Image will be displayed in the right pane',
+      mp4:  'Video will be embedded in the right pane',
+      mov:  'Video will be embedded in the right pane',
+      avi:  'Video will be embedded in the right pane',
+      webm: 'Video will be embedded in the right pane',
+      mp3:  'Audio will be embedded in the right pane',
+      wav:  'Audio will be embedded in the right pane',
+      ogg:  'Audio will be embedded in the right pane',
+    };
+    return labels[ext] || 'File will be available as a resource in the right pane';
   }
 
   function getSteps() {
-    return safeParseJson($('#pbsg_steps_json').val(), []);
+    try { const v = JSON.parse($('#pbsg_steps_json').val() || ''); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
   }
 
-  function setSteps(steps) {
-    $('#pbsg_steps_json').val(JSON.stringify(steps || []));
+  function setSteps(steps) { $('#pbsg_steps_json').val(JSON.stringify(steps || [])); markDirty(); }
+
+  // ═══════════════════════════════════════════════════════════
+  //  Unsaved-changes detection
+  // ═══════════════════════════════════════════════════════════
+  let _savedSnapshot = '';   // JSON string of last-saved state
+  let _isDirty = false;
+
+  /** Take a snapshot of the current form state (steps JSON + intro fields). */
+  function currentSnapshot() {
+    const parts = [
+      $('#pbsg_steps_json').val() || '',
+      $('#pbsg_intro_title').val() || '',
+      $('#pbsg_intro_subtitle').val() || '',
+      $('#pbsg_intro_description').val() || '',
+    ];
+    return parts.join('|||');
   }
 
-    function getTemplateSelect() {
-    return $('#page_template');
-  }
-
-  function isSplitGuideTemplateSelected() {
-    const $template = getTemplateSelect();
-    // If the dropdown exists in the DOM, trust it
-    if ($template.length > 0) {
-      return $template.val() === PBSG_ADMIN.templateSlug;
-    }
-    // Pressbooks hides the template dropdown — fall back to the server-side meta value
-    return PBSG_ADMIN.currentTemplate === PBSG_ADMIN.templateSlug;
-  }
-
-  function toggleMetaBox() {
-    const $box = $('#' + PBSG_ADMIN.metaBoxId).closest('.postbox');
-    if ($box.length === 0) return;
-
-    if (isSplitGuideTemplateSelected()) {
-      $box.show();
-    } else {
-      $box.hide();
+  /** Call after any user edit to flag the page as dirty. */
+  function markDirty() {
+    if (_savedSnapshot === '') return;  // still initialising
+    if (currentSnapshot() !== _savedSnapshot) {
+      _isDirty = true;
     }
   }
 
-  function forceDefaultSplitGuideTemplate() {
-    if (!PBSG_ADMIN.isNewPage) return false;
-
-    const $template = getTemplateSelect();
-    if ($template.length === 0) return false;
-
-    const hasTargetOption = $template.find('option[value="' + PBSG_ADMIN.templateSlug + '"]').length > 0;
-    if (!hasTargetOption) return false;
-
-    if ($template.val() !== PBSG_ADMIN.templateSlug) {
-      $template.val(PBSG_ADMIN.templateSlug).trigger('change');
-    }
-
-    toggleMetaBox();
-    return true;
+  /** Call on page-load and after a successful save to reset the dirty flag. */
+  function markClean() {
+    _savedSnapshot = currentSnapshot();
+    _isDirty = false;
   }
 
-  function setupDefaultTemplateWatcher() {
-    $(document).on('change', '#page_template', function () {
-      toggleMetaBox();
-    });
-
-    if (!PBSG_ADMIN.isNewPage) {
-      toggleMetaBox();
-      return;
+  // Browser navigation guard
+  $(window).on('beforeunload', function () {
+    if (_isDirty) {
+      return 'You have unsaved changes. Are you sure you want to leave?';
     }
+  });
 
-    let tries = 0;
-    const maxTries = 40;
-
-    const timer = setInterval(function () {
-      tries++;
-      const done = forceDefaultSplitGuideTemplate();
-
-      if (done || tries >= maxTries) {
-        clearInterval(timer);
-        toggleMetaBox();
-      }
-    }, 250);
-
-    $(window).on('load', function () {
-      forceDefaultSplitGuideTemplate();
-      toggleMetaBox();
-    });
-
-    // In case Pressbooks rebuilds the sidebar/dropdown later
-    const observer = new MutationObserver(function () {
-      forceDefaultSplitGuideTemplate();
-      toggleMetaBox();
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-  }
-
-  setupDefaultTemplateWatcher();
-
-  // Normalize older data
-  function normalizeStep(s) {
-    const out = Object.assign({}, s || {});
-
-    if (!out.tutorial_type && out.url) {
-      out.tutorial_type = 'url';
-      out.tutorial_url = out.url;
-    }
-
-    if (!out.tutorial_url) out.tutorial_url = '';
-    if (!out.tutorial_attachment_id) out.tutorial_attachment_id = 0;
-    if (!out.tutorial_file_name) out.tutorial_file_name = '';
-    if (!out.tutorial_file_url) out.tutorial_file_url = '';
-
-    // Branch defaults
-    out.branch_mode = out.branch_mode || 'none';
-    if (!['none', 'optional', 'mandatory'].includes(out.branch_mode)) {
-      out.branch_mode = 'none';
-    }
-
-    out.branch_trigger_attempts = parseInt(out.branch_trigger_attempts, 10) || 1;
-    if (out.branch_trigger_attempts < 1) out.branch_trigger_attempts = 1;
-
-    if (!out.branch_title) out.branch_title = '';
-    if (!out.branch_intro) out.branch_intro = '';
-
-    if (!out.branch_tutorial_type) out.branch_tutorial_type = '';
-    if (!out.branch_tutorial_url) out.branch_tutorial_url = '';
-    if (!out.branch_tutorial_attachment_id) out.branch_tutorial_attachment_id = 0;
-    if (!out.branch_tutorial_file_name) out.branch_tutorial_file_name = '';
-    if (!out.branch_tutorial_file_url) out.branch_tutorial_file_url = '';
-
-    return out;
-  }
-
-  function tutorialSummary(s) {
-    s = normalizeStep(s);
-
-    if (s.tutorial_type === 'url' && s.tutorial_url) {
-      return 'URL selected';
-    }
-
-    if (s.tutorial_type === 'file' && (s.tutorial_file_name || s.tutorial_attachment_id)) {
-      return s.tutorial_file_name
-        ? `File: ${s.tutorial_file_name}`
-        : 'File selected';
-    }
-
-    return '';
+  function norm(s) {
+    const o = Object.assign({}, s || {});
+    if (!o.tutorial_type && o.url) { o.tutorial_type = 'url'; o.tutorial_url = o.url; }
+    o.tutorial_url = o.tutorial_url || '';
+    o.tutorial_attachment_id = o.tutorial_attachment_id || 0;
+    o.tutorial_file_name = o.tutorial_file_name || '';
+    o.tutorial_file_url = o.tutorial_file_url || '';
+    o.quiz = o.quiz || null;
+    o.h5p_id = o.h5p_id || 0;
+    o.title = o.title || '';
+    // Branch / sub-tutorial defaults
+    o.branch_mode = o.branch_mode || 'none';
+    if (!['none', 'optional', 'mandatory'].includes(o.branch_mode)) o.branch_mode = 'none';
+    o.branch_trigger_attempts = parseInt(o.branch_trigger_attempts, 10) || 1;
+    if (o.branch_trigger_attempts < 1) o.branch_trigger_attempts = 1;
+    o.branch_title = o.branch_title || '';
+    o.branch_intro = o.branch_intro || '';
+    o.branch_tutorial_type = o.branch_tutorial_type || '';
+    o.branch_tutorial_url = o.branch_tutorial_url || '';
+    o.branch_tutorial_attachment_id = o.branch_tutorial_attachment_id || 0;
+    o.branch_tutorial_file_name = o.branch_tutorial_file_name || '';
+    o.branch_tutorial_file_url = o.branch_tutorial_file_url || '';
+    return o;
   }
 
   function branchSummary(s) {
-    s = normalizeStep(s);
-
+    s = norm(s);
     if (s.branch_mode === 'none') return '';
-
     const mode = s.branch_mode === 'mandatory' ? 'Mandatory' : 'Optional';
     const count = s.branch_trigger_attempts;
-
-    return `${mode} · after ${count} wrong ${count === 1 ? 'attempt' : 'attempts'}`;
+    return mode + ' \u00B7 after ' + count + ' wrong ' + (count === 1 ? 'attempt' : 'attempts');
   }
 
-  // --- Steps Table Rendering ---
-  function renderStepsTable() {
-    const steps = getSteps().map(normalizeStep);
-    const $tbody = $('#pbsg-steps-table tbody');
+  // ═══════════════════════════════════════════════════════════
+  //  Template Watcher (unchanged logic)
+  // ═══════════════════════════════════════════════════════════
+  function isSplitGuide() {
+    const $t = $('#page_template');
+    return $t.length > 0 && $t.val() === PBSG_ADMIN.templateSlug;
+  }
+  function toggleMetaBox() {
+    const $b = $('#' + PBSG_ADMIN.metaBoxId).closest('.postbox');
+    if ($b.length) $b[isSplitGuide() ? 'show' : 'hide']();
+  }
+  function forceTemplate() {
+    if (!PBSG_ADMIN.isNewPage) return false;
+    const $t = $('#page_template');
+    if (!$t.length || !$t.find('option[value="' + PBSG_ADMIN.templateSlug + '"]').length) return false;
+    if ($t.val() !== PBSG_ADMIN.templateSlug) $t.val(PBSG_ADMIN.templateSlug).trigger('change');
+    toggleMetaBox();
+    return true;
+  }
+  $(document).on('change', '#page_template', toggleMetaBox);
+  if (!PBSG_ADMIN.isNewPage) { toggleMetaBox(); }
+  else {
+    let tries = 0;
+    const tmr = setInterval(() => { if (forceTemplate() || ++tries >= 40) { clearInterval(tmr); toggleMetaBox(); } }, 250);
+    $(window).on('load', () => { forceTemplate(); toggleMetaBox(); });
+    new MutationObserver(() => { forceTemplate(); toggleMetaBox(); }).observe(document.body, { childList: true, subtree: true });
+  }
 
-    if ($tbody.length === 0) return;
+  // ═══════════════════════════════════════════════════════════
+  //  Collapsed State Tracking (Issue 1)
+  // ═══════════════════════════════════════════════════════════
+  const collapsedSteps = new Set();
 
-    $tbody.empty();
+  // ═══════════════════════════════════════════════════════════
+  //  Intro Section Toggle
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('click', '#pbsg-intro-toggle', function () {
+    const $body = $('#pbsg-intro-body'), $chev = $('#pbsg-intro-chevron');
+    $body.toggle();
+    $chev.html($body.is(':visible') ? '&#x25BC;' : '&#x25B6;');
+  });
 
-    if (steps.length === 0) {
-      $tbody.append(`
-        <tr>
-          <td colspan="5" style="padding:12px; opacity:0.8;">
-            No steps yet. Click <strong>Add Step</strong> to create one.
-          </td>
-        </tr>
-      `);
-      return;
-    }
+  // ═══════════════════════════════════════════════════════════
+  //  Objectives (Phase 7)
+  // ═══════════════════════════════════════════════════════════
+  function syncObj() {
+    const arr = [];
+    $('#pbsg-objectives-list .pbsg-objective-input').each(function () { const v = $(this).val().trim(); if (v) arr.push(v); });
+    $('#pbsg_intro_objectives').val(JSON.stringify(arr));
+  }
+  $(document).on('click', '#pbsg-add-objective', function () {
+    $('#pbsg-objectives-list').append(`
+      <div class="pbsg-objective-row">
+        <span class="pbsg-objective-check">&#x2713;</span>
+        <input type="text" class="pbsg-objective-input" placeholder="Learning objective..." />
+        <button type="button" class="pbsg-objective-remove" title="Remove">&times;</button>
+      </div>`);
+    $('#pbsg-objectives-list .pbsg-objective-input').last().focus();
+  });
+  $(document).on('click', '.pbsg-objective-remove', function () { $(this).closest('.pbsg-objective-row').remove(); syncObj(); });
+  $(document).on('input', '.pbsg-objective-input', syncObj);
+  syncObj();
+
+  // ═══════════════════════════════════════════════════════════
+  //  Step Card Rendering
+  // ═══════════════════════════════════════════════════════════
+  function quizName(t) { return { multichoice: 'Multiple Choice', blanks: 'Fill in Blanks', singlechoice: 'Single Choice' }[t] || ''; }
+
+  function renderStepCards() {
+    const steps = getSteps().map(norm);
+    const $c = $('#pbsg-steps-container');
+    if (!$c.length) return;
+
+    // Snapshot collapsed state before wiping DOM
+    $c.find('.pbsg-step-card--collapsed').each(function () {
+      collapsedSteps.add(parseInt($(this).data('idx'), 10));
+    });
+
+    $c.empty();
 
     steps.forEach((s, idx) => {
-      const title = escapeHtml(s.title || '');
-      const h5pId = s.h5p_id ? String(s.h5p_id) : '';
+      const num = idx + 1;
+      const qt = s.quiz ? s.quiz.type : '';
+      const hasQuiz = qt || s.h5p_id > 0;
+      const hasRes = s.tutorial_type === 'url' || s.tutorial_type === 'file';
 
-      const summary = escapeHtml(tutorialSummary(s));
-      const branch = escapeHtml(branchSummary(s));
+      const quizBadge = hasQuiz ? `<span class="pbsg-badge pbsg-badge--info">${qt ? esc(quizName(qt)) : 'H5P #' + s.h5p_id}</span>` : '';
+      const resBadge = hasRes ? `<span class="pbsg-badge pbsg-badge--ok">Resource &#x2713;</span>` : '';
 
-      const row = `
-        <tr data-idx="${idx}">
-          <td>
-            <input type="text" class="pbsg-step-title" value="${title}" style="width:100%;" />
-          </td>
-          <td>
-            <div style="display:flex; gap:6px; align-items:center;">
-              <input type="number" min="1" class="pbsg-step-h5p" value="${escapeHtml(h5pId)}" style="width:100px;" />
-              <button type="button" class="button pbsg-pick-h5p">Add H5P</button>
+      $c.append(`
+        <div class="pbsg-step-card" data-idx="${idx}" id="pbsg-step-${idx}">
+          <div class="pbsg-step-header">
+            <span class="pbsg-drag-handle" title="Drag to reorder">&#x2807;</span>
+            <span class="pbsg-step-number">${num}</span>
+            <input class="pbsg-step-title-input" type="text" value="${esc(s.title)}" placeholder="Step title (optional)" data-idx="${idx}" />
+            <div class="pbsg-step-badges">
+              ${quizBadge}${resBadge}
             </div>
-          </td>
-          <td>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <div class="pbsg-tutorial-summary" style="flex:1; min-width:0; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; ${summary ? '' : 'display:none;'}">
-                <span>${summary}</span>
+            <div class="pbsg-step-header-actions">
+              <span class="pbsg-step-chevron" data-idx="${idx}" title="Collapse">&#x25BC;</span>
+              <button type="button" class="pbsg-btn-ghost pbsg-remove-step" data-idx="${idx}" title="Remove step">&times;</button>
+            </div>
+          </div>
+          <div class="pbsg-step-body" data-idx="${idx}">
+            <div class="pbsg-panel pbsg-panel-quiz" data-idx="${idx}">
+              <div class="pbsg-panel-label">
+                <span class="pbsg-panel-icon">&#x1F9E9;</span> Quiz Question
               </div>
-              <button type="button" class="button pbsg-set-tutorial">Set Tutorial</button>
-              <button type="button" class="button pbsg-clear-tutorial">Clear</button>
+              ${renderQuizPanel(s, idx)}
             </div>
-          </td>
-          <td>
-            <div style="display:flex; gap:8px; align-items:center;">
-              <div class="pbsg-branch-summary" style="flex:1; min-width:0; opacity:.9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; ${branch ? '' : 'display:none;'}">
-                <span>${branch}</span>
+            <div class="pbsg-panel" data-idx="${idx}">
+              <div class="pbsg-panel-label">
+                <span class="pbsg-panel-icon">&#x1F4D6;</span> Tutorial Resource
               </div>
-              <button type="button" class="button pbsg-set-branch">Set Branch Review</button>
-              <button type="button" class="button pbsg-clear-branch">Clear</button>
+              ${renderResourcePanel(s, idx)}
             </div>
-          </td>
-          <td>
-            <button type="button" class="button link-delete pbsg-remove-step">Remove</button>
-          </td>
-        </tr>
-      `;
-      $tbody.append(row);
+            <div class="pbsg-panel pbsg-panel-branch" data-idx="${idx}" style="grid-column: 1 / -1; border-top: 1px solid #F1F1F1; padding: 12px 20px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="pbsg-panel-icon">&#x1F500;</span>
+                <strong style="font-size:13px;">Branch Review</strong>
+                <span class="pbsg-branch-summary" style="flex:1; opacity:.85; font-size:13px;">${esc(branchSummary(s))}</span>
+                <button type="button" class="button pbsg-set-branch" data-idx="${idx}">Set Branch</button>
+                <button type="button" class="button pbsg-clear-branch" data-idx="${idx}">Clear</button>
+              </div>
+            </div>
+            <div class="pbsg-step-footer">
+              <button type="button" class="button pbsg-collapse-step" data-idx="${idx}">Collapse</button>
+            </div>
+          </div>
+        </div>`);
+
+      // Restore collapsed state
+      if (collapsedSteps.has(idx)) {
+        $(`#pbsg-step-${idx}`).addClass('pbsg-step-card--collapsed');
+      }
     });
 
-    // Persist normalization back into JSON
+    // SortableJS (optional)
+    if (typeof Sortable !== 'undefined' && $c[0]) {
+      if ($c[0]._sortable) $c[0]._sortable.destroy();
+      $c[0]._sortable = Sortable.create($c[0], {
+        handle: '.pbsg-drag-handle',
+        animation: 200,
+        ghostClass: 'sortable-ghost',
+        onEnd: function () { reorderFromDOM(); renderStepCards(); }
+      });
+    }
+
     setSteps(steps);
   }
 
-  function syncStepsFromTable() {
-    const steps = getSteps().map(normalizeStep);
+  // ─── Quiz Panel ────────────────────────────────────────
+  function renderQuizPanel(s, idx) {
+    if (s.h5p_id > 0 && !s.quiz) {
+      return `<div class="pbsg-linked-h5p">
+        <div class="pbsg-linked-h5p-info">
+          <span class="pbsg-linked-icon">&#x1F517;</span>
+          <span>Linked to <strong>H5P #${s.h5p_id}</strong></span>
+        </div>
+        <div class="pbsg-linked-h5p-actions">
+          <a href="#" class="pbsg-detach-h5p" data-idx="${idx}">Detach &amp; create new inline</a>
+          <span class="pbsg-sep">|</span>
+          <a href="#" class="pbsg-use-existing-h5p" data-idx="${idx}">Change H5P</a>
+          <span class="pbsg-sep">|</span>
+          <a href="#" class="pbsg-edit-h5p" data-idx="${idx}" data-h5p-id="${s.h5p_id}">Edit H5P</a>
+        </div>
+      </div>`;
+    }
 
-    $('#pbsg-steps-table tbody tr').each(function () {
-      const $tr = $(this);
-      if ($tr.find('.pbsg-step-title').length === 0) return;
+    const qt = s.quiz ? s.quiz.type : 'multichoice';
 
-      const idx = parseInt($tr.attr('data-idx'), 10);
-      if (isNaN(idx) || !steps[idx]) return;
-
-      steps[idx].title = $tr.find('.pbsg-step-title').val() || '';
-      steps[idx].h5p_id = parseInt($tr.find('.pbsg-step-h5p').val(), 10) || 0;
-
-      // Legacy mirror
-      if (steps[idx].tutorial_type === 'url') steps[idx].url = steps[idx].tutorial_url || '';
-      else steps[idx].url = '';
-    });
-
-    setSteps(steps);
+    return `
+      <div class="pbsg-quiz-type-selector" data-idx="${idx}">
+        <button type="button" class="pbsg-quiz-type-btn${qt === 'multichoice' ? ' active' : ''}" data-type="multichoice" data-idx="${idx}">
+          <span class="pbsg-type-icon">&#x2611;</span>Multiple Choice</button>
+        <button type="button" class="pbsg-quiz-type-btn${qt === 'blanks' ? ' active' : ''}" data-type="blanks" data-idx="${idx}">
+          <span class="pbsg-type-icon">&#x270F;&#xFE0F;</span>Fill in Blanks</button>
+        <button type="button" class="pbsg-quiz-type-btn${qt === 'singlechoice' ? ' active' : ''}" data-type="singlechoice" data-idx="${idx}">
+          <span class="pbsg-type-icon">&#x25C9;</span>Single Choice</button>
+      </div>
+      <div class="pbsg-quiz-form" data-idx="${idx}">${renderQuizForm(qt, s.quiz || {}, idx)}</div>
+      <div class="pbsg-existing-h5p-link">
+        <span>&#x1F4A1;</span>
+        <span>Or <a href="#" class="pbsg-use-existing-h5p" data-idx="${idx}">use an existing H5P quiz</a> instead</span>
+      </div>`;
   }
 
-  renderStepsTable();
+  function renderQuizForm(type, quiz, idx) {
+    if (type === 'blanks') return renderBlanksForm(quiz, idx);
+    if (type === 'singlechoice') return renderSCForm(quiz, idx);
+    return renderMCForm(quiz, idx);
+  }
 
-  // Add step
-  $('#pbsg-add-step').on('click', function () {
-    const steps = getSteps().map(normalizeStep);
-    steps.push({
-      title: '',
-      h5p_id: 0,
+  // ─── Multiple Choice ──────────────────────────────────
+  function renderMCForm(quiz, idx) {
+    const q = quiz.question || '';
+    const ans = quiz.answers || [{ text: '', correct: true }, { text: '', correct: false }];
 
-      tutorial_type: '',
-      tutorial_url: '',
-      tutorial_attachment_id: 0,
-      tutorial_file_name: '',
-      tutorial_file_url: '',
-
-      url: '', // legacy
-
-      branch_mode: 'none',
-      branch_trigger_attempts: 1,
-      branch_title: '',
-      branch_intro: '',
-      branch_tutorial_type: '',
-      branch_tutorial_url: '',
-      branch_tutorial_attachment_id: 0,
-      branch_tutorial_file_name: '',
-      branch_tutorial_file_url: ''
-
+    let rows = '';
+    ans.forEach((a, ai) => {
+      const cor = a.correct;
+      const rowClass = 'pbsg-answer-row' + (cor ? ' pbsg-answer-row--correct' : ' pbsg-answer-row--incorrect');
+      rows += `<div class="${rowClass}">
+        <input type="checkbox" class="pbsg-answer-check" data-idx="${idx}" data-aidx="${ai}" ${cor ? 'checked' : ''} />
+        <input type="text" class="pbsg-answer-input" data-idx="${idx}" data-aidx="${ai}" value="${esc(a.text)}" placeholder="Answer option..." />
+        ${cor ? `<span class="pbsg-answer-correct-label">&#x2713; Correct</span>` : ''}
+        <button type="button" class="pbsg-answer-remove" data-idx="${idx}" data-aidx="${ai}" title="Remove">&times;</button>
+      </div>`;
     });
-    setSteps(steps);
-    renderStepsTable();
-  });
 
-  // Remove step
-  $(document).on('click', '.pbsg-remove-step', function () {
-    const idx = parseInt($(this).closest('tr').attr('data-idx'), 10);
-    const steps = getSteps().map(normalizeStep);
-    if (!isNaN(idx)) steps.splice(idx, 1);
-    setSteps(steps);
-    renderStepsTable();
-  });
+    return `
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Question</label>
+        <input type="text" class="pbsg-quiz-question" data-idx="${idx}" data-quiz-field="question" value="${esc(q)}" placeholder="Enter your question..." />
+      </div>
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Answers <span class="pbsg-field-optional">&mdash; check the correct one(s)</span></label>
+        <div class="pbsg-answers-list" data-idx="${idx}">${rows}</div>
+        <button type="button" class="pbsg-btn-outline pbsg-add-answer" data-idx="${idx}">+ Add Answer</button>
+      </div>`;
+  }
 
-  // Keep JSON synced on typing
-  $(document).on('input', '.pbsg-step-title, .pbsg-step-h5p', function () {
-    syncStepsFromTable();
-  });
+  // ─── Fill in the Blanks ───────────────────────────────
+  function renderBlanksForm(quiz, idx) {
+    const sentence = quiz.sentence || '';
+    const caseSens = quiz.case_sensitive !== undefined ? quiz.case_sensitive : false;
+    const typos = quiz.accept_typos !== undefined ? quiz.accept_typos : false;
+    const preview = blanksPreview(sentence);
+    const cnt = (sentence.match(/\*[^*]+\*/g) || []).length;
 
-  // --- H5P Picker (Thickbox) ---
-  let currentPickRowIdx = null;
-
-  function openH5PPicker(items) {
-    const options = items.map(i =>
-      `<option value="${i.id}">${escapeHtml(i.title)} (ID: ${i.id})</option>`
-    ).join('');
-
-    const html = `
-      <div id="pbsg-h5p-modal" style="padding:14px;">
-        <h2 style="margin-top:0;">Select an H5P quiz</h2>
-        <p style="margin:8px 0 12px;">Pick a quiz to set the <strong>H5P ID</strong> for this step.</p>
-
-        <select id="pbsg-h5p-select" style="width:100%; max-width:520px;">
-          <option value="">— Select H5P —</option>
-          ${options}
-        </select>
-
-        <div style="margin-top:12px; display:flex; gap:8px;">
-          <button type="button" class="button button-primary" id="pbsg-h5p-insert">Insert</button>
-          <button type="button" class="button" id="pbsg-h5p-cancel">Cancel</button>
+    return `
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Sentence</label>
+        <textarea class="pbsg-blanks-sentence" data-idx="${idx}" rows="3" placeholder="Wrap answer words with *asterisks*...">${esc(sentence)}</textarea>
+        <div class="pbsg-field-hint">
+          Wrap answer words with <code>*asterisks*</code> &mdash; they become blank fields.<br>
+          Use <code>/</code> for alternatives: <code>*colour/color*</code><br>
+          Use <code>:</code> to add a hint: <code>*Norway:Scandinavian country*</code>
         </div>
       </div>
-    `;
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Preview</label>
+        <div class="pbsg-blanks-preview" data-idx="${idx}">${preview}</div>
+        ${cnt > 0
+          ? `<div class="pbsg-validation-msg pbsg-validation-msg--ok">&#x2713; ${cnt} blank${cnt !== 1 ? 's' : ''} detected</div>`
+          : `<div class="pbsg-validation-msg pbsg-validation-msg--error">&#x26A0; No blanks detected &mdash; wrap words with *asterisks*</div>`}
+      </div>
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Answer Validation</label>
+        <div class="pbsg-blanks-options">
+          <label class="pbsg-toggle-option${caseSens ? ' pbsg-toggle-option--active' : ''}">
+            <input type="checkbox" class="pbsg-blanks-case" data-idx="${idx}" ${caseSens ? 'checked' : ''} />
+            <div>
+              <div class="pbsg-toggle-title">Case sensitive</div>
+              <div class="pbsg-toggle-desc">&ldquo;Norway&rdquo; &#x2260; &ldquo;norway&rdquo; &mdash; students must match exact capitalization</div>
+            </div>
+          </label>
+          <label class="pbsg-toggle-option${typos ? ' pbsg-toggle-option--active' : ''}">
+            <input type="checkbox" class="pbsg-blanks-typos" data-idx="${idx}" ${typos ? 'checked' : ''} />
+            <div>
+              <div class="pbsg-toggle-title">Accept minor spelling errors</div>
+              <div class="pbsg-toggle-desc">Words 3&ndash;9 chars: 1 typo allowed &middot; 10+ chars: 2 typos allowed</div>
+            </div>
+          </label>
+        </div>
+      </div>`;
+  }
 
-    if (!$('#pbsg-h5p-inline').length) {
-      $('body').append('<div id="pbsg-h5p-inline" style="display:none;"></div>');
-    }
-    $('#pbsg-h5p-inline').html(html);
-
-    tb_show('Select H5P', '#TB_inline?inlineId=pbsg-h5p-inline&width=640&height=280');
-
-    $('#pbsg-h5p-cancel').on('click', function () {
-      tb_remove();
-    });
-
-    $('#pbsg-h5p-insert').on('click', function () {
-      const id = $('#pbsg-h5p-select').val();
-      if (!id || currentPickRowIdx === null) return;
-
-      const $row = $(`#pbsg-steps-table tbody tr[data-idx="${currentPickRowIdx}"]`);
-      $row.find('.pbsg-step-h5p').val(id);
-
-      syncStepsFromTable();
-      tb_remove();
+  function blanksPreview(sentence) {
+    if (!sentence) return '<span class="pbsg-blanks-empty">Type a sentence above to see the preview</span>';
+    return esc(sentence).replace(/\*([^*]+)\*/g, function (_m, inner) {
+      let display = inner, hint = '';
+      const ci = inner.indexOf(':');
+      if (ci > -1) { display = inner.substring(0, ci); hint = inner.substring(ci + 1); }
+      const first = display.split('/')[0];
+      const hasAlts = display.indexOf('/') > -1;
+      const hintHtml = hint ? ` <span class="pbsg-hint-icon" title="Hint: ${esc(hint)}">&#x1F4A1;</span>` : '';
+      const altTitle = hasAlts ? ` title="Also accepts: ${esc(display.split('/').slice(1).join(', '))}"` : '';
+      return `<span class="pbsg-blank-slot"${altTitle}>${esc(first)}${hintHtml}</span>`;
     });
   }
 
-  $(document).on('click', '.pbsg-pick-h5p', function () {
-    if (!isSplitGuideTemplateSelected()) {
-      alert('Please select the “Split Guide (H5P + Tutorial)” template first.');
+  // ─── Single Choice ────────────────────────────────────
+  function renderSCForm(quiz, idx) {
+    const q = quiz.question || '';
+    const correct = quiz.correct_answer || '';
+    const wrongs = quiz.wrong_answers || [''];
+
+    let wrongRows = '';
+    wrongs.forEach((w, wi) => {
+      wrongRows += `<div class="pbsg-answer-row pbsg-answer-row--incorrect">
+        <input type="text" class="pbsg-sc-wrong-input" data-idx="${idx}" data-widx="${wi}" value="${esc(w)}" placeholder="Wrong answer..." />
+        <button type="button" class="pbsg-sc-wrong-remove" data-idx="${idx}" data-widx="${wi}" title="Remove">&times;</button>
+      </div>`;
+    });
+
+    return `
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Question</label>
+        <input type="text" class="pbsg-quiz-question" data-idx="${idx}" data-quiz-field="question" value="${esc(q)}" placeholder="Enter your question..." />
+      </div>
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Correct Answer</label>
+        <div class="pbsg-sc-correct-row">
+          <span class="pbsg-sc-icon">&#x2713;</span>
+          <input type="text" class="pbsg-sc-correct-input" data-idx="${idx}" value="${esc(correct)}" placeholder="The correct answer..." />
+        </div>
+      </div>
+      <div class="pbsg-field">
+        <label class="pbsg-field-label">Wrong Answers</label>
+        <div class="pbsg-answers-list pbsg-sc-wrong-list" data-idx="${idx}">${wrongRows}</div>
+        <button type="button" class="pbsg-btn-outline pbsg-add-sc-wrong" data-idx="${idx}">+ Add Wrong Answer</button>
+      </div>`;
+  }
+
+  // ─── Resource Panel ───────────────────────────────────
+  function renderResourcePanel(s, idx) {
+    s = norm(s);
+    const isFile = s.tutorial_type === 'file';
+
+    let content = '';
+    if (!isFile) {
+      const isYT = /youtube\.com|youtu\.be/i.test(s.tutorial_url);
+      content = `
+        <div class="pbsg-field">
+          <label class="pbsg-field-label">URL</label>
+          <input type="url" class="pbsg-resource-url" data-idx="${idx}" value="${esc(s.tutorial_url)}" placeholder="https://..." />
+          <div class="pbsg-field-hint">YouTube links are auto-embedded. Library database URLs open in an iframe.</div>
+        </div>
+        ${s.tutorial_url ? `<div class="pbsg-resource-preview">
+          <span class="pbsg-preview-icon">${isYT ? '&#x25B6;&#xFE0F;' : '&#x1F310;'}</span>
+          ${isYT ? 'YouTube video will be embedded in the right pane' : 'Page will load in the right pane iframe'}
+        </div>` : ''}`;
+    } else {
+      const fn = s.tutorial_file_name || (s.tutorial_attachment_id ? 'Attachment #' + s.tutorial_attachment_id : '');
+      content = fn
+        ? `<div class="pbsg-file-info">
+            <span class="pbsg-file-icon">&#x1F4C4;</span>
+            <div>
+              <div class="pbsg-file-name">${esc(fn)}</div>
+              <div class="pbsg-file-meta">Uploaded</div>
+            </div>
+            <button type="button" class="pbsg-btn-ghost pbsg-clear-resource" data-idx="${idx}" title="Remove file">&times;</button>
+          </div>
+          <div class="pbsg-resource-preview">
+            <span class="pbsg-preview-icon">${filePreviewIcon(fn)}</span>${filePreviewLabel(fn)}
+          </div>`
+        : `<div class="pbsg-upload-zone" data-idx="${idx}">
+            <span class="pbsg-upload-icon">&#x2B06;&#xFE0F;</span>
+            <div>Drag &amp; drop a file here, or click to browse</div>
+            ${PBSG_ADMIN.maxUploadLabel ? `<div class="pbsg-upload-size-hint">Max file size: ${esc(PBSG_ADMIN.maxUploadLabel)}</div>` : ''}
+          </div>`;
+    }
+
+    return `
+      <div class="pbsg-resource-type-toggle" data-idx="${idx}">
+        <label class="${!isFile ? 'active' : ''}">
+          <input type="radio" name="pbsg_res_type_${idx}" value="url" ${!isFile ? 'checked' : ''} />
+          <span>&#x1F517; URL</span>
+        </label>
+        <label class="${isFile ? 'active' : ''}">
+          <input type="radio" name="pbsg_res_type_${idx}" value="file" ${isFile ? 'checked' : ''} />
+          <span>&#x1F4C4; Upload File</span>
+        </label>
+      </div>
+      ${content}`;
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  Event Handlers — Steps
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('click', '#pbsg-add-step', function () {
+    const steps = getSteps().map(norm);
+    steps.push({ title: '', h5p_id: 0, quiz: { type: 'multichoice', question: '', answers: [{ text: '', correct: true }, { text: '', correct: false }] },
+      tutorial_type: '', tutorial_url: '', tutorial_attachment_id: 0, tutorial_file_name: '', tutorial_file_url: '', url: '',
+      branch_mode: 'none', branch_trigger_attempts: 1, branch_title: '', branch_intro: '',
+      branch_tutorial_type: '', branch_tutorial_url: '', branch_tutorial_attachment_id: 0,
+      branch_tutorial_file_name: '', branch_tutorial_file_url: '' });
+    setSteps(steps);
+    renderStepCards();
+    const $last = $('.pbsg-step-card').last();
+    if ($last.length) $('html, body').animate({ scrollTop: $last.offset().top - 60 }, 300);
+  });
+
+  $(document).on('click', '.pbsg-remove-step', function () {
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx) || !confirm('Remove this step?')) return;
+    const steps = getSteps().map(norm); steps.splice(idx, 1); setSteps(steps); renderStepCards();
+  });
+
+  $(document).on('click', '.pbsg-step-chevron, .pbsg-collapse-step', function () {
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+    const $card = $(`#pbsg-step-${idx}`);
+    $card.toggleClass('pbsg-step-card--collapsed');
+    if ($card.hasClass('pbsg-step-card--collapsed')) collapsedSteps.add(idx);
+    else collapsedSteps.delete(idx);
+  });
+
+  $(document).on('input', '.pbsg-step-title-input', function () {
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+    const steps = getSteps().map(norm);
+    if (steps[idx]) { steps[idx].title = $(this).val() || ''; setSteps(steps); }
+  });
+
+  function reorderFromDOM() {
+    const steps = getSteps().map(norm), newOrder = [];
+    $('#pbsg-steps-container .pbsg-step-card').each(function () {
+      const idx = parseInt($(this).data('idx'), 10);
+      if (!isNaN(idx) && steps[idx]) newOrder.push(steps[idx]);
+    });
+    setSteps(newOrder);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  Quiz Type Switching
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('click', '.pbsg-quiz-type-btn', function () {
+    const idx = parseInt($(this).data('idx'), 10), type = $(this).data('type');
+    if (isNaN(idx) || !type) return;
+    syncQuiz(idx);
+    const steps = getSteps().map(norm), step = steps[idx];
+    if (!step) return;
+    const newQ = { type };
+    switch (type) {
+      case 'multichoice': newQ.question = (step.quiz && step.quiz.question) || ''; newQ.answers = [{ text: '', correct: true }, { text: '', correct: false }]; break;
+      case 'blanks': newQ.sentence = ''; newQ.case_sensitive = false; newQ.accept_typos = false; break;
+      case 'singlechoice': newQ.question = (step.quiz && step.quiz.question) || ''; newQ.correct_answer = ''; newQ.wrong_answers = ['']; break;
+    }
+    step.quiz = newQ; step.h5p_id = 0; steps[idx] = step; setSteps(steps); renderStepCards();
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Multiple Choice Events
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('input', '.pbsg-quiz-question, .pbsg-answer-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
+  $(document).on('change', '.pbsg-answer-check', function () {
+    const idx = parseInt($(this).data('idx'), 10);
+    syncQuiz(idx);
+    renderStepCards(); // re-render to update correct/incorrect styling
+  });
+  $(document).on('click', '.pbsg-add-answer', function () {
+    const idx = parseInt($(this).data('idx'), 10), steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.answers = steps[idx].quiz.answers || []; steps[idx].quiz.answers.push({ text: '', correct: false }); setSteps(steps); renderStepCards(); }
+  });
+  $(document).on('click', '.pbsg-answer-remove', function () {
+    const idx = parseInt($(this).data('idx'), 10), ai = parseInt($(this).data('aidx'), 10), steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.answers && steps[idx].quiz.answers.length > 2) { steps[idx].quiz.answers.splice(ai, 1); setSteps(steps); renderStepCards(); }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Fill in the Blanks Events
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('input', '.pbsg-blanks-sentence', function () {
+    const idx = parseInt($(this).data('idx'), 10), sentence = $(this).val();
+    const $card = $(`#pbsg-step-${idx}`);
+    $card.find('.pbsg-blanks-preview').html(blanksPreview(sentence));
+    const cnt = (sentence.match(/\*[^*]+\*/g) || []).length;
+    const $vm = $card.find('.pbsg-validation-msg');
+    if (cnt > 0) {
+      $vm.removeClass('pbsg-validation-msg--error').addClass('pbsg-validation-msg--ok')
+        .html('&#x2713; ' + cnt + ' blank' + (cnt !== 1 ? 's' : '') + ' detected');
+    } else {
+      $vm.removeClass('pbsg-validation-msg--ok').addClass('pbsg-validation-msg--error')
+        .html('&#x26A0; No blanks detected &mdash; wrap words with *asterisks*');
+    }
+    syncQuiz(idx);
+  });
+  $(document).on('change', '.pbsg-blanks-case, .pbsg-blanks-typos', function () {
+    const $opt = $(this).closest('.pbsg-toggle-option');
+    $opt.toggleClass('pbsg-toggle-option--active', $(this).is(':checked'));
+    syncQuiz(parseInt($(this).data('idx'), 10));
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Single Choice Events
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('input', '.pbsg-sc-correct-input, .pbsg-sc-wrong-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
+  $(document).on('click', '.pbsg-add-sc-wrong', function () {
+    const idx = parseInt($(this).data('idx'), 10), steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.wrong_answers = steps[idx].quiz.wrong_answers || []; steps[idx].quiz.wrong_answers.push(''); setSteps(steps); renderStepCards(); }
+  });
+  $(document).on('click', '.pbsg-sc-wrong-remove', function () {
+    const idx = parseInt($(this).data('idx'), 10), wi = parseInt($(this).data('widx'), 10), steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.wrong_answers && steps[idx].quiz.wrong_answers.length > 1) { steps[idx].quiz.wrong_answers.splice(wi, 1); setSteps(steps); renderStepCards(); }
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Sync Quiz Data from Form
+  // ═══════════════════════════════════════════════════════════
+  function syncQuiz(idx) {
+    if (isNaN(idx)) return;
+    const steps = getSteps().map(norm), step = steps[idx];
+    if (!step || !step.quiz) return;
+    const $card = $(`#pbsg-step-${idx}`);
+    if (!$card.length) return;
+    switch (step.quiz.type) {
+      case 'multichoice': {
+        step.quiz.question = $card.find('.pbsg-quiz-question').val() || '';
+        const a = []; $card.find('.pbsg-answers-list > div').each(function () { a.push({ text: $(this).find('.pbsg-answer-input').val() || '', correct: $(this).find('.pbsg-answer-check').is(':checked') }); });
+        step.quiz.answers = a; break;
+      }
+      case 'blanks': {
+        step.quiz.sentence = $card.find('.pbsg-blanks-sentence').val() || '';
+        step.quiz.case_sensitive = $card.find('.pbsg-blanks-case').is(':checked');
+        step.quiz.accept_typos = $card.find('.pbsg-blanks-typos').is(':checked'); break;
+      }
+      case 'singlechoice': {
+        step.quiz.question = $card.find('.pbsg-quiz-question').val() || '';
+        step.quiz.correct_answer = $card.find('.pbsg-sc-correct-input').val() || '';
+        const w = []; $card.find('.pbsg-sc-wrong-input').each(function () { w.push($(this).val() || ''); });
+        step.quiz.wrong_answers = w; break;
+      }
+    }
+    steps[idx] = step; setSteps(steps);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  Resource Panel Events
+  // ═══════════════════════════════════════════════════════════
+  // Issue 6: Fix resource panel — don't clear URL on toggle, only on successful file select
+  $(document).on('change', '.pbsg-resource-type-toggle input[type="radio"]', function () {
+    const idx = parseInt($(this).closest('.pbsg-resource-type-toggle').data('idx'), 10), type = $(this).val();
+    if (isNaN(idx)) return;
+    syncResource(idx);
+    const steps = getSteps().map(norm), step = steps[idx]; if (!step) return;
+
+    if (type === 'file') {
+      // Switching to file mode — always set type to 'file' so upload zone renders
+      step.tutorial_type = 'file';
+      steps[idx] = step; setSteps(steps); renderStepCards();
+    } else {
+      // Switching to URL mode — clear file data, keep URL
+      step.tutorial_type = step.tutorial_url ? 'url' : '';
+      step.tutorial_attachment_id = 0;
+      step.tutorial_file_name = '';
+      step.tutorial_file_url = '';
+      steps[idx] = step; setSteps(steps); renderStepCards();
+    }
+  });
+
+  $(document).on('input', '.pbsg-resource-url', function () { syncResource(parseInt($(this).data('idx'), 10)); });
+
+  // Upload zone — click to open media picker, with wp.media guard
+  $(document).on('click', '.pbsg-upload-zone', function (e) {
+    e.preventDefault();
+    e.stopPropagation(); // prevent event from bubbling to card collapse
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+
+    if (typeof wp === 'undefined' || typeof wp.media !== 'function') {
+      alert('Media uploader not available. Please reload the page and try again.');
       return;
     }
 
-    const idx = parseInt($(this).closest('tr').attr('data-idx'), 10);
-    if (isNaN(idx)) return;
-    currentPickRowIdx = idx;
-
-    $.post(PBSG_ADMIN.ajaxUrl, {
-      action: 'pbsg_list_h5p',
-      nonce: PBSG_ADMIN.nonce
-    })
-      .done(function (res) {
-        if (!res || !res.success) {
-          alert(res?.data?.message || 'Could not load H5P items.');
-          return;
-        }
-        openH5PPicker(res.data.items || []);
-      })
-      .fail(function () {
-        alert('Request failed while loading H5P items.');
-      });
+    openMediaPicker(idx);
   });
 
-  // --- Tutorial Picker (Thickbox + WP Media) ---
-  let currentTutorialRowIdx = null;
+  // Drag-and-drop on upload zone
+  $(document).on('dragover dragenter', '.pbsg-upload-zone', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $(this).addClass('pbsg-upload-zone--dragover');
+  });
 
-  function openTutorialPicker(step) {
-    step = normalizeStep(step);
+  $(document).on('dragleave', '.pbsg-upload-zone', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $(this).removeClass('pbsg-upload-zone--dragover');
+  });
 
-    const html = `
-      <div id="pbsg-tutorial-modal" style="padding:14px;">
-        <h2 style="margin-top:0;">Set Tutorial Source</h2>
+  $(document).on('drop', '.pbsg-upload-zone', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+    $(this).removeClass('pbsg-upload-zone--dragover');
 
-        <div style="margin:10px 0; display:flex; gap:16px;">
-          <label style="display:flex; gap:6px; align-items:center;">
-            <input type="radio" name="pbsg_tut_type" value="url" ${step.tutorial_type !== 'file' ? 'checked' : ''}/>
-            URL
-          </label>
-          <label style="display:flex; gap:6px; align-items:center;">
-            <input type="radio" name="pbsg_tut_type" value="file" ${step.tutorial_type === 'file' ? 'checked' : ''}/>
-            Upload / Select File (PDF / slides)
-          </label>
-        </div>
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
 
-        <div id="pbsg-tut-url-block" style="margin-top:10px;">
-          <p style="margin:0 0 6px;"><strong>URL</strong></p>
-          <input type="url" id="pbsg-tut-url" style="width:100%;" placeholder="https://example.com/tutorial" value="${escapeHtml(step.tutorial_url)}"/>
-          <p style="margin:6px 0 0; opacity:.8;">Tip: YouTube watch links will be embedded automatically.</p>
-        </div>
+    const files = e.originalEvent.dataTransfer.files;
+    if (!files || files.length === 0) return;
 
-        <div id="pbsg-tut-file-block" style="margin-top:10px; display:none;">
-          <p style="margin:0 0 6px;"><strong>File</strong></p>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <button type="button" class="button" id="pbsg-tut-pick-file">Choose / Upload File</button>
-            <span id="pbsg-tut-file-label" style="opacity:.85;">${escapeHtml(step.tutorial_file_name || (step.tutorial_attachment_id ? ('Attachment #' + step.tutorial_attachment_id) : 'No file selected'))}</span>
-          </div>
-          <input type="hidden" id="pbsg-tut-attachment-id" value="${step.tutorial_attachment_id || 0}" />
-          <input type="hidden" id="pbsg-tut-file-name" value="${escapeHtml(step.tutorial_file_name || '')}" />
-          <input type="hidden" id="pbsg-tut-file-url" value="${escapeHtml(step.tutorial_file_url || '')}" />
-          <p style="margin:6px 0 0; opacity:.8;">PDF can be embedded. Slides may open in a new tab depending on browser support.</p>
-        </div>
+    const file = files[0];
 
-        <div style="margin-top:14px; display:flex; gap:8px;">
-          <button type="button" class="button button-primary" id="pbsg-tut-save">Save</button>
-          <button type="button" class="button" id="pbsg-tut-cancel">Cancel</button>
-        </div>
-      </div>
-    `;
-
-    if (!$('#pbsg-tutorial-inline').length) {
-      $('body').append('<div id="pbsg-tutorial-inline" style="display:none;"></div>');
-    }
-    $('#pbsg-tutorial-inline').html(html);
-
-    tb_show('Set Tutorial', '#TB_inline?inlineId=pbsg-tutorial-inline&width=720&height=420');
-
-    function refreshBlocks() {
-      const t = $('input[name="pbsg_tut_type"]:checked').val();
-      if (t === 'file') {
-        $('#pbsg-tut-url-block').hide();
-        $('#pbsg-tut-file-block').show();
-      } else {
-        $('#pbsg-tut-file-block').hide();
-        $('#pbsg-tut-url-block').show();
-      }
+    // Client-side file size validation
+    const maxSize = PBSG_ADMIN.maxUploadSize || 0;
+    if (maxSize > 0 && file.size > maxSize) {
+      const $zone = $(this);
+      $zone.find('.pbsg-upload-error').remove();
+      $zone.append(`<div class="pbsg-upload-error">File too large. Maximum size: ${PBSG_ADMIN.maxUploadLabel || 'unknown'}</div>`);
+      return;
     }
 
-    refreshBlocks();
-    $(document).off('change.pbsgTut').on('change.pbsgTut', 'input[name="pbsg_tut_type"]', refreshBlocks);
+    uploadFileViaDrop(file, idx, $(this));
+  });
 
-    $('#pbsg-tut-cancel').on('click', function () {
-      tb_remove();
-    });
+  /**
+   * Upload a dropped file via our custom pbsg_upload_file AJAX handler.
+   * Uses media_handle_upload() on the server so the file enters the
+   * WP media library exactly like the media picker would.
+   */
+  function uploadFileViaDrop(file, idx, $zone) {
+    // Show progress UI
+    $zone.find('.pbsg-upload-error, .pbsg-upload-progress').remove();
+    $zone.append(`<div class="pbsg-upload-progress"><div class="pbsg-upload-progress-bar" style="width:0%"></div></div>`);
+    const $bar = $zone.find('.pbsg-upload-progress-bar');
 
-    // WP Media picker
-    $('#pbsg-tut-pick-file').on('click', function (e) {
-      e.preventDefault();
+    const formData = new FormData();
+    formData.append('pbsg_file', file);                    // matches $_FILES['pbsg_file'] in PHP
+    formData.append('action', 'pbsg_upload_file');         // routes to our ajax_upload_file handler
+    formData.append('nonce', PBSG_ADMIN.uploadNonce);      // verified by check_ajax_referer()
 
-      const frame = wp.media({
-        title: 'Select or Upload Tutorial File',
-        button: { text: 'Use this file' },
-        multiple: false
-      });
-
-      frame.on('select', function () {
-        const attachment = frame.state().get('selection').first().toJSON();
-        $('#pbsg-tut-attachment-id').val(attachment.id || 0);
-        $('#pbsg-tut-file-name').val(attachment.filename || attachment.title || '');
-        $('#pbsg-tut-file-url').val(attachment.url || '');
-        $('#pbsg-tut-file-label').text(attachment.filename || attachment.title || ('Attachment #' + (attachment.id || '')));
-      });
-
-      frame.open();
-    });
-
-    $('#pbsg-tut-save').on('click', function () {
-      if (currentTutorialRowIdx === null) return;
-
-      const steps = getSteps().map(normalizeStep);
-      const step = steps[currentTutorialRowIdx];
-      if (!step) return;
-
-      const t = $('input[name="pbsg_tut_type"]:checked').val();
-
-      if (t === 'file') {
-        const attId = parseInt($('#pbsg-tut-attachment-id').val(), 10) || 0;
-        const fileName = $('#pbsg-tut-file-name').val() || '';
-        const fileUrl  = $('#pbsg-tut-file-url').val() || '';
-
-        step.tutorial_type = attId ? 'file' : '';
-        step.tutorial_attachment_id = attId;
-        step.tutorial_file_name = fileName;
-        step.tutorial_file_url = fileUrl;
-
-        // Clear URL if file
-        step.tutorial_url = '';
-        step.url = '';
-      } else {
-        const url = $('#pbsg-tut-url').val() || '';
-        step.tutorial_type = url ? 'url' : '';
-        step.tutorial_url = url;
-        step.url = url; // legacy mirror
-
-        // Clear file if url
-        step.tutorial_attachment_id = 0;
-        step.tutorial_file_name = '';
-        step.tutorial_file_url = '';
+    $.ajax({
+      url: PBSG_ADMIN.ajaxUrl,
+      type: 'POST',
+      data: formData,
+      processData: false,
+      contentType: false,
+      xhr: function () {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', function (evt) {
+          if (evt.lengthComputable) {
+            const pct = Math.round((evt.loaded / evt.total) * 100);
+            $bar.css('width', pct + '%');
+          }
+        }, false);
+        return xhr;
+      },
+      success: function (res) {
+        $zone.find('.pbsg-upload-progress').remove();
+        if (res && res.success && res.data) {
+          const att = res.data;
+          const steps = getSteps().map(norm);
+          if (steps[idx]) {
+            steps[idx].tutorial_type = 'file';
+            steps[idx].tutorial_attachment_id = att.id || 0;
+            steps[idx].tutorial_file_name = att.filename || '';
+            steps[idx].tutorial_file_url = att.url || '';
+            steps[idx].tutorial_url = '';
+            steps[idx].url = '';
+            setSteps(steps);
+            renderStepCards();
+          }
+        } else {
+          const msg = (res && res.data && res.data.message) ? res.data.message : 'Upload failed. Please try again.';
+          $zone.append(`<div class="pbsg-upload-error">${esc(msg)}</div>`);
+        }
+      },
+      error: function (xhr) {
+        $zone.find('.pbsg-upload-progress').remove();
+        let msg = 'Upload failed. Please try again.';
+        try {
+          const r = JSON.parse(xhr.responseText);
+          if (r && r.data && r.data.message) msg = r.data.message;
+        } catch (_) { /* ignore parse error */ }
+        $zone.append(`<div class="pbsg-upload-error">${esc(msg)}</div>`);
       }
+    });
+  }
 
-      steps[currentTutorialRowIdx] = step;
-      setSteps(steps);
+  /**
+   * Open the WordPress media picker for a given step index.
+   */
+  function openMediaPicker(idx) {
+    const frame = wp.media({ title: 'Select or Upload Tutorial File', button: { text: 'Use this file' }, multiple: false });
+    let fileSelected = false;
 
-      renderStepsTable();
+    frame.on('select', function () {
+      fileSelected = true;
+      const att = frame.state().get('selection').first().toJSON();
+      const steps = getSteps().map(norm);
+      if (steps[idx]) {
+        steps[idx].tutorial_type = 'file';
+        steps[idx].tutorial_attachment_id = att.id || 0;
+        steps[idx].tutorial_file_name = att.filename || att.title || '';
+        steps[idx].tutorial_file_url = att.url || '';
+        // Clear URL since file was successfully chosen
+        steps[idx].tutorial_url = '';
+        steps[idx].url = '';
+        setSteps(steps);
+        renderStepCards();
+      }
+    });
+
+    // If user closes picker without selecting, revert to URL mode if no file
+    frame.on('close', function () {
+      if (!fileSelected) {
+        const steps = getSteps().map(norm);
+        if (steps[idx] && !steps[idx].tutorial_attachment_id) {
+          steps[idx].tutorial_type = steps[idx].tutorial_url ? 'url' : '';
+          setSteps(steps);
+          renderStepCards();
+        }
+      }
+    });
+
+    frame.open();
+  }
+
+  $(document).on('click', '.pbsg-clear-resource', function () {
+    const idx = parseInt($(this).data('idx'), 10); if (isNaN(idx)) return;
+    const steps = getSteps().map(norm);
+    if (steps[idx]) { steps[idx].tutorial_type = ''; steps[idx].tutorial_url = ''; steps[idx].tutorial_attachment_id = 0; steps[idx].tutorial_file_name = ''; steps[idx].tutorial_file_url = ''; steps[idx].url = ''; setSteps(steps); renderStepCards(); }
+  });
+
+  function syncResource(idx) {
+    if (isNaN(idx)) return;
+    const steps = getSteps().map(norm), step = steps[idx]; if (!step) return;
+    const $card = $(`#pbsg-step-${idx}`), url = $card.find('.pbsg-resource-url').val() || '';
+    if (step.tutorial_type !== 'file') { step.tutorial_url = url; step.tutorial_type = url ? 'url' : ''; step.url = url; }
+    steps[idx] = step; setSteps(steps);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  Use Existing H5P / Detach
+  // ═══════════════════════════════════════════════════════════
+  let pickIdx = null;
+  $(document).on('click', '.pbsg-use-existing-h5p', function (e) {
+    e.preventDefault();
+    pickIdx = parseInt($(this).data('idx'), 10);
+    if (isNaN(pickIdx)) return;
+    $.post(PBSG_ADMIN.ajaxUrl, { action: 'pbsg_list_h5p', nonce: PBSG_ADMIN.nonce })
+      .done(function (res) { if (res && res.success) openPicker(res.data.items || []); else alert(res && res.data ? res.data.message : 'Could not load H5P items.'); })
+      .fail(function () { alert('Request failed while loading H5P items.'); });
+  });
+
+  function openPicker(items) {
+    const opts = items.map(i => `<option value="${i.id}">${esc(i.title)} (ID: ${i.id})</option>`).join('');
+    if (!$('#pbsg-h5p-inline').length) $('body').append('<div id="pbsg-h5p-inline" style="display:none;"></div>');
+    $('#pbsg-h5p-inline').html(`<div style="padding:14px;"><h2 style="margin-top:0;">Select an H5P quiz</h2><p>Pick a quiz to link to this step.</p>
+      <select id="pbsg-h5p-select" style="width:100%;max-width:520px;"><option value="">— Select H5P —</option>${opts}</select>
+      <div style="margin-top:12px;display:flex;gap:8px;"><button type="button" class="button button-primary" id="pbsg-h5p-insert">Insert</button><button type="button" class="button" id="pbsg-h5p-cancel">Cancel</button></div></div>`);
+    tb_show('Select H5P', '#TB_inline?inlineId=pbsg-h5p-inline&width=640&height=280');
+    $('#pbsg-h5p-cancel').on('click', tb_remove);
+    $('#pbsg-h5p-insert').on('click', function () {
+      const id = parseInt($('#pbsg-h5p-select').val(), 10);
+      if (!id || pickIdx === null) return;
+      const steps = getSteps().map(norm);
+      if (steps[pickIdx]) { steps[pickIdx].h5p_id = id; steps[pickIdx].quiz = null; setSteps(steps); renderStepCards(); }
       tb_remove();
     });
   }
 
+  $(document).on('click', '.pbsg-detach-h5p', function (e) {
+    e.preventDefault();
+    const idx = parseInt($(this).data('idx'), 10); if (isNaN(idx)) return;
+    const steps = getSteps().map(norm);
+    if (steps[idx]) { steps[idx].h5p_id = 0; steps[idx].quiz = { type: 'multichoice', question: '', answers: [{ text: '', correct: true }, { text: '', correct: false }] }; setSteps(steps); renderStepCards(); }
+  });
 
+  // Issue 5: Edit H5P — fetch existing content and populate inline form
+  $(document).on('click', '.pbsg-edit-h5p', function (e) {
+    e.preventDefault();
+    const idx = parseInt($(this).data('idx'), 10);
+    const h5pId = parseInt($(this).data('h5p-id'), 10);
+    if (isNaN(idx) || isNaN(h5pId)) return;
+
+    const $card = $(`#pbsg-step-${idx}`);
+    $card.find('.pbsg-linked-h5p').html('<p style="text-align:center; color:#646970;">Loading quiz data...</p>');
+
+    $.post(PBSG_ADMIN.ajaxUrl, {
+      action: 'pbsg_get_h5p_content',
+      nonce: PBSG_ADMIN.nonce,
+      h5p_id: h5pId
+    }).done(function (res) {
+      if (!res || !res.success) {
+        alert(res && res.data ? res.data.message : 'Could not load H5P content.');
+        renderStepCards();
+        return;
+      }
+      const quiz = res.data.quiz;
+      if (!quiz) { alert('Unsupported H5P content type for inline editing.'); renderStepCards(); return; }
+
+      const steps = getSteps().map(norm);
+      if (!steps[idx]) return;
+
+      // Populate the inline form with existing content
+      steps[idx].quiz = quiz;
+      // Keep h5p_id so save_meta knows to UPDATE, not CREATE
+      steps[idx]._editing_h5p = true;
+      setSteps(steps);
+      // Expand the card if collapsed
+      collapsedSteps.delete(idx);
+      renderStepCards();
+    }).fail(function () {
+      alert('Failed to fetch H5P content.');
+      renderStepCards();
+    });
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Cover Image Picker
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('click', '#pbsg_pick_cover_image', function (e) {
+    e.preventDefault();
+    const frame = wp.media({ title: 'Select Tutorial Cover Image', button: { text: 'Use this image' }, library: { type: 'image' }, multiple: false });
+    frame.on('select', function () { const a = frame.state().get('selection').first().toJSON(); $('#pbsg_cover_image_id').val(a.id || 0); $('#pbsg_cover_image_url').val(a.url || ''); $('#pbsg_cover_preview').attr('src', a.url || '').removeClass('pbsg-hidden'); });
+    frame.open();
+  });
+  $(document).on('click', '#pbsg_clear_cover_image', function (e) { e.preventDefault(); $('#pbsg_cover_image_id').val(''); $('#pbsg_cover_image_url').val(''); $('#pbsg_cover_preview').attr('src', '').addClass('pbsg-hidden'); });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Sync all forms before WP save
+  // ═══════════════════════════════════════════════════════════
+  // Issue 7d: Validate Fill in Blanks has at least one *blank* before save
+  $(document).on('click', '#publish, #save-post', function (e) {
+    const steps = getSteps().map(norm);
+    let valid = true;
+
+    steps.forEach((s, idx) => {
+      syncQuiz(idx);
+      syncResource(idx);
+
+      // Validate Fill in Blanks has at least one *blank*
+      if (s.quiz && s.quiz.type === 'blanks') {
+        const sentence = s.quiz.sentence || '';
+        const blanks = (sentence.match(/\*[^*]+\*/g) || []).length;
+        if (sentence.trim().length > 0 && blanks === 0) {
+          valid = false;
+          // Expand the step card so user can see the error
+          $(`#pbsg-step-${idx}`).removeClass('pbsg-step-card--collapsed');
+          collapsedSteps.delete(idx);
+          // Highlight the error
+          $(`#pbsg-step-${idx} .pbsg-blanks-sentence`).css('border-color', '#8C2004');
+          alert('Step ' + (idx + 1) + ': Fill in the Blanks requires at least one *blank* word wrapped in asterisks.');
+        }
+      }
+    });
+
+    if (!valid) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return false;
+    }
+
+    // Save is proceeding — clear the dirty flag so beforeunload doesn't fire
+    markClean();
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Track dirty state on intro fields and other non-step inputs
+  // ═══════════════════════════════════════════════════════════
+  $(document).on('input change', '#pbsg_intro_title, #pbsg_intro_subtitle, #pbsg_intro_description, .pbsg-objective-input, #pbsg_cover_image_id, #pbsg_left_ratio_slider, #pbsg_use_default_ratio, #pbsg_user_resizable', markDirty);
+
+  // ═══════════════════════════════════════════════════════════
+  //  Layout Settings Section (Stretch Goal 5)
+  // ═══════════════════════════════════════════════════════════
+
+  // Collapsible toggle (delegated — matches intro section pattern)
+  $(document).on('click', '#pbsg-layout-toggle', function () {
+    var $body = $('#pbsg-layout-body');
+    var $chevron = $('#pbsg-layout-chevron');
+    $body.toggle();
+    $chevron.html($body.is(':visible') ? '&#x25BC;' : '&#x25B6;');
+  });
+
+  // Slider ↔ preview ↔ hidden field
+  var $ratioSlider = $('#pbsg_left_ratio_slider');
+  var $ratioValue  = $('#pbsg_ratio_value');
+  var $ratioHidden = $('#pbsg_left_ratio');
+  var $previewLeft = $('#pbsg_preview_left');
+  var $previewLeftLabel  = $('#pbsg_preview_left_label');
+  var $previewRightLabel = $('#pbsg_preview_right_label');
+  var $useDefault  = $('#pbsg_use_default_ratio');
+  var $controls    = $('#pbsg_ratio_controls');
+
+  function updateRatioPreview() {
+    var v = parseInt($ratioSlider.val(), 10);
+    $ratioValue.text(v + '%');
+    $previewLeft.css('width', v + '%');
+    $previewLeftLabel.text(v);
+    $previewRightLabel.text(100 - v);
+
+    // Update hidden field: empty if using default, numeric otherwise
+    if ($useDefault.is(':checked')) {
+      $ratioHidden.val('');
+    } else {
+      $ratioHidden.val(v);
+    }
+    markDirty();
+  }
+
+  $ratioSlider.on('input', updateRatioPreview);
+
+  $useDefault.on('change', function () {
+    if ($(this).is(':checked')) {
+      $controls.css({ opacity: 0.4, 'pointer-events': 'none' });
+      $ratioHidden.val('');
+    } else {
+      $controls.css({ opacity: 1, 'pointer-events': '' });
+      $ratioHidden.val(parseInt($ratioSlider.val(), 10));
+    }
+    markDirty();
+  });
+
+  // User-resizable checkbox also marks dirty
+  $('#pbsg_user_resizable').on('change', markDirty);
+
+  // ═══════════════════════════════════════════════════════════
+  //  Benchmark Settings Section (Stretch Goal 5)
+  // ═══════════════════════════════════════════════════════════
+
+  // Collapsible toggle (delegated)
+  $(document).on('click', '#pbsg-benchmark-toggle', function () {
+    var $body = $('#pbsg-benchmark-body');
+    var $chevron = $('#pbsg-benchmark-chevron');
+    $body.toggle();
+    $chevron.html($body.is(':visible') ? '&#x25BC;' : '&#x25B6;');
+  });
+
+  // Use-site-defaults checkbox toggles controls
+  var $useSiteBench = $('#pbsg_use_site_benchmarks');
+  var $benchControls = $('#pbsg_benchmark_controls');
+  var $benchHidden   = $('#pbsg_benchmarks_json');
+
+  $useSiteBench.on('change', function () {
+    if ($(this).is(':checked')) {
+      $benchControls.css({ opacity: 0.4, 'pointer-events': 'none' });
+      $benchHidden.val('');  // empty = use site defaults
+    } else {
+      $benchControls.css({ opacity: 1, 'pointer-events': '' });
+      syncBenchOverrides();
+    }
+    markDirty();
+  });
+
+  // Sync all benchmark override inputs → hidden JSON field
+  function syncBenchOverrides() {
+    var obj = {};
+    var hasValue = false;
+    $('.pbsg-bench-override').each(function () {
+      var key = $(this).attr('data-key');
+      var val = $(this).val();
+      if (val !== '' && val !== undefined) {
+        obj[key] = parseInt(val, 10);
+        hasValue = true;
+      }
+    });
+    $benchHidden.val(hasValue ? JSON.stringify(obj) : '');
+  }
+
+  $(document).on('input change', '.pbsg-bench-override', function () {
+    if (!$useSiteBench.is(':checked')) {
+      syncBenchOverrides();
+    }
+    markDirty();
+  });
+
+  // Track dirty state on benchmark inputs
+  $(document).on('input change', '#pbsg_use_site_benchmarks, .pbsg-bench-override', markDirty);
+
+  // ═══════════════════════════════════════════════════════════
+  //  Branch Review Picker (Sprint 7 — sub-tutorials)
+  // ═══════════════════════════════════════════════════════════
   let currentBranchRowIdx = null;
 
   function openBranchPicker(step) {
-    step = normalizeStep(step);
-
+    step = norm(step);
     const html = `
       <div id="pbsg-branch-modal" style="padding:14px;">
         <h2 style="margin-top:0;">Set Wrong-Answer Branch Review</h2>
-
-        <p style="margin:0 0 12px;">
-          This sub-tutorial will appear only if the student answers this question incorrectly.
-        </p>
-
-      <div style="margin:12px 0;">
-        <p><strong>Branch mode</strong></p>
-
-        <label>
-          <input type="radio" name="pbsg_branch_mode" value="none"
-            ${step.branch_mode === 'none' ? 'checked' : ''} />
-          None
-        </label>
-
-        <label>
-          <input type="radio" name="pbsg_branch_mode" value="optional"
-            ${step.branch_mode === 'optional' ? 'checked' : ''} />
-          Optional
-        </label>
-
-        <label>
-          <input type="radio" name="pbsg_branch_mode" value="mandatory"
-            ${step.branch_mode === 'mandatory' ? 'checked' : ''} />
-          Mandatory
-        </label>
-      </div>
-
+        <p style="margin:0 0 12px;">This sub-tutorial will appear only if the student answers this question incorrectly.</p>
+        <div style="margin:12px 0;">
+          <p><strong>Branch mode</strong></p>
+          <label><input type="radio" name="pbsg_branch_mode" value="none" ${step.branch_mode === 'none' ? 'checked' : ''} /> None</label>
+          <label><input type="radio" name="pbsg_branch_mode" value="optional" ${step.branch_mode === 'optional' ? 'checked' : ''} /> Optional</label>
+          <label><input type="radio" name="pbsg_branch_mode" value="mandatory" ${step.branch_mode === 'mandatory' ? 'checked' : ''} /> Mandatory</label>
+        </div>
         <div style="margin:10px 0;">
           <p style="margin:0 0 6px;"><strong>Branch title</strong></p>
-          <input type="text" id="pbsg-branch-title" style="width:100%;" value="${escapeHtml(step.branch_title)}" placeholder="Need a quick review?" />
+          <input type="text" id="pbsg-branch-title" style="width:100%;" value="${esc(step.branch_title)}" placeholder="Need a quick review?" />
         </div>
-
         <div style="margin:10px 0;">
           <p style="margin:0 0 6px;"><strong>Instruction text</strong></p>
-          <textarea id="pbsg-branch-intro" style="width:100%; min-height:90px;" placeholder="You answered this question incorrectly. Review this help content before continuing.">${escapeHtml(step.branch_intro)}</textarea>
-       
+          <textarea id="pbsg-branch-intro" style="width:100%; min-height:90px;" placeholder="You answered this question incorrectly. Review this help content before continuing.">${esc(step.branch_intro)}</textarea>
           <div style="margin:10px 0;">
             <p><strong>Show branch after this many incorrect answers</strong></p>
-            <input type="number"
-              id="pbsg-branch-trigger-attempts"
-              min="1"
-              value="${step.branch_trigger_attempts || 1}"
-              style="width:100px;" />
+            <input type="number" id="pbsg-branch-trigger-attempts" min="1" value="${step.branch_trigger_attempts || 1}" style="width:100px;" />
+          </div>
         </div>
-       
-        </div>
-
         <hr style="margin:16px 0;" />
-
         <div style="margin:10px 0; display:flex; gap:16px;">
-          <label style="display:flex; gap:6px; align-items:center;">
-            <input type="radio" name="pbsg_branch_tut_type" value="url" ${step.branch_tutorial_type !== 'file' ? 'checked' : ''} />
-            URL
-          </label>
-          <label style="display:flex; gap:6px; align-items:center;">
-            <input type="radio" name="pbsg_branch_tut_type" value="file" ${step.branch_tutorial_type === 'file' ? 'checked' : ''} />
-            Upload / Select File
-          </label>
+          <label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="pbsg_branch_tut_type" value="url" ${step.branch_tutorial_type !== 'file' ? 'checked' : ''} /> URL</label>
+          <label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="pbsg_branch_tut_type" value="file" ${step.branch_tutorial_type === 'file' ? 'checked' : ''} /> Upload / Select File</label>
         </div>
-
         <div id="pbsg-branch-url-block" style="margin-top:10px;">
           <p style="margin:0 0 6px;"><strong>Branch URL</strong></p>
-          <input type="url" id="pbsg-branch-url" style="width:100%;" placeholder="https://example.com/review" value="${escapeHtml(step.branch_tutorial_url)}" />
+          <input type="url" id="pbsg-branch-url" style="width:100%;" placeholder="https://example.com/review" value="${esc(step.branch_tutorial_url)}" />
         </div>
-
         <div id="pbsg-branch-file-block" style="margin-top:10px; display:none;">
           <p style="margin:0 0 6px;"><strong>Branch file</strong></p>
           <div style="display:flex; gap:8px; align-items:center;">
             <button type="button" class="button" id="pbsg-branch-pick-file">Choose / Upload File</button>
-            <span id="pbsg-branch-file-label" style="opacity:.85;">${escapeHtml(step.branch_tutorial_file_name || (step.branch_tutorial_attachment_id ? ('Attachment #' + step.branch_tutorial_attachment_id) : 'No file selected'))}</span>
+            <span id="pbsg-branch-file-label" style="opacity:.85;">${esc(step.branch_tutorial_file_name || (step.branch_tutorial_attachment_id ? ('Attachment #' + step.branch_tutorial_attachment_id) : 'No file selected'))}</span>
           </div>
           <input type="hidden" id="pbsg-branch-attachment-id" value="${step.branch_tutorial_attachment_id || 0}" />
-          <input type="hidden" id="pbsg-branch-file-name" value="${escapeHtml(step.branch_tutorial_file_name || '')}" />
-          <input type="hidden" id="pbsg-branch-file-url" value="${escapeHtml(step.branch_tutorial_file_url || '')}" />
+          <input type="hidden" id="pbsg-branch-file-name" value="${esc(step.branch_tutorial_file_name || '')}" />
+          <input type="hidden" id="pbsg-branch-file-url" value="${esc(step.branch_tutorial_file_url || '')}" />
         </div>
-
         <div style="margin-top:14px; display:flex; gap:8px;">
           <button type="button" class="button button-primary" id="pbsg-branch-save">Save</button>
           <button type="button" class="button" id="pbsg-branch-cancel">Cancel</button>
         </div>
       </div>
     `;
-
     if (!$('#pbsg-branch-inline').length) {
       $('body').append('<div id="pbsg-branch-inline" style="display:none;"></div>');
     }
     $('#pbsg-branch-inline').html(html);
-
     tb_show('Set Branch Review', '#TB_inline?inlineId=pbsg-branch-inline&width=760&height=560');
 
     function refreshBranchBlocks() {
       const t = $('input[name="pbsg_branch_tut_type"]:checked').val();
-      if (t === 'file') {
-        $('#pbsg-branch-url-block').hide();
-        $('#pbsg-branch-file-block').show();
-      } else {
-        $('#pbsg-branch-file-block').hide();
-        $('#pbsg-branch-url-block').show();
-      }
+      if (t === 'file') { $('#pbsg-branch-url-block').hide(); $('#pbsg-branch-file-block').show(); }
+      else { $('#pbsg-branch-file-block').hide(); $('#pbsg-branch-url-block').show(); }
     }
-
     refreshBranchBlocks();
     $(document).off('change.pbsgBranchType').on('change.pbsgBranchType', 'input[name="pbsg_branch_tut_type"]', refreshBranchBlocks);
 
-    $('#pbsg-branch-cancel').on('click', function () {
-      tb_remove();
-    });
+    $('#pbsg-branch-cancel').on('click', function () { tb_remove(); });
 
     $('#pbsg-branch-pick-file').on('click', function (e) {
       e.preventDefault();
-
-      const frame = wp.media({
-        title: 'Select or Upload Branch Review File',
-        button: { text: 'Use this file' },
-        multiple: false
-      });
-
+      const frame = wp.media({ title: 'Select or Upload Branch Review File', button: { text: 'Use this file' }, multiple: false });
       frame.on('select', function () {
         const attachment = frame.state().get('selection').first().toJSON();
         $('#pbsg-branch-attachment-id').val(attachment.id || 0);
@@ -645,26 +1170,22 @@ jQuery(function ($) {
         $('#pbsg-branch-file-url').val(attachment.url || '');
         $('#pbsg-branch-file-label').text(attachment.filename || attachment.title || ('Attachment #' + (attachment.id || '')));
       });
-
       frame.open();
     });
 
     $('#pbsg-branch-save').on('click', function () {
       if (currentBranchRowIdx === null) return;
-
-      const steps = getSteps().map(normalizeStep);
+      const steps = getSteps().map(norm);
       const step = steps[currentBranchRowIdx];
       if (!step) return;
 
       step.branch_mode = $('input[name="pbsg_branch_mode"]:checked').val() || 'none';
       step.branch_trigger_attempts = parseInt($('#pbsg-branch-trigger-attempts').val(), 10) || 1;
       if (step.branch_trigger_attempts < 1) step.branch_trigger_attempts = 1;
-
       step.branch_title = $('#pbsg-branch-title').val() || '';
       step.branch_intro = $('#pbsg-branch-intro').val() || '';
 
       const t = $('input[name="pbsg_branch_tut_type"]:checked').val();
-
       if (t === 'file') {
         const attId = parseInt($('#pbsg-branch-attachment-id').val(), 10) || 0;
         step.branch_tutorial_type = attId ? 'file' : '';
@@ -680,69 +1201,26 @@ jQuery(function ($) {
         step.branch_tutorial_file_name = '';
         step.branch_tutorial_file_url = '';
       }
-
       steps[currentBranchRowIdx] = step;
       setSteps(steps);
-      renderStepsTable();
+      renderStepCards();
       tb_remove();
     });
   }
 
-
-
-  $(document).on('click', '.pbsg-set-tutorial', function () {
-    if (!isSplitGuideTemplateSelected()) {
-      alert('Please select the “Split Guide (H5P + Tutorial)” template first.');
-      return;
-    }
-    const idx = parseInt($(this).closest('tr').attr('data-idx'), 10);
-    if (isNaN(idx)) return;
-
-    currentTutorialRowIdx = idx;
-    const steps = getSteps().map(normalizeStep);
-    openTutorialPicker(steps[idx] || {});
-  });
-
-  $(document).on('click', '.pbsg-clear-tutorial', function () {
-    const idx = parseInt($(this).closest('tr').attr('data-idx'), 10);
-    if (isNaN(idx)) return;
-
-    const steps = getSteps().map(normalizeStep);
-    if (!steps[idx]) return;
-
-    steps[idx].tutorial_type = '';
-    steps[idx].tutorial_url = '';
-    steps[idx].tutorial_attachment_id = 0;
-    steps[idx].tutorial_file_name = '';
-    steps[idx].tutorial_file_url = '';
-    steps[idx].url = '';
-
-    setSteps(steps);
-    renderStepsTable();
-  });
-
-
   $(document).on('click', '.pbsg-set-branch', function () {
-    if (!isSplitGuideTemplateSelected()) {
-      alert('Please select the “Split Guide (H5P + Tutorial)” template first.');
-      return;
-    }
-
-    const idx = parseInt($(this).closest('tr').attr('data-idx'), 10);
+    const idx = parseInt($(this).data('idx'), 10);
     if (isNaN(idx)) return;
-
     currentBranchRowIdx = idx;
-    const steps = getSteps().map(normalizeStep);
+    const steps = getSteps().map(norm);
     openBranchPicker(steps[idx] || {});
   });
 
   $(document).on('click', '.pbsg-clear-branch', function () {
-    const idx = parseInt($(this).closest('tr').attr('data-idx'), 10);
+    const idx = parseInt($(this).data('idx'), 10);
     if (isNaN(idx)) return;
-
-    const steps = getSteps().map(normalizeStep);
+    const steps = getSteps().map(norm);
     if (!steps[idx]) return;
-
     steps[idx].branch_mode = 'none';
     steps[idx].branch_trigger_attempts = 1;
     steps[idx].branch_title = '';
@@ -752,240 +1230,49 @@ jQuery(function ($) {
     steps[idx].branch_tutorial_attachment_id = 0;
     steps[idx].branch_tutorial_file_name = '';
     steps[idx].branch_tutorial_file_url = '';
-
     setSteps(steps);
-    renderStepsTable();
+    renderStepCards();
   });
 
-  // --- Page-level cover image picker ---
-  $(document).on('click', '#pbsg_pick_cover_image', function (e) {
-    e.preventDefault();
-
-    const frame = wp.media({
-      title: 'Select Tutorial Cover Image',
-      button: { text: 'Use this image' },
-      library: { type: 'image' },
-      multiple: false
-    });
-
-    frame.on('select', function () {
-      const attachment = frame.state().get('selection').first().toJSON();
-      const imageUrl = attachment.url || '';
-      const imageId = attachment.id || 0;
-
-      $('#pbsg_cover_image_id').val(imageId);
-      $('#pbsg_cover_image_url').val(imageUrl);
-
-      $('#pbsg_cover_preview')
-        .attr('src', imageUrl)
-        .show();
-    });
-
-    frame.open();
-  });
-
-  $(document).on('click', '#pbsg_clear_cover_image', function (e) {
-    e.preventDefault();
-
-    $('#pbsg_cover_image_id').val('');
-    $('#pbsg_cover_image_url').val('');
-    $('#pbsg_cover_preview')
-      .attr('src', '')
-      .hide();
-  });
-
-
-    // --- Introduction placeholder for the main editor ---
-  function setupIntroductionPlaceholder() {
-    const placeholderText = 'Add introduction';
-
-    function getEditorWrap() {
-      return $('#wp-content-wrap');
-    }
-
-    function getEditorContainer() {
-      return $('#wp-content-editor-container');
-    }
-
-    function getTextarea() {
-      return $('#content');
-    }
-
-    function ensurePlaceholderEl() {
-      const $container = getEditorContainer();
-      if (!$container.length) return $();
-
-      if (!$container.find('.pbsg-editor-placeholder').length) {
-        $container.css('position', 'relative');
-        $container.append(
-          '<div class="pbsg-editor-placeholder">' + placeholderText + '</div>'
-        );
-      }
-
-      return $container.find('.pbsg-editor-placeholder');
-    }
-
-    function editorIsEmpty() {
-      if (typeof tinymce !== 'undefined') {
-        const editor = tinymce.get('content');
-        if (editor && !editor.isHidden()) {
-          const text = (editor.getContent({ format: 'text' }) || '')
-            .replace(/\u00a0/g, ' ')
-            .trim();
-
-          const html = (editor.getContent() || '')
-            .replace(/<p>(?:\s|&nbsp;|<br[^>]*\/?>)*<\/p>/gi, '')
-            .replace(/&nbsp;/gi, '')
-            .trim();
-
-          return text === '' && html === '';
-        }
-      }
-
-      const val = (getTextarea().val() || '').trim();
-      return val === '';
-    }
-
-    function updatePlaceholder() {
-      const $ph = ensurePlaceholderEl();
-      if (!$ph.length) return;
-
-      const isVisual = getEditorWrap().hasClass('tmce-active');
-      const empty = editorIsEmpty();
-
-      if (isVisual && empty) {
-        $ph.show();
-      } else {
-        $ph.hide();
-      }
-    }
-
-    function bindEvents() {
-      const $container = getEditorContainer();
-      if (!$container.length) return;
-
-      ensurePlaceholderEl();
-
-      // click placeholder -> focus editor
-      $container.off('click.pbsgPlaceholder').on('click.pbsgPlaceholder', '.pbsg-editor-placeholder', function () {
-        const editor = (typeof tinymce !== 'undefined') ? tinymce.get('content') : null;
-        if (editor) {
-          editor.focus();
-        } else {
-          getTextarea().trigger('focus');
-        }
-      });
-
-      // switch Visual / Code tabs
-      $(document).on('click.pbsgPlaceholder', '#content-tmce, #content-html', function () {
-        setTimeout(updatePlaceholder, 100);
-      });
-
-      // textarea mode
-      getTextarea().on('input.pbsgPlaceholder change.pbsgPlaceholder', function () {
-        updatePlaceholder();
-      });
-
-      // TinyMCE mode
-      const tryBindTinyMCE = function () {
-        if (typeof tinymce === 'undefined') return false;
-        const editor = tinymce.get('content');
-        if (!editor) return false;
-
-        if (!editor._pbsgPlaceholderBound) {
-          editor._pbsgPlaceholderBound = true;
-
-          editor.on('init', updatePlaceholder);
-          editor.on('focus', function () {
-            ensurePlaceholderEl().hide();
-          });
-          editor.on('blur', updatePlaceholder);
-          editor.on('keyup change SetContent input NodeChange Undo Redo', updatePlaceholder);
-        }
-
-        return true;
-      };
-
-      let tries = 0;
-      const timer = setInterval(function () {
-        tries++;
-        const ok = tryBindTinyMCE();
-        updatePlaceholder();
-
-        if (ok || tries >= 40) {
-          clearInterval(timer);
-        }
-      }, 300);
-
-      $(window).on('load', function () {
-        setTimeout(updatePlaceholder, 300);
-      });
-    }
-
-    bindEvents();
-    setTimeout(updatePlaceholder, 300);
-  }
-
-  setupIntroductionPlaceholder();
-
-  // ── Save as Template ──────────────────────────────────────────────────────
-
+  // ═══════════════════════════════════════════════════════════
+  //  Save as Template (Sprint 7 SG3)
+  // ═══════════════════════════════════════════════════════════
   $(document).on('click', '#pbsg-save-as-template', function () {
     const postId = $('#post_ID').val();
-
     if (!postId || postId === '0') {
       alert('Please save or publish the tutorial first before saving it as a template.');
       return;
     }
-
     const html = `
       <div id="pbsg-save-tpl-modal" style="padding:18px;">
         <h2 style="margin-top:0;">Save as Template</h2>
-        <p style="color:#50575e; margin-bottom:14px;">
-          The current steps will be saved as a reusable template for new tutorials.
-        </p>
-
+        <p style="color:#50575e; margin-bottom:14px;">The current steps will be saved as a reusable template for new tutorials.</p>
         <p style="margin:0 0 6px;"><strong>Template name <span style="color:#d63638;">*</span></strong></p>
         <input type="text" id="pbsg-tpl-name" style="width:100%;" placeholder="e.g. Library Catalogue Search" />
-
         <p style="margin:12px 0 6px;"><strong>Description</strong></p>
-        <textarea id="pbsg-tpl-desc" style="width:100%; min-height:70px;" placeholder="Optional — describe when to use this template"></textarea>
-
+        <textarea id="pbsg-tpl-desc" style="width:100%; min-height:70px;" placeholder="Optional \u2014 describe when to use this template"></textarea>
         <p style="margin:12px 0 6px;"><strong>Category</strong></p>
         <input type="text" id="pbsg-tpl-cat" style="width:100%;" placeholder="e.g. General, Research, Databases" />
-
         <p id="pbsg-tpl-save-error" style="color:#d63638; margin:8px 0 0; display:none;"></p>
-
         <div style="margin-top:16px; display:flex; gap:8px;">
           <button type="button" class="button button-primary" id="pbsg-tpl-save-btn">Save Template</button>
           <button type="button" class="button" id="pbsg-tpl-cancel-btn">Cancel</button>
         </div>
       </div>
     `;
-
     if (!$('#pbsg-save-tpl-inline').length) {
       $('body').append('<div id="pbsg-save-tpl-inline" style="display:none;"></div>');
     }
     $('#pbsg-save-tpl-inline').html(html);
-
     tb_show('Save as Template', '#TB_inline?inlineId=pbsg-save-tpl-inline&width=560&height=380');
 
     $('#pbsg-tpl-cancel-btn').on('click', () => tb_remove());
-
     $('#pbsg-tpl-save-btn').on('click', function () {
       const name = $.trim($('#pbsg-tpl-name').val());
       const $err = $('#pbsg-tpl-save-error');
-
       $err.hide();
-
-      if (!name) {
-        $err.text('Please enter a template name.').show();
-        $('#pbsg-tpl-name').trigger('focus');
-        return;
-      }
-
+      if (!name) { $err.text('Please enter a template name.').show(); $('#pbsg-tpl-name').trigger('focus'); return; }
       const $btn = $(this).prop('disabled', true).text('Saving\u2026');
-
       $.post(PBSG_ADMIN.ajaxUrl, {
         action:      'pbsg_save_as_template',
         nonce:       PBSG_ADMIN.templateNonce,
@@ -999,7 +1286,6 @@ jQuery(function ($) {
       .done(function (res) {
         if (res && res.success) {
           tb_remove();
-          // Brief confirmation in-place
           const $btn2 = $('#pbsg-save-as-template');
           const orig  = $btn2.text();
           $btn2.text('Saved!').prop('disabled', true);
@@ -1017,9 +1303,12 @@ jQuery(function ($) {
     });
   });
 
+  // ═══════════════════════════════════════════════════════════
+  //  Init
+  // ═══════════════════════════════════════════════════════════
+  renderStepCards();
+
+  // Snapshot initial state AFTER rendering so we have a clean baseline
+  // (use setTimeout to let WP finish any post-load mutations)
+  setTimeout(markClean, 300);
 });
-
-
-
-
-

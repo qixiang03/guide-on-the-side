@@ -69,7 +69,7 @@ class PBSGAnalyticsCsvExportTest extends TestCase
     /**
      * @covers PBSG_Analytics::handle_export_csv
      */
-    public function test_export_csv_checks_edit_pages_capability(): void
+    public function test_export_csv_checks_capability(): void
     {
         WPStubs::$returns['current_user_can'] = false;
 
@@ -79,8 +79,8 @@ class PBSGAnalyticsCsvExportTest extends TestCase
             // Expected
         }
 
-        // The source verifies edit_pages capability
-        $this->assertStringContainsString("current_user_can( 'edit_pages' )", $this->sourceCode);
+        // The source verifies pbsg_export_csv capability
+        $this->assertStringContainsString("current_user_can( 'pbsg_export_csv' )", $this->sourceCode);
     }
 
     /* ---------------------------------------------------------------
@@ -144,6 +144,9 @@ class PBSGAnalyticsCsvExportTest extends TestCase
             'Give-ups',
             'Correct Rate (%)',
             'Avg Attempts',
+            'Incorrect Attempts',
+            'Total Retries',
+            'Max Retries',
         ];
 
         foreach ($expectedHeaders as $header) {
@@ -192,6 +195,9 @@ class PBSGAnalyticsCsvExportTest extends TestCase
             'Correct Rate (%)',
             'Avg Attempts',
             'Avg Time (s)',
+            'Incorrect Attempts',
+            'Total Retries',
+            'Max Retries',
         ];
 
         foreach ($expectedHeaders as $header) {

@@ -66,6 +66,9 @@ class PBSG_Analytics {
         // Admin-only AJAX endpoints
         add_action( 'wp_ajax_pbsg_get_analytics', array( __CLASS__, 'handle_get_analytics' ) );
         add_action( 'wp_ajax_pbsg_export_csv', array( __CLASS__, 'handle_export_csv' ) );
+
+        // Schema upgrade check
+        add_action( 'admin_init', array( __CLASS__, 'maybe_upgrade_schema' ) );
     }
 
     /* =========================================================================
@@ -119,6 +122,9 @@ class PBSG_Analytics {
             second_attempt_correct BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
             total_time_seconds BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
             total_answered BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            incorrect_attempts BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            total_retries BIGINT(20) UNSIGNED NOT NULL DEFAULT 0,
+            max_retries_single_session INT UNSIGNED NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
@@ -152,7 +158,18 @@ class PBSG_Analytics {
         dbDelta( $sql_daily );
 
         // Store schema version for future migrations
-        update_option( 'pbsg_analytics_db_version', '1.0.0' );
+        update_option( 'pbsg_analytics_db_version', '1.1.0' );
+    }
+
+    /**
+     * Check and apply schema upgrades on admin_init.
+     * Uses dbDelta which is idempotent — safe to re-run.
+     */
+    public static function maybe_upgrade_schema() {
+        $current = get_option( 'pbsg_analytics_db_version', '1.0.0' );
+        if ( version_compare( $current, '1.1.0', '<' ) ) {
+            self::create_tables();
+        }
     }
 
     /* =========================================================================
@@ -263,22 +280,26 @@ class PBSG_Analytics {
         $daily = $wpdb->prefix . self::TABLE_DAILY_STATS;
         $today = current_time( 'Y-m-d' );
 
+        // Ensure view_count >= completion_count using GREATEST — a completion
+        // always guarantees at least one view even if the view event was lost.
         $wpdb->query( $wpdb->prepare(
-            "INSERT INTO {$table} (tutorial_page_id, completion_count, total_time_seconds, total_sessions)
-             VALUES (%d, 1, %d, 1)
+            "INSERT INTO {$table} (tutorial_page_id, view_count, completion_count, total_time_seconds, total_sessions)
+             VALUES (%d, 1, 1, %d, 1)
              ON DUPLICATE KEY UPDATE
                 completion_count = completion_count + 1,
                 total_time_seconds = total_time_seconds + %d,
-                total_sessions = total_sessions + 1",
+                total_sessions = total_sessions + 1,
+                view_count = GREATEST(view_count, completion_count)",
             $tutorial_id, $total_time, $total_time
         ) );
 
         $wpdb->query( $wpdb->prepare(
-            "INSERT INTO {$daily} (stat_date, tutorial_page_id, device_type, completion_count, total_time_seconds)
-             VALUES (%s, %d, %s, 1, %d)
+            "INSERT INTO {$daily} (stat_date, tutorial_page_id, device_type, view_count, completion_count, total_time_seconds)
+             VALUES (%s, %d, %s, 1, 1, %d)
              ON DUPLICATE KEY UPDATE
                 completion_count = completion_count + 1,
-                total_time_seconds = total_time_seconds + %d",
+                total_time_seconds = total_time_seconds + %d,
+                view_count = GREATEST(view_count, completion_count)",
             $today, $tutorial_id, $device, $total_time, $total_time
         ) );
     }
@@ -343,13 +364,17 @@ class PBSG_Analytics {
         $attempt   = isset( $data['attempt_number'] ) ? absint( $data['attempt_number'] ) : 1;
         $time_spent = isset( $data['time_seconds'] ) ? absint( $data['time_seconds'] ) : 0;
 
-        // Base upsert
+        $incorrect = 1 - $correct;
+        $is_retry  = ( $attempt > 1 ) ? 1 : 0;
+
+        // Base upsert with retry tracking columns
         $wpdb->query( $wpdb->prepare(
             "INSERT INTO {$table}
                 (tutorial_page_id, h5p_content_id, question_index, question_text,
                  total_attempts, correct_count, incorrect_count, total_time_seconds, total_answered,
-                 first_attempt_correct, second_attempt_correct)
-             VALUES (%d, %d, %d, %s, 1, %d, %d, %d, 0, %d, %d)
+                 first_attempt_correct, second_attempt_correct,
+                 incorrect_attempts, total_retries, max_retries_single_session)
+             VALUES (%d, %d, %d, %s, 1, %d, %d, %d, 0, %d, %d, %d, %d, %d)
              ON DUPLICATE KEY UPDATE
                 total_attempts = total_attempts + 1,
                 correct_count = correct_count + %d,
@@ -357,14 +382,19 @@ class PBSG_Analytics {
                 total_time_seconds = total_time_seconds + %d,
                 question_text = IF(question_text = '', %s, question_text),
                 first_attempt_correct = first_attempt_correct + %d,
-                second_attempt_correct = second_attempt_correct + %d",
+                second_attempt_correct = second_attempt_correct + %d,
+                incorrect_attempts = incorrect_attempts + %d,
+                total_retries = total_retries + %d,
+                max_retries_single_session = GREATEST(max_retries_single_session, %d)",
             $tutorial_id, $h5p_id, $q_index, $q_text,
-            $correct, ( 1 - $correct ), $time_spent,
+            $correct, $incorrect, $time_spent,
             ( $attempt === 1 && $correct ? 1 : 0 ),
             ( $attempt === 2 && $correct ? 1 : 0 ),
-            $correct, ( 1 - $correct ), $time_spent, $q_text,
+            $incorrect, $is_retry, $attempt,
+            $correct, $incorrect, $time_spent, $q_text,
             ( $attempt === 1 && $correct ? 1 : 0 ),
-            ( $attempt === 2 && $correct ? 1 : 0 )
+            ( $attempt === 2 && $correct ? 1 : 0 ),
+            $incorrect, $is_retry, $attempt
         ) );
 
         // If correct, also increment total_answered (unique answer — correct eventually)
@@ -425,7 +455,7 @@ class PBSG_Analytics {
      * Returns JSON with computed metrics for the requested view.
      */
     public static function handle_get_analytics() {
-        if ( ! current_user_can( 'edit_pages' ) ) {
+        if ( ! current_user_can( 'pbsg_view_analytics' ) ) {
             wp_send_json_error( 'Unauthorized', 403 );
         }
 
@@ -469,7 +499,10 @@ class PBSG_Analytics {
         $date_to   = self::sanitize_date( isset( $_GET['date_to'] ) ? $_GET['date_to'] : '', date( 'Y-m-d' ) );
         $device    = isset( $_GET['device'] ) ? sanitize_text_field( $_GET['device'] ) : '';
 
-        // Tutorial summaries — aggregated from daily stats with date range filtering
+        // Build device filter clause — shared across tutorials, trend, and KPIs
+        $device_where = $device ? $wpdb->prepare( " AND d.device_type = %s", $device ) : '';
+
+        // Tutorial summaries — aggregated from daily stats with date + device filtering
         $tutorials = $wpdb->get_results( $wpdb->prepare(
             "SELECT d.tutorial_page_id, p.post_title AS tutorial_name,
                     SUM(d.view_count) AS view_count,
@@ -482,7 +515,7 @@ class PBSG_Analytics {
                         ELSE 0 END AS avg_time_seconds
              FROM {$daily} d
              JOIN {$wpdb->posts} p ON p.ID = d.tutorial_page_id
-             WHERE p.post_status = 'publish' AND d.stat_date BETWEEN %s AND %s
+             WHERE p.post_status = 'publish' AND d.stat_date BETWEEN %s AND %s {$device_where}
              GROUP BY d.tutorial_page_id, p.post_title
              ORDER BY SUM(d.view_count) DESC",
             $date_from, $date_to
@@ -505,14 +538,16 @@ class PBSG_Analytics {
         }
         unset( $t );
 
-        // Daily trend data (filtered by date range)
-        $device_where = $device ? $wpdb->prepare( " AND device_type = %s", $device ) : '';
+        // Daily trend data (filtered by date range + device)
+        // Use LEAST to clamp completions <= views defensively
+        // Note: $device_where re-aliased for non-joined query (uses device_type directly)
+        $device_where_bare = $device ? $wpdb->prepare( " AND device_type = %s", $device ) : '';
         $daily_trend = $wpdb->get_results( $wpdb->prepare(
             "SELECT stat_date,
                     SUM(view_count) AS views,
-                    SUM(completion_count) AS completions
+                    LEAST(SUM(completion_count), SUM(view_count)) AS completions
              FROM {$daily}
-             WHERE stat_date BETWEEN %s AND %s {$device_where}
+             WHERE stat_date BETWEEN %s AND %s {$device_where_bare}
              GROUP BY stat_date
              ORDER BY stat_date ASC",
             $date_from, $date_to
@@ -542,11 +577,19 @@ class PBSG_Analytics {
             $totals['avg_score'] = round( array_sum( array_column( $tutorials, 'avg_score' ) ) / count( $tutorials ), 1 );
         }
 
+        // Attach per-tutorial benchmarks for badge colouring + attention flags
+        $site_benchmarks = PB_Split_Guide_Plugin::resolve_benchmarks();
+        foreach ( $tutorials as &$t ) {
+            $t['benchmarks'] = PB_Split_Guide_Plugin::resolve_benchmarks( $t['tutorial_page_id'] );
+        }
+        unset( $t );
+
         return array(
             'totals'           => $totals,
             'tutorials'        => $tutorials,
             'daily_trend'      => $daily_trend,
             'device_breakdown' => $device_breakdown,
+            'benchmarks'       => $site_benchmarks,
             'date_scope'       => array(
                 'date_from' => $date_from,
                 'date_to'   => $date_to,
@@ -564,8 +607,13 @@ class PBSG_Analytics {
 
         $date_from = self::sanitize_date( isset( $_GET['date_from'] ) ? $_GET['date_from'] : '', date( 'Y-m-d', strtotime( '-30 days' ) ) );
         $date_to   = self::sanitize_date( isset( $_GET['date_to'] ) ? $_GET['date_to'] : '', date( 'Y-m-d' ) );
+        $device    = isset( $_GET['device'] ) ? sanitize_text_field( $_GET['device'] ) : '';
 
-        // Tutorial aggregate stats — from daily stats with date range filtering
+        // Build device filter clauses
+        $device_where      = $device ? $wpdb->prepare( " AND d.device_type = %s", $device ) : '';
+        $device_where_bare = $device ? $wpdb->prepare( " AND device_type = %s", $device ) : '';
+
+        // Tutorial aggregate stats — from daily stats with date range + device filtering
         $stats = $wpdb->get_row( $wpdb->prepare(
             "SELECT d.tutorial_page_id, p.post_title AS tutorial_name,
                     COALESCE(SUM(d.view_count), 0) AS view_count,
@@ -573,7 +621,7 @@ class PBSG_Analytics {
                     COALESCE(SUM(d.total_time_seconds), 0) AS total_time_seconds
              FROM {$daily} d
              JOIN {$wpdb->posts} p ON p.ID = d.tutorial_page_id
-             WHERE d.tutorial_page_id = %d AND d.stat_date BETWEEN %s AND %s
+             WHERE d.tutorial_page_id = %d AND d.stat_date BETWEEN %s AND %s {$device_where}
              GROUP BY d.tutorial_page_id, p.post_title",
             $tutorial_id, $date_from, $date_to
         ), ARRAY_A );
@@ -599,19 +647,19 @@ class PBSG_Analytics {
                 : 0;
         }
 
-        // Daily views for this tutorial — filtered by selected date range
+        // Daily views for this tutorial — filtered by date range + device
         $daily_views = $wpdb->get_results( $wpdb->prepare(
             "SELECT stat_date, SUM(view_count) AS views, SUM(completion_count) AS completions
              FROM {$daily}
-             WHERE tutorial_page_id = %d AND stat_date BETWEEN %s AND %s
+             WHERE tutorial_page_id = %d AND stat_date BETWEEN %s AND %s {$device_where_bare}
              GROUP BY stat_date ORDER BY stat_date ASC",
             $tutorial_id, $date_from, $date_to
         ), ARRAY_A ) ?: array();
 
-        // Step dwell times — filtered by date range
+        // Step dwell times — filtered by date range + device
         $step_data = $wpdb->get_results( $wpdb->prepare(
             "SELECT step_views FROM {$daily}
-             WHERE tutorial_page_id = %d AND step_views IS NOT NULL AND stat_date BETWEEN %s AND %s",
+             WHERE tutorial_page_id = %d AND step_views IS NOT NULL AND stat_date BETWEEN %s AND %s {$device_where_bare}",
             $tutorial_id, $date_from, $date_to
         ), ARRAY_A ) ?: array();
 
@@ -676,6 +724,8 @@ class PBSG_Analytics {
             'step_names'  => $step_names,
             'questions'   => $questions,
             'giveup_rate' => $giveup_rate,
+            'benchmarks'  => PB_Split_Guide_Plugin::resolve_benchmarks( $tutorial_id ),
+            'device_note' => $device ? ucfirst( $device ) . ' only — views, completions, funnel, and dwell times are filtered to this device type.' : '',
             'date_scope'  => array(
                 'date_from' => $date_from,
                 'date_to'   => $date_to,
@@ -721,7 +771,18 @@ class PBSG_Analytics {
             ? round( $question['total_time_seconds'] / $question['total_answered'] )
             : 0;
 
+        // Retry statistics
+        $question['retry_stats'] = array(
+            'incorrect_attempts'        => (int) ( $question['incorrect_attempts'] ?? 0 ),
+            'total_retries'             => (int) ( $question['total_retries'] ?? 0 ),
+            'max_retries_single_session'=> (int) ( $question['max_retries_single_session'] ?? 0 ),
+            'avg_retries_per_completion'=> $question['total_answered'] > 0
+                ? round( (int) ( $question['total_retries'] ?? 0 ) / $question['total_answered'], 1 )
+                : 0,
+        );
+
         $question['date_scope'] = array( 'all_time' => true );
+        $question['benchmarks'] = PB_Split_Guide_Plugin::resolve_benchmarks( $tutorial_id );
 
         return $question;
     }
@@ -737,7 +798,7 @@ class PBSG_Analytics {
     }
 
     public static function handle_export_csv() {
-        if ( ! current_user_can( 'edit_pages' ) ) {
+        if ( ! current_user_can( 'pbsg_export_csv' ) ) {
             wp_die( 'Unauthorized' );
         }
 
@@ -808,7 +869,7 @@ class PBSG_Analytics {
             $filename = $tutorial_slug . '-tutorial-' . $date_from . '-to-' . $date_to . '.csv';
             self::send_csv_headers( $filename );
 
-            fputcsv( $output, array( 'Question', 'H5P ID', 'Attempts', 'Correct', 'Incorrect', 'Give-ups', 'Correct Rate (%)', 'Avg Attempts' ) );
+            fputcsv( $output, array( 'Question', 'H5P ID', 'Attempts', 'Correct', 'Incorrect', 'Give-ups', 'Correct Rate (%)', 'Avg Attempts', 'Incorrect Attempts', 'Total Retries', 'Max Retries' ) );
 
             global $wpdb;
             $q_table = $wpdb->prefix . self::TABLE_QUESTION_STATS;
@@ -829,6 +890,9 @@ class PBSG_Analytics {
                     $q['giveup_count'],
                     $rate,
                     $avg,
+                    $q['incorrect_attempts'] ?? 0,
+                    $q['total_retries'] ?? 0,
+                    $q['max_retries_single_session'] ?? 0,
                 ) );
             }
         } elseif ( 'question_detail' === $export_type ) {
@@ -844,12 +908,14 @@ class PBSG_Analytics {
                 'Correct', 'Incorrect', 'Give-ups', 'Correct Rate (%)',
                 '1st Attempt Correct', '2nd Attempt Correct', '3rd+ Attempt Correct',
                 'Avg Attempts', 'Avg Time (s)',
+                'Incorrect Attempts', 'Total Retries', 'Max Retries',
             ) );
 
             $question = self::get_question_detail( $tutorial_id, $h5p_id, $q_index );
 
             if ( ! isset( $question['error'] ) ) {
-                $dist = $question['attempt_distribution'];
+                $dist  = $question['attempt_distribution'];
+                $retry = $question['retry_stats'];
                 $avg_attempts = $question['total_answered'] > 0
                     ? round( $question['total_attempts'] / $question['total_answered'], 1 )
                     : 0;
@@ -868,6 +934,9 @@ class PBSG_Analytics {
                     $dist['third_plus_correct'],
                     $avg_attempts,
                     $question['avg_time_seconds'],
+                    $retry['incorrect_attempts'],
+                    $retry['total_retries'],
+                    $retry['max_retries_single_session'],
                 ) );
             }
         }
@@ -901,17 +970,22 @@ class PBSG_Analytics {
 
         $date_from = self::sanitize_date( isset( $_GET['date_from'] ) ? $_GET['date_from'] : '', date( 'Y-m-d', strtotime( '-30 days' ) ) );
         $date_to   = self::sanitize_date( isset( $_GET['date_to'] ) ? $_GET['date_to'] : '', date( 'Y-m-d' ) );
+        $device    = isset( $_GET['device'] ) ? sanitize_text_field( $_GET['device'] ) : '';
+
+        // Build device filter clauses for comparison queries
+        $device_where      = $device ? $wpdb->prepare( " AND d.device_type = %s", $device ) : '';
+        $device_where_bare = $device ? $wpdb->prepare( " AND device_type = %s", $device ) : '';
 
         $tutorials = array();
 
         foreach ( $ids as $tid ) {
-            // Aggregate from daily stats (date-filterable)
+            // Aggregate from daily stats (date + device filterable)
             $stats = $wpdb->get_row( $wpdb->prepare(
                 "SELECT COALESCE(SUM(d.view_count), 0) AS view_count,
                         COALESCE(SUM(d.completion_count), 0) AS completion_count,
                         COALESCE(SUM(d.total_time_seconds), 0) AS total_time_seconds
                  FROM {$daily} d
-                 WHERE d.tutorial_page_id = %d AND d.stat_date BETWEEN %s AND %s",
+                 WHERE d.tutorial_page_id = %d AND d.stat_date BETWEEN %s AND %s {$device_where}",
                 $tid, $date_from, $date_to
             ) );
 
@@ -940,10 +1014,10 @@ class PBSG_Analytics {
                 }
             }
 
-            // Step funnel data (date-filtered)
+            // Step funnel data (date + device filtered)
             $step_data = $wpdb->get_results( $wpdb->prepare(
                 "SELECT step_views FROM {$daily}
-                 WHERE tutorial_page_id = %d AND step_views IS NOT NULL AND stat_date BETWEEN %s AND %s",
+                 WHERE tutorial_page_id = %d AND step_views IS NOT NULL AND stat_date BETWEEN %s AND %s {$device_where_bare}",
                 $tid, $date_from, $date_to
             ), ARRAY_A ) ?: array();
 
@@ -1023,6 +1097,7 @@ class PBSG_Analytics {
                 'hardest_question'   => $hardest ?: null,
                 'funnel'             => $funnel,
                 'devices'            => $devices,
+                'benchmarks'         => PB_Split_Guide_Plugin::resolve_benchmarks( $tid ),
             );
         }
 

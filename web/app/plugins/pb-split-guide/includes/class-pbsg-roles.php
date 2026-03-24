@@ -66,6 +66,20 @@ class PBSG_Roles {
     }
 
     /**
+     * H5P capabilities that must NEVER be granted to librarians.
+     *
+     * H5P's assign_capabilities() auto-maps these from core caps that
+     * librarians legitimately need (edit_others_pages → install_recommended,
+     * manage_options → manage_h5p_libraries). We deny them at runtime via
+     * the user_has_cap filter so no database race condition can re-grant them.
+     */
+    const BLOCKED_H5P_CAPS = array(
+        'install_recommended_h5p_libraries', // mapped from edit_others_pages — installs content types from Hub
+        'manage_h5p_libraries',              // mapped from manage_options — admin Libraries page
+        'disable_h5p_security',              // mapped from install_plugins — disables file extension checks
+    );
+
+    /**
      * Called on plugin activation.
      * Registers the pbsg_librarian role and grants admin the custom caps.
      */
@@ -78,6 +92,16 @@ class PBSG_Roles {
             __( 'Librarian', 'pb-split-guide' ),
             self::get_librarian_caps()
         );
+
+        // Best-effort cleanup: remove any H5P-auto-mapped caps from the
+        // stored role. The real enforcement is the user_has_cap filter in
+        // init(), which denies these at runtime regardless of DB state.
+        $role = get_role( self::LIBRARIAN_ROLE );
+        if ( $role ) {
+            foreach ( self::BLOCKED_H5P_CAPS as $cap ) {
+                $role->remove_cap( $cap );
+            }
+        }
 
         // Grant admin all custom caps (including manage_librarians)
         $admin = get_role( 'administrator' );
@@ -103,6 +127,45 @@ class PBSG_Roles {
                 $admin->remove_cap( $cap );
             }
         }
+    }
+
+    /**
+     * Initialize runtime hooks.
+     * Call this from the main plugin file on every request.
+     */
+    public static function init() {
+        // Runtime capability filter — intercepts current_user_can() checks
+        // to deny H5P management caps for librarians. This is immune to
+        // H5P's assign_capabilities() re-adding caps at any hook priority,
+        // because we filter at check time rather than modifying stored caps.
+        add_filter( 'user_has_cap', array( __CLASS__, 'filter_librarian_caps' ), 10, 4 );
+    }
+
+    /**
+     * Deny blocked H5P capabilities for librarian users at runtime.
+     *
+     * WordPress calls this filter every time current_user_can() is invoked.
+     * For librarians, we force-deny capabilities that H5P auto-maps from
+     * core caps (e.g. edit_others_pages → install_recommended_h5p_libraries).
+     * This prevents librarians from installing new content types from the
+     * H5P Hub while still allowing them to create and edit H5P content.
+     *
+     * @param bool[]   $allcaps All capabilities for the user.
+     * @param string[] $caps    Required primitive capabilities for the check.
+     * @param array    $args    Arguments: [0] = requested cap, [1] = user ID.
+     * @param WP_User  $user    The user object.
+     * @return bool[] Filtered capabilities.
+     */
+    public static function filter_librarian_caps( $allcaps, $caps, $args, $user ) {
+        if ( ! in_array( self::LIBRARIAN_ROLE, $user->roles, true ) ) {
+            return $allcaps;
+        }
+
+        foreach ( self::BLOCKED_H5P_CAPS as $cap ) {
+            $allcaps[ $cap ] = false;
+        }
+
+        return $allcaps;
     }
 
     /**

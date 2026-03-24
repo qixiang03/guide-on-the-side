@@ -232,13 +232,6 @@ if (!function_exists('get_userdata')) {
     }
 }
 
-if (!function_exists('is_super_admin')) {
-    function is_super_admin($user_id = false): bool
-    {
-        return (bool) WPStubs::returnFor('is_super_admin', false);
-    }
-}
-
 if (!function_exists('date_i18n')) {
     function date_i18n(string $format, $timestamp = false, bool $gmt = false): string
     {
@@ -652,6 +645,24 @@ if (!function_exists('esc_url')) {
     }
 }
 
+if (!function_exists('wp_max_upload_size')) {
+    function wp_max_upload_size(): int
+    {
+        return (int) WPStubs::returnFor('wp_max_upload_size', 2097152); // 2 MB default
+    }
+}
+
+if (!function_exists('size_format')) {
+    function size_format($bytes, int $decimals = 0): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        $bytes = max((int) $bytes, 0);
+        $pow   = $bytes ? floor(log($bytes, 1024)) : 0;
+        $pow   = min($pow, count($units) - 1);
+        return round($bytes / (1024 ** $pow), $decimals) . ' ' . $units[$pow];
+    }
+}
+
 if (!function_exists('add_shortcode')) {
     function add_shortcode(string $tag, callable $callback): void
     {
@@ -664,23 +675,5 @@ if (!function_exists('add_menu_page')) {
     {
         WPStubs::record('add_menu_page', [$page_title, $menu_title, $capability, $menu_slug, $callback, $icon_url, $position]);
         return $menu_slug;
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  WP_User stub (for PBSG_Admin_Menu_Filter::librarian_login_redirect) */
-/* ------------------------------------------------------------------ */
-
-if (!class_exists('WP_User')) {
-    class WP_User
-    {
-        /** @var array<int, string> */
-        public $roles;
-
-        /** @param array<int, string> $roles */
-        public function __construct(array $roles = [])
-        {
-            $this->roles = $roles;
-        }
     }
 }
