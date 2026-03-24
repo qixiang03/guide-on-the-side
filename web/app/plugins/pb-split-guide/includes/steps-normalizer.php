@@ -66,6 +66,32 @@ final class PBSG_Steps_Normalizer
                 if (!$tutorial_url) $tutorial_type = '';
             }
 
+            // ── Branch / sub-tutorial fields (wrong-answer remediation) ──
+            $branch_mode = isset($s['branch_mode']) ? self::sanitize_key((string)$s['branch_mode']) : 'none';
+            if (!in_array($branch_mode, ['none', 'optional', 'mandatory'], true)) {
+                $branch_mode = 'none';
+            }
+            $branch_trigger_attempts = isset($s['branch_trigger_attempts']) ? (int)$s['branch_trigger_attempts'] : 1;
+            if ($branch_trigger_attempts < 1) $branch_trigger_attempts = 1;
+            $branch_title = isset($s['branch_title']) ? self::sanitize_text((string)$s['branch_title']) : '';
+            $branch_intro = isset($s['branch_intro']) ? self::sanitize_text((string)$s['branch_intro']) : '';
+
+            $branch_tutorial_type = isset($s['branch_tutorial_type']) ? self::sanitize_key((string)$s['branch_tutorial_type']) : '';
+            $branch_tutorial_url  = isset($s['branch_tutorial_url']) ? self::sanitize_url((string)$s['branch_tutorial_url']) : '';
+            $branch_tutorial_attachment_id = isset($s['branch_tutorial_attachment_id']) ? (int)$s['branch_tutorial_attachment_id'] : 0;
+            if ($branch_tutorial_attachment_id < 0) $branch_tutorial_attachment_id = 0;
+            if (!in_array($branch_tutorial_type, ['url', 'file'], true)) {
+                $branch_tutorial_type = ($branch_tutorial_attachment_id > 0)
+                    ? 'file'
+                    : ($branch_tutorial_url ? 'url' : '');
+            }
+            if ($branch_tutorial_type === 'file' && $branch_tutorial_attachment_id <= 0) {
+                $branch_tutorial_type = $branch_tutorial_url ? 'url' : '';
+            }
+            if ($branch_tutorial_type === 'url' && !$branch_tutorial_url) {
+                $branch_tutorial_type = '';
+            }
+
             // Pre-check: does this step have quiz data? (peek at raw data before full normalization)
             $raw_quiz = isset($s['quiz']) && is_array($s['quiz']) ? $s['quiz'] : null;
             $has_quiz = $raw_quiz && !empty(self::sanitize_key($raw_quiz['type'] ?? ''));
@@ -85,6 +111,17 @@ final class PBSG_Steps_Normalizer
 
                 // Legacy key (optional)
                 'url' => $tutorial_type === 'url' ? $tutorial_url : '',
+
+                // Branch / sub-tutorial fields
+                'branch_mode'                  => $branch_mode,
+                'branch_trigger_attempts'      => $branch_trigger_attempts,
+                'branch_title'                 => $branch_title,
+                'branch_intro'                 => $branch_intro,
+                'branch_tutorial_type'         => $branch_tutorial_type,
+                'branch_tutorial_url'          => $branch_tutorial_type === 'url' ? $branch_tutorial_url : '',
+                'branch_tutorial_attachment_id' => $branch_tutorial_type === 'file' ? $branch_tutorial_attachment_id : 0,
+                'branch_tutorial_file_name'    => isset($s['branch_tutorial_file_name']) ? self::sanitize_text((string)$s['branch_tutorial_file_name']) : '',
+                'branch_tutorial_file_url'     => isset($s['branch_tutorial_file_url']) ? self::sanitize_url((string)$s['branch_tutorial_file_url']) : '',
             ];
 
             // Preserve quiz data for H5P creation (consumed by save_meta, not stored long-term)

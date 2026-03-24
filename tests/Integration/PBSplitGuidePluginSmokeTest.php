@@ -86,7 +86,7 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
     public function test_total_hook_count_matches_expected(): void
     {
         $this->assertCount(4, WPStubs::$hooks['filter'], 'Expected 4 filters');
-        $this->assertCount(19, WPStubs::$hooks['action'], 'Expected 19 actions');
+        $this->assertCount(25, WPStubs::$hooks['action'], 'Expected 25 actions');
     }
 
     /* =============================================================
@@ -386,16 +386,11 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
     {
         $this->assertTrue(WPStubs::wasCalled('register_activation_hook'));
 
-        // First activation hook: PBSG_Roles::activate
-        $rolesArgs = WPStubs::callArgs('register_activation_hook', 0);
-        $this->assertIsArray($rolesArgs);
-        $this->assertCount(2, $rolesArgs);
-        $this->assertSame(['PBSG_Roles', 'activate'], $rolesArgs[1]);
-
-        // Second activation hook: PBSG_Analytics::create_tables
-        $analyticsArgs = WPStubs::callArgs('register_activation_hook', 1);
-        $this->assertIsArray($analyticsArgs);
-        $this->assertCount(2, $analyticsArgs);
-        $this->assertSame(['PBSG_Analytics', 'create_tables'], $analyticsArgs[1]);
+        // Combined activation hook: closure calling Roles::activate,
+        // Analytics::create_tables, and Template_Manager::create_tables
+        $args = WPStubs::callArgs('register_activation_hook', 0);
+        $this->assertIsArray($args);
+        $this->assertCount(2, $args);
+        $this->assertTrue(is_callable($args[1]), 'Activation hook callback should be callable');
     }
 }
