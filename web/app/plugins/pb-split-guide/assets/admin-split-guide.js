@@ -29,7 +29,12 @@ jQuery(function ($) {
 
   function isSplitGuideTemplateSelected() {
     const $template = getTemplateSelect();
-    return $template.length > 0 && $template.val() === PBSG_ADMIN.templateSlug;
+    // If the dropdown exists in the DOM, trust it
+    if ($template.length > 0) {
+      return $template.val() === PBSG_ADMIN.templateSlug;
+    }
+    // Pressbooks hides the template dropdown — fall back to the server-side meta value
+    return PBSG_ADMIN.currentTemplate === PBSG_ADMIN.templateSlug;
   }
 
   function toggleMetaBox() {
@@ -649,6 +654,95 @@ jQuery(function ($) {
   }
 
   setupIntroductionPlaceholder();
+
+  // ── Save as Template ──────────────────────────────────────────────────────
+
+  $(document).on('click', '#pbsg-save-as-template', function () {
+    const postId = $('#post_ID').val();
+
+    if (!postId || postId === '0') {
+      alert('Please save or publish the tutorial first before saving it as a template.');
+      return;
+    }
+
+    const html = `
+      <div id="pbsg-save-tpl-modal" style="padding:18px;">
+        <h2 style="margin-top:0;">Save as Template</h2>
+        <p style="color:#50575e; margin-bottom:14px;">
+          The current steps will be saved as a reusable template for new tutorials.
+        </p>
+
+        <p style="margin:0 0 6px;"><strong>Template name <span style="color:#d63638;">*</span></strong></p>
+        <input type="text" id="pbsg-tpl-name" style="width:100%;" placeholder="e.g. Library Catalogue Search" />
+
+        <p style="margin:12px 0 6px;"><strong>Description</strong></p>
+        <textarea id="pbsg-tpl-desc" style="width:100%; min-height:70px;" placeholder="Optional — describe when to use this template"></textarea>
+
+        <p style="margin:12px 0 6px;"><strong>Category</strong></p>
+        <input type="text" id="pbsg-tpl-cat" style="width:100%;" placeholder="e.g. General, Research, Databases" />
+
+        <p id="pbsg-tpl-save-error" style="color:#d63638; margin:8px 0 0; display:none;"></p>
+
+        <div style="margin-top:16px; display:flex; gap:8px;">
+          <button type="button" class="button button-primary" id="pbsg-tpl-save-btn">Save Template</button>
+          <button type="button" class="button" id="pbsg-tpl-cancel-btn">Cancel</button>
+        </div>
+      </div>
+    `;
+
+    if (!$('#pbsg-save-tpl-inline').length) {
+      $('body').append('<div id="pbsg-save-tpl-inline" style="display:none;"></div>');
+    }
+    $('#pbsg-save-tpl-inline').html(html);
+
+    tb_show('Save as Template', '#TB_inline?inlineId=pbsg-save-tpl-inline&width=560&height=380');
+
+    $('#pbsg-tpl-cancel-btn').on('click', () => tb_remove());
+
+    $('#pbsg-tpl-save-btn').on('click', function () {
+      const name = $.trim($('#pbsg-tpl-name').val());
+      const $err = $('#pbsg-tpl-save-error');
+
+      $err.hide();
+
+      if (!name) {
+        $err.text('Please enter a template name.').show();
+        $('#pbsg-tpl-name').trigger('focus');
+        return;
+      }
+
+      const $btn = $(this).prop('disabled', true).text('Saving\u2026');
+
+      $.post(PBSG_ADMIN.ajaxUrl, {
+        action:      'pbsg_save_as_template',
+        nonce:       PBSG_ADMIN.templateNonce,
+        post_id:     postId,
+        name:        name,
+        description: $('#pbsg-tpl-desc').val(),
+        category:    $('#pbsg-tpl-cat').val(),
+        steps_json:  $('#pbsg_steps_json').val(),
+        header_note: $('#pbsg_header_note').val() || '',
+      })
+      .done(function (res) {
+        if (res && res.success) {
+          tb_remove();
+          // Brief confirmation in-place
+          const $btn2 = $('#pbsg-save-as-template');
+          const orig  = $btn2.text();
+          $btn2.text('Saved!').prop('disabled', true);
+          setTimeout(() => $btn2.text(orig).prop('disabled', false), 2000);
+        } else {
+          const msg = res?.data?.message || 'Could not save template.';
+          $err.text(msg).show();
+          $btn.prop('disabled', false).text('Save Template');
+        }
+      })
+      .fail(function () {
+        $err.text('Request failed. Please try again.').show();
+        $btn.prop('disabled', false).text('Save Template');
+      });
+    });
+  });
 
 });
 
