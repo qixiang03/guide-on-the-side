@@ -37,6 +37,7 @@ class PBSG_Admin_Menu_Filter {
         'edit.php',
         'post.php',
         'post-new.php',
+        'revision.php',            // Browse/restore tutorial revisions
         'upload.php',
         'media-new.php',
         'profile.php',
@@ -129,9 +130,12 @@ class PBSG_Admin_Menu_Filter {
             $script_allowed = in_array( $page_param, self::ALLOWED_PAGE_PARAMS, true );
         }
 
-        // For edit.php and post-new.php, only allow page post type
+        // For edit.php and post-new.php, require post_type=page explicitly.
+        // Without this, navigating to edit.php (no params) shows the Posts
+        // list, which librarians shouldn't access (edit_posts is only granted
+        // for H5P capability mapping, not for actual post management).
         if ( in_array( $current_script, array( 'edit.php', 'post-new.php' ), true ) ) {
-            if ( $post_type !== '' && $post_type !== 'page' ) {
+            if ( $post_type !== 'page' ) {
                 $script_allowed = false;
             }
         }

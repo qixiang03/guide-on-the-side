@@ -84,4 +84,174 @@ final class PBSGStepsNormalizerTest extends TestCase
         $this->assertSame('', $out[0]['tutorial_type']);
         $this->assertSame('', $out[0]['tutorial_url']);
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Issue 2: Steps with quiz-only data must not be filtered out
+    // ═══════════════════════════════════════════════════════════
+
+    public function test_step_with_only_quiz_data_is_preserved(): void
+    {
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'tutorial_url' => '',
+                'quiz' => [
+                    'type' => 'multichoice',
+                    'question' => 'What color is the sky?',
+                    'answers' => [
+                        ['text' => 'Blue', 'correct' => true],
+                        ['text' => 'Red', 'correct' => false],
+                    ],
+                ],
+            ],
+        ];
+
+        $result = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $result, 'Step with only quiz data must not be filtered out');
+        $this->assertArrayHasKey('quiz', $result[0]);
+        $this->assertSame('multichoice', $result[0]['quiz']['type']);
+    }
+
+    public function test_step_with_blanks_quiz_only_is_preserved(): void
+    {
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'quiz' => [
+                    'type' => 'blanks',
+                    'sentence' => 'The capital of Canada is *Ottawa*.',
+                    'case_sensitive' => false,
+                    'accept_typos' => true,
+                ],
+            ],
+        ];
+
+        $result = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $result, 'Step with blanks quiz data must not be filtered out');
+        $this->assertSame('blanks', $result[0]['quiz']['type']);
+    }
+
+    public function test_step_with_singlechoice_quiz_only_is_preserved(): void
+    {
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'quiz' => [
+                    'type' => 'singlechoice',
+                    'question' => 'What is 2+2?',
+                    'correct_answer' => '4',
+                    'wrong_answers' => ['3', '5'],
+                ],
+            ],
+        ];
+
+        $result = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $result, 'Step with singlechoice quiz data must not be filtered out');
+        $this->assertSame('singlechoice', $result[0]['quiz']['type']);
+    }
+
+    public function test_step_with_quiz_type_but_no_content_is_preserved(): void
+    {
+        // Quiz type is set but question/answers not filled yet — should still be kept
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'quiz' => [
+                    'type' => 'multichoice',
+                    'question' => '',
+                    'answers' => [],
+                ],
+            ],
+        ];
+
+        $result = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $result, 'Step with quiz type but empty content should still be kept');
+    }
+
+    public function test_step_with_empty_quiz_type_and_no_other_data_is_dropped(): void
+    {
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'quiz' => [
+                    'type' => '',
+                ],
+            ],
+        ];
+
+        $result = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(0, $result, 'Step with empty quiz type and no other data should be dropped');
+    }
+
+    public function test_twenty_plus_steps_with_quiz_data_all_survive(): void
+    {
+        $input = [];
+        for ($i = 0; $i < 25; $i++) {
+            $input[] = [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'tutorial_url' => '',
+                'quiz' => [
+                    'type' => 'multichoice',
+                    'question' => "Question $i",
+                    'answers' => [
+                        ['text' => 'A', 'correct' => true],
+                        ['text' => 'B', 'correct' => false],
+                    ],
+                ],
+            ];
+        }
+
+        $result = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(25, $result, 'All 25 quiz-only steps must survive normalization');
+        for ($i = 0; $i < 25; $i++) {
+            $this->assertArrayHasKey('quiz', $result[$i], "Step $i missing quiz data");
+            $this->assertSame('multichoice', $result[$i]['quiz']['type']);
+        }
+    }
+
+    public function test_mixed_steps_with_and_without_quiz_preserve_correctly(): void
+    {
+        $input = [
+            // Step with title only
+            ['title' => 'Intro Step', 'h5p_id' => 0, 'tutorial_type' => ''],
+            // Step with quiz only
+            ['title' => '', 'h5p_id' => 0, 'tutorial_type' => '', 'quiz' => [
+                'type' => 'multichoice', 'question' => 'Q1', 'answers' => [['text' => 'A', 'correct' => true]],
+            ]],
+            // Empty step — should be dropped
+            ['title' => '', 'h5p_id' => 0, 'tutorial_type' => ''],
+            // Step with URL resource
+            ['title' => '', 'h5p_id' => 0, 'tutorial_type' => 'url', 'tutorial_url' => 'https://example.com'],
+            // Step with quiz and title
+            ['title' => 'Step 5', 'h5p_id' => 0, 'tutorial_type' => '', 'quiz' => [
+                'type' => 'blanks', 'sentence' => '*Answer*',
+            ]],
+        ];
+
+        $result = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(4, $result, 'Should keep 4 of 5 steps (empty one dropped)');
+        $this->assertSame('Intro Step', $result[0]['title']);
+        $this->assertSame('multichoice', $result[1]['quiz']['type']);
+        $this->assertSame('url', $result[2]['tutorial_type']);
+        $this->assertSame('Step 5', $result[3]['title']);
+    }
 }

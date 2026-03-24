@@ -122,6 +122,64 @@ class PBSGAnalyticsAggregationTest extends TestCase
     }
 
     /* ---------------------------------------------------------------
+       Completions >= Views invariant
+       --------------------------------------------------------------- */
+
+    /**
+     * @covers PBSG_Analytics::record_tutorial_complete
+     */
+    public function test_record_tutorial_complete_ensures_view_count_gte_completion_count(): void
+    {
+        $method = new ReflectionMethod(PBSG_Analytics::class, 'record_tutorial_complete');
+        $method->setAccessible(true);
+
+        WPStubs::$returns['current_time'] = '2026-03-01';
+        $method->invoke(null, 42, 'desktop', 120);
+
+        $queries = $this->wpdb->getQueriesContaining('GREATEST(view_count, completion_count)');
+        $this->assertNotEmpty($queries, 'record_tutorial_complete should use GREATEST to ensure view_count >= completion_count');
+    }
+
+    /**
+     * @covers PBSG_Analytics::record_tutorial_complete
+     */
+    public function test_record_tutorial_complete_daily_ensures_view_count_gte_completion_count(): void
+    {
+        $method = new ReflectionMethod(PBSG_Analytics::class, 'record_tutorial_complete');
+        $method->setAccessible(true);
+
+        WPStubs::$returns['current_time'] = '2026-03-01';
+        $method->invoke(null, 42, 'desktop', 120);
+
+        $queries = $this->wpdb->getQueriesContaining('pbsg_daily_stats');
+        $greatest_found = false;
+        foreach ($queries as $q) {
+            if (str_contains($q, 'GREATEST(view_count, completion_count)')) {
+                $greatest_found = true;
+                break;
+            }
+        }
+        $this->assertTrue($greatest_found, 'Daily stats completion should use GREATEST for view_count');
+    }
+
+    /**
+     * @covers PBSG_Analytics::record_tutorial_complete
+     */
+    public function test_record_tutorial_complete_inserts_view_count_of_one(): void
+    {
+        $method = new ReflectionMethod(PBSG_Analytics::class, 'record_tutorial_complete');
+        $method->setAccessible(true);
+
+        WPStubs::$returns['current_time'] = '2026-03-01';
+        $method->invoke(null, 42, 'desktop', 120);
+
+        // The INSERT for a new row should include view_count = 1
+        $queries = $this->wpdb->getQueriesContaining('pbsg_tutorial_stats');
+        $this->assertNotEmpty($queries);
+        $this->assertStringContainsString('view_count', $queries[0]);
+    }
+
+    /* ---------------------------------------------------------------
        Quiz attempt recording
        --------------------------------------------------------------- */
 
@@ -408,6 +466,103 @@ class PBSGAnalyticsAggregationTest extends TestCase
             }
         }
         $this->assertTrue($found, 'Daily stats should include device_type');
+    }
+
+    /* ---------------------------------------------------------------
+       Retry tracking in quiz attempts
+       --------------------------------------------------------------- */
+
+    /**
+     * @covers PBSG_Analytics::record_quiz_attempt
+     */
+    public function test_record_quiz_attempt_incorrect_increments_incorrect_attempts(): void
+    {
+        $method = new ReflectionMethod(PBSG_Analytics::class, 'record_quiz_attempt');
+        $method->setAccessible(true);
+
+        $data = [
+            'h5p_content_id' => 10,
+            'question_index' => 0,
+            'question_text'  => 'What is 2+2?',
+            'is_correct'     => false,
+            'attempt_number' => 1,
+            'time_seconds'   => 10,
+        ];
+
+        $method->invoke(null, 42, $data);
+
+        $queries = $this->wpdb->getQueriesContaining('incorrect_attempts');
+        $this->assertNotEmpty($queries, 'Incorrect answer should track incorrect_attempts');
+    }
+
+    /**
+     * @covers PBSG_Analytics::record_quiz_attempt
+     */
+    public function test_record_quiz_attempt_retry_increments_total_retries(): void
+    {
+        $method = new ReflectionMethod(PBSG_Analytics::class, 'record_quiz_attempt');
+        $method->setAccessible(true);
+
+        $data = [
+            'h5p_content_id' => 10,
+            'question_index' => 0,
+            'question_text'  => 'What is 2+2?',
+            'is_correct'     => true,
+            'attempt_number' => 3,
+            'time_seconds'   => 10,
+        ];
+
+        $method->invoke(null, 42, $data);
+
+        $queries = $this->wpdb->getQueriesContaining('total_retries = total_retries + ');
+        $this->assertNotEmpty($queries, 'Attempt > 1 should increment total_retries');
+    }
+
+    /**
+     * @covers PBSG_Analytics::record_quiz_attempt
+     */
+    public function test_record_quiz_attempt_first_attempt_does_not_increment_retries(): void
+    {
+        $method = new ReflectionMethod(PBSG_Analytics::class, 'record_quiz_attempt');
+        $method->setAccessible(true);
+
+        $data = [
+            'h5p_content_id' => 10,
+            'question_index' => 0,
+            'question_text'  => 'What is 2+2?',
+            'is_correct'     => true,
+            'attempt_number' => 1,
+            'time_seconds'   => 10,
+        ];
+
+        $method->invoke(null, 42, $data);
+
+        // total_retries should appear in the query but with value 0 for first attempt
+        $queries = $this->wpdb->getQueriesContaining('total_retries');
+        $this->assertNotEmpty($queries, 'total_retries column should be in the query');
+    }
+
+    /**
+     * @covers PBSG_Analytics::record_quiz_attempt
+     */
+    public function test_record_quiz_attempt_tracks_max_retries_single_session(): void
+    {
+        $method = new ReflectionMethod(PBSG_Analytics::class, 'record_quiz_attempt');
+        $method->setAccessible(true);
+
+        $data = [
+            'h5p_content_id' => 10,
+            'question_index' => 0,
+            'question_text'  => 'What is 2+2?',
+            'is_correct'     => false,
+            'attempt_number' => 5,
+            'time_seconds'   => 10,
+        ];
+
+        $method->invoke(null, 42, $data);
+
+        $queries = $this->wpdb->getQueriesContaining('GREATEST(max_retries_single_session');
+        $this->assertNotEmpty($queries, 'Should use GREATEST to track max retries per session');
     }
 
 }

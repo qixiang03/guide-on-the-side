@@ -66,11 +66,15 @@ final class PBSG_Steps_Normalizer
                 if (!$tutorial_url) $tutorial_type = '';
             }
 
+            // Pre-check: does this step have quiz data? (peek at raw data before full normalization)
+            $raw_quiz = isset($s['quiz']) && is_array($s['quiz']) ? $s['quiz'] : null;
+            $has_quiz = $raw_quiz && !empty(self::sanitize_key($raw_quiz['type'] ?? ''));
+
             // Skip empty rows
-            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '');
+            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '') || $has_quiz;
             if (!$has_any) continue;
 
-            $clean[] = [
+            $clean_step = [
                 'title' => $title,
                 'h5p_id' => $h5p_id,
 
@@ -82,9 +86,88 @@ final class PBSG_Steps_Normalizer
                 // Legacy key (optional)
                 'url' => $tutorial_type === 'url' ? $tutorial_url : '',
             ];
+
+            // Preserve quiz data for H5P creation (consumed by save_meta, not stored long-term)
+            $quiz = isset($s['quiz']) && is_array($s['quiz']) ? $s['quiz'] : null;
+            if ($quiz) {
+                $quiz_type = self::sanitize_key($quiz['type'] ?? '');
+                $clean_quiz = ['type' => $quiz_type];
+
+                switch ($quiz_type) {
+                    case 'multichoice':
+                        $clean_quiz['question'] = self::sanitize_text($quiz['question'] ?? '');
+                        $clean_quiz['answers']  = self::sanitize_mc_answers($quiz['answers'] ?? []);
+                        break;
+
+                    case 'blanks':
+                        $clean_quiz['sentence']       = self::sanitize_blanks_sentence($quiz['sentence'] ?? '');
+                        $clean_quiz['case_sensitive']  = (bool) ($quiz['case_sensitive'] ?? true);
+                        $clean_quiz['accept_typos']    = (bool) ($quiz['accept_typos'] ?? false);
+                        break;
+
+                    case 'singlechoice':
+                        $clean_quiz['question']       = self::sanitize_text($quiz['question'] ?? '');
+                        $clean_quiz['correct_answer'] = self::sanitize_text($quiz['correct_answer'] ?? '');
+                        $clean_quiz['wrong_answers']  = array_map(
+                            [self::class, 'sanitize_text'],
+                            is_array($quiz['wrong_answers'] ?? null) ? $quiz['wrong_answers'] : []
+                        );
+                        break;
+
+                    default:
+                        $clean_quiz = null;
+                        break;
+                }
+
+                if ($clean_quiz && !empty($clean_quiz['type'])) {
+                    $clean_step['quiz'] = $clean_quiz;
+                }
+            }
+
+            $clean[] = $clean_step;
         }
 
         return $clean;
+    }
+
+    /**
+     * Sanitize multiple-choice answers array.
+     *
+     * @param mixed $answers
+     * @return array
+     */
+    private static function sanitize_mc_answers($answers): array
+    {
+        if (!is_array($answers)) {
+            return [];
+        }
+
+        $clean = [];
+        foreach ($answers as $a) {
+            if (!is_array($a)) continue;
+            $text = self::sanitize_text($a['text'] ?? '');
+            if ($text === '') continue;
+            $clean[] = [
+                'text'    => $text,
+                'correct' => !empty($a['correct']),
+            ];
+        }
+        return $clean;
+    }
+
+    /**
+     * Sanitize a fill-in-the-blanks sentence.
+     * Preserves *asterisk* markers but strips dangerous content.
+     *
+     * @param string $sentence
+     * @return string
+     */
+    private static function sanitize_blanks_sentence(string $sentence): string
+    {
+        $sentence = trim($sentence);
+        // Strip HTML tags but preserve asterisks, slashes, colons (used for blanks syntax)
+        $sentence = strip_tags($sentence);
+        return $sentence;
     }
 
     private static function sanitize_text(string $text): string

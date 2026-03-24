@@ -13,8 +13,15 @@
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "testMatch": ["**/tests/js/**/*.test.js"],
-    "moduleFileExtensions": ["js"],
-    "testPathIgnorePatterns": ["/node_modules/", "/web/"]
+    "testMatch": [
+      "**/tests/js/**/*.test.js"
+    ],
+    "moduleFileExtensions": [
+      "js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/web/"
+    ]
   }
 }

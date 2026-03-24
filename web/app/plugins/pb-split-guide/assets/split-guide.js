@@ -722,6 +722,79 @@ function showSummaryScreen(){
   }
 }
 
+// ===== Resize Handle (Stretch Goal 5b) =====
+function initResizer() {
+  const handle = document.getElementById('pbsgResizeHandle');
+  if (!handle) return;  // not enabled for this guide
+
+  const container = document.querySelector('.pbsg-container');
+  if (!container) return;
+
+  const minPct = parseInt(handle.getAttribute('aria-valuemin'), 10) || 10;
+  const maxPct = parseInt(handle.getAttribute('aria-valuemax'), 10) || 50;
+
+  let dragging = false;
+
+  handle.addEventListener('pointerdown', function(e) {
+    dragging = true;
+    handle.setPointerCapture(e.pointerId);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+    // Disable iframe pointer events during drag (iframes swallow pointer events)
+    container.querySelectorAll('iframe').forEach(function(f) {
+      f.style.pointerEvents = 'none';
+    });
+  });
+
+  document.addEventListener('pointermove', function(e) {
+    if (!dragging) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0) return;  // guard against hidden/zero-width container
+    let pct = ((e.clientX - rect.left) / rect.width) * 100;
+    pct = Math.max(minPct, Math.min(maxPct, pct));
+
+    container.style.setProperty('--pbsg-left-ratio', pct.toFixed(1));
+    container.style.setProperty('--pbsg-right-ratio', (100 - pct).toFixed(1));
+    handle.setAttribute('aria-valuenow', Math.round(pct));
+  });
+
+  document.addEventListener('pointerup', function() {
+    if (!dragging) return;
+    dragging = false;
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    container.querySelectorAll('iframe').forEach(function(f) {
+      f.style.pointerEvents = '';
+    });
+  });
+
+  // Keyboard accessibility: left/right arrow keys
+  handle.addEventListener('keydown', function(e) {
+    var currentStr = container.style.getPropertyValue('--pbsg-left-ratio');
+    var parsed = parseFloat(currentStr);
+    var current = isNaN(parsed)
+      ? (parseInt(handle.getAttribute('aria-valuenow'), 10) || 40)
+      : parsed;
+    var next = current;
+
+    if (e.key === 'ArrowLeft' || e.key === 'Left') {
+      next = Math.max(minPct, current - 1);
+    } else if (e.key === 'ArrowRight' || e.key === 'Right') {
+      next = Math.min(maxPct, current + 1);
+    } else {
+      return;  // not an arrow key, don't intercept
+    }
+
+    if (next !== current) {
+      container.style.setProperty('--pbsg-left-ratio', next);
+      container.style.setProperty('--pbsg-right-ratio', 100 - next);
+      handle.setAttribute('aria-valuenow', Math.round(next));
+      e.preventDefault();
+    }
+  });
+}
+
+initResizer();
 bindMenu();
 render();
 

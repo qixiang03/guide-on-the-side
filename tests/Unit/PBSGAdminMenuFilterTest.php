@@ -71,7 +71,7 @@ final class PBSGAdminMenuFilterTest extends TestCase
     {
         $expected = [
             'index.php', 'edit.php', 'post.php', 'post-new.php',
-            'upload.php', 'media-new.php', 'profile.php',
+            'revision.php', 'upload.php', 'media-new.php', 'profile.php',
             'admin-ajax.php', 'admin-post.php', 'admin.php',
         ];
 

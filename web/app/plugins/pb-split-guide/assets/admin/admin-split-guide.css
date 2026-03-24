@@ -1,51 +1,1261 @@
-/* Keep the steps table columns stable */
-#pbsg-steps-table {
-  table-layout: fixed;
-  width: 100%;
+/* ================================================================
+   PB Split Guide — Admin Editor CSS (v2.1)
+   Card-based step editor with inline quiz authoring
+   ================================================================ */
+
+/* ── Design Tokens ─────────────────────────────────────────── */
+:root {
+  --pbsg-green: #517E1B;
+  --pbsg-green-hover: #436a16;
+  --pbsg-green-light: #e8f0dc;
+  --pbsg-green-border: #c5d9ac;
+  --pbsg-red: #8C2004;
+  --pbsg-red-hover: #731a03;
+  --pbsg-off-white: #F8F8F8;
+  --pbsg-grey-light: #E0E0E0;
+  --pbsg-grey-dark: #333333;
+  --pbsg-grey-mid: #646970;
+  --pbsg-grey-list: #F1F1F1;
+  --pbsg-white: #ffffff;
+  --pbsg-radius: 8px;
+  --pbsg-radius-sm: 4px;
+  --pbsg-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  --pbsg-shadow-hover: 0 2px 8px rgba(0,0,0,0.08);
 }
 
-/* Optional: give the Tutorial Source column a predictable width */
-#pbsg-steps-table th:nth-child(3),
+/* ================================================================
+   WP ADMIN OVERRIDES
+   Scoped under .pbsg-metabox so our rules beat WP admin defaults.
+   ================================================================ */
 
-/* Truncate the URL/file summary text */
-#pbsg-steps-table .pbsg-tutorial-summary {
-  min-width: 0; /* important inside flex */
+/* Reset WP admin padding/margin on our metabox container */
+.pbsg-metabox,
+#pbsg_settings .inside .pbsg-metabox {
+  padding: 0 !important;
+  margin: 0 !important;
 }
 
-#pbsg-steps-table .pbsg-tutorial-summary span {
+/* Force grid/flex layouts that WP admin may override */
+.pbsg-metabox .pbsg-intro-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 20px !important;
+}
+
+.pbsg-metabox .pbsg-intro-row {
+  display: flex !important;
+  gap: 14px !important;
+}
+
+.pbsg-metabox .pbsg-step-body {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+}
+
+.pbsg-metabox .pbsg-step-card--collapsed .pbsg-step-body {
+  display: none !important;
+}
+
+.pbsg-metabox .pbsg-steps-container {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+
+/* Override WP input styles within our fields */
+.pbsg-metabox .pbsg-field input[type="text"],
+.pbsg-metabox .pbsg-field input[type="url"],
+.pbsg-metabox .pbsg-field textarea,
+.pbsg-metabox .pbsg-field select {
+  width: 100% !important;
+  padding: 8px 12px !important;
+  border: 1px solid #E0E0E0 !important;
+  border-radius: 4px !important;
+  font-size: 14px !important;
+  color: #333333 !important;
+  box-sizing: border-box !important;
+  box-shadow: none !important;
+}
+
+.pbsg-metabox .pbsg-field input:focus,
+.pbsg-metabox .pbsg-field textarea:focus,
+.pbsg-metabox .pbsg-field select:focus {
+  border-color: #517E1B !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(81,126,27,.2) !important;
+}
+
+/* Override WP button styles for our custom buttons */
+.pbsg-metabox .pbsg-btn-outline {
+  background: transparent !important;
+  color: #517E1B !important;
+  border: 1px solid #517E1B !important;
+  border-radius: 4px !important;
+  padding: 6px 14px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  margin-top: 8px !important;
+  line-height: 1.4 !important;
+  height: auto !important;
+}
+
+.pbsg-metabox .pbsg-btn-outline:hover {
+  background: #517E1B !important;
+  color: #ffffff !important;
+}
+
+.pbsg-metabox .pbsg-add-step-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 14px 28px !important;
+  background: #ffffff !important;
+  border: 2px dashed #E0E0E0 !important;
+  border-radius: 8px !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: #646970 !important;
+  cursor: pointer !important;
+  width: 100% !important;
+  justify-content: center !important;
+  height: auto !important;
+  line-height: 1.4 !important;
+}
+
+.pbsg-metabox .pbsg-add-step-btn:hover {
+  border-color: #517E1B !important;
+  color: #517E1B !important;
+  background: #e8f0dc !important;
+}
+
+/* Override WP section header (intro toggle) */
+.pbsg-metabox .pbsg-section-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 14px 20px !important;
+  background: #F8F8F8 !important;
+  border-bottom: 1px solid #F1F1F1 !important;
+  cursor: pointer !important;
+}
+
+.pbsg-metabox .pbsg-section-header-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+/* Override WP step header */
+.pbsg-metabox .pbsg-step-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 14px 20px !important;
+  background: #F8F8F8 !important;
+  border-bottom: 1px solid #F1F1F1 !important;
+}
+
+/* Override WP card */
+.pbsg-metabox .pbsg-step-card,
+.pbsg-metabox .pbsg-intro-section {
+  background: #ffffff !important;
+  border: 1px solid #E0E0E0 !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+  overflow: hidden !important;
+}
+
+/* Override WP quiz type buttons */
+.pbsg-metabox .pbsg-quiz-type-btn {
+  flex: 1 !important;
+  padding: 10px 8px !important;
+  border: 2px solid #E0E0E0 !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #646970 !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  line-height: 1.3 !important;
+  height: auto !important;
+}
+
+.pbsg-metabox .pbsg-quiz-type-btn.active {
+  border-color: #517E1B !important;
+  background: #e8f0dc !important;
+  color: #517E1B !important;
+}
+
+.pbsg-metabox .pbsg-quiz-type-btn:hover {
+  border-color: #517E1B !important;
+  color: #517E1B !important;
+}
+
+/* Override WP step title input */
+.pbsg-metabox .pbsg-step-title-input {
+  flex: 1 !important;
+  border: 1px solid transparent !important;
+  border-radius: 4px !important;
+  padding: 6px 10px !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #333333 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+
+.pbsg-metabox .pbsg-step-title-input:focus {
+  background: #ffffff !important;
+  border-color: #517E1B !important;
+  box-shadow: 0 0 0 2px rgba(81,126,27,.15) !important;
+}
+
+/* Override WP objective input */
+.pbsg-metabox .pbsg-objective-input {
+  flex: 1 !important;
+  border: none !important;
+  background: transparent !important;
+  font-size: 14px !important;
+  outline: none !important;
+  padding: 4px 0 !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+
+/* Override WP answer input */
+.pbsg-metabox .pbsg-answer-input,
+.pbsg-metabox .pbsg-sc-wrong-input,
+.pbsg-metabox .pbsg-sc-correct-row input {
+  flex: 1 !important;
+  border: none !important;
+  background: transparent !important;
+  font-size: 14px !important;
+  padding: 4px 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  height: auto !important;
+}
+
+/* ================================================================
+   END WP ADMIN OVERRIDES
+   ================================================================ */
+
+/* ── Metabox Container ─────────────────────────────────────── */
+.pbsg-metabox {
+  padding: 0;
+}
+
+/* ── Common Field Styles ───────────────────────────────────── */
+.pbsg-field {
+  margin-bottom: 14px;
+}
+
+.pbsg-field-label {
   display: block;
-  max-width: 360px; /* adjust (this is the “fixed length”) */
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pbsg-grey-dark);
+  margin-bottom: 4px;
+}
+
+.pbsg-field-optional {
+  font-weight: 400;
+  color: var(--pbsg-grey-mid);
+}
+
+.pbsg-field-hint {
+  font-size: 12px;
+  color: var(--pbsg-grey-mid);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+
+.pbsg-field-hint code {
+  background: #f0f0f0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.pbsg-field input[type="text"],
+.pbsg-field input[type="url"],
+.pbsg-field textarea,
+.pbsg-field select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius-sm);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--pbsg-grey-dark);
+  transition: border-color .15s;
+  box-sizing: border-box;
+}
+
+.pbsg-field input:focus,
+.pbsg-field textarea:focus,
+.pbsg-field select:focus {
+  border-color: var(--pbsg-green);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(81,126,27,.2);
+}
+
+.pbsg-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.pbsg-field--half {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* ── Badges ────────────────────────────────────────────────── */
+.pbsg-badge {
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-weight: 600;
   white-space: nowrap;
 }
 
-/* Column widths (1=title, 2=H5P, 3=tutorial, 4=remove) */
-#pbsg-steps-table th:nth-child(2),
-#pbsg-steps-table td:nth-child(2) { width: 240px; }  /* H5P column */
-#pbsg-steps-table th:nth-child(4),
-#pbsg-steps-table td:nth-child(4) { width: 120px; }  /* Remove column */
-
-/* Text mode placeholder for tutorial introduction */
-#content::placeholder {
-  color: #757575;
-  opacity: 1;
-  font-size: 28px;
+.pbsg-badge--info {
+  background: var(--pbsg-green-light);
+  color: var(--pbsg-green);
 }
 
-/* Fake placeholder for the main tutorial introduction editor */
-#wp-content-editor-container {
-  position: relative;
+.pbsg-badge--ok {
+  background: var(--pbsg-green-light);
+  color: var(--pbsg-green);
 }
 
-.pbsg-editor-placeholder {
-  position: absolute;
-  top: 86px;
-  left: 24px;
-  z-index: 20;
-  color: #757575;
-  font-size: 24px;
-  line-height: 1.4;
-  pointer-events: auto;
+/* ── Button Variants ───────────────────────────────────────── */
+.pbsg-btn-outline {
+  background: transparent !important;
+  color: var(--pbsg-green) !important;
+  border: 1px solid var(--pbsg-green) !important;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.pbsg-btn-outline:hover {
+  background: var(--pbsg-green) !important;
+  color: var(--pbsg-white) !important;
+}
+
+.pbsg-btn-ghost {
+  background: none;
+  border: none;
+  color: var(--pbsg-grey-mid);
+  padding: 4px 8px;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.pbsg-btn-ghost:hover {
+  color: var(--pbsg-red);
+}
+
+/* ── Hidden utility ────────────────────────────────────────── */
+.pbsg-hidden {
+  display: none !important;
+}
+
+/* ================================================================
+   INTRO SECTION (Phase 7)
+   ================================================================ */
+
+.pbsg-intro-section {
+  background: var(--pbsg-white);
+  border: 1px solid var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius);
+  box-shadow: var(--pbsg-shadow);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.pbsg-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: var(--pbsg-off-white);
+  border-bottom: 1px solid var(--pbsg-grey-list);
+  cursor: pointer;
   user-select: none;
+}
+
+.pbsg-section-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pbsg-section-icon {
+  font-size: 18px;
+}
+
+.pbsg-section-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--pbsg-grey-dark);
+}
+
+.pbsg-chevron {
+  font-size: 16px;
+  color: var(--pbsg-grey-mid);
+  transition: transform .2s;
+}
+
+.pbsg-intro-body {
+  padding: 20px;
+}
+
+.pbsg-intro-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .pbsg-metabox .pbsg-intro-grid,
+  .pbsg-intro-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.pbsg-intro-fields {
+  /* left column */
+}
+
+.pbsg-intro-cover-col {
+  /* right column */
+}
+
+.pbsg-intro-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+  .pbsg-metabox .pbsg-intro-row,
+  .pbsg-intro-row {
+    flex-direction: column !important;
+  }
+}
+
+/* Objectives */
+.pbsg-objectives-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.pbsg-objective-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: var(--pbsg-off-white);
+  border: 1px solid var(--pbsg-grey-list);
+  border-radius: var(--pbsg-radius-sm);
+  border-left: 3px solid var(--pbsg-green);
+}
+
+.pbsg-objective-check {
+  color: var(--pbsg-green);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pbsg-objective-input {
+  flex: 1;
+  border: none !important;
+  background: transparent !important;
+  font-size: 14px;
+  outline: none;
+  padding: 4px 0 !important;
+  box-shadow: none !important;
+}
+
+.pbsg-objective-remove {
+  background: none;
+  border: none;
+  color: var(--pbsg-grey-mid);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  opacity: .5;
+  transition: all .15s;
+}
+
+.pbsg-objective-remove:hover {
+  opacity: 1;
+  color: var(--pbsg-red);
+}
+
+/* Cover image */
+.pbsg-cover-image-box {
+  margin-bottom: 12px;
+}
+
+.pbsg-cover-preview {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #dcdcde;
+  border-radius: var(--pbsg-radius-sm);
+  margin-bottom: 10px;
+}
+
+.pbsg-cover-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ================================================================
+   STEP CARDS
+   ================================================================ */
+
+.pbsg-steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pbsg-step-card {
+  background: var(--pbsg-white);
+  border: 1px solid var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius);
+  box-shadow: var(--pbsg-shadow);
+  overflow: hidden;
+  transition: box-shadow .2s;
+}
+
+.pbsg-step-card:hover {
+  box-shadow: var(--pbsg-shadow-hover);
+}
+
+/* Collapsed state */
+.pbsg-step-card--collapsed .pbsg-step-body {
+  display: none;
+}
+
+.pbsg-step-card--collapsed .pbsg-step-chevron {
+  transform: rotate(-90deg);
+}
+
+.pbsg-step-card--collapsed .pbsg-step-badges {
+  display: flex;
+}
+
+/* Step Header */
+.pbsg-step-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--pbsg-off-white);
+  border-bottom: 1px solid var(--pbsg-grey-list);
+  user-select: none;
+}
+
+.pbsg-drag-handle {
+  color: var(--pbsg-grey-mid);
+  font-size: 18px;
+  cursor: grab;
+  opacity: .5;
+  transition: opacity .15s;
+  line-height: 1;
+}
+
+.pbsg-drag-handle:hover {
+  opacity: 1;
+}
+
+.pbsg-step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--pbsg-green);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pbsg-step-title-input {
+  flex: 1;
+  border: 1px solid transparent;
+  border-radius: var(--pbsg-radius-sm);
+  padding: 6px 10px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--pbsg-grey-dark);
+  background: transparent;
+  transition: border-color .15s, background .15s;
+}
+
+.pbsg-step-title-input::placeholder {
+  color: #aaa;
+  font-weight: 400;
+}
+
+.pbsg-step-title-input:hover {
+  background: var(--pbsg-white);
+  border-color: var(--pbsg-grey-light);
+}
+
+.pbsg-step-title-input:focus {
+  background: var(--pbsg-white);
+  border-color: var(--pbsg-green);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(81,126,27,.15);
+}
+
+.pbsg-step-badges {
+  display: none;
+  gap: 8px;
+  align-items: center;
+  margin-left: auto;
+  margin-right: 8px;
+}
+
+.pbsg-step-header-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.pbsg-step-chevron {
+  font-size: 18px;
+  color: var(--pbsg-grey-mid);
+  transition: transform .2s;
+  cursor: pointer;
+  padding: 4px;
+}
+
+/* Step Body */
+.pbsg-step-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+
+@media (max-width: 900px) {
+  .pbsg-metabox .pbsg-step-body,
+  .pbsg-step-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pbsg-metabox .pbsg-panel-quiz,
+  .pbsg-panel-quiz {
+    border-right: none !important;
+    border-bottom: 1px solid var(--pbsg-grey-list);
+  }
+}
+
+/* Panels */
+.pbsg-panel {
+  padding: 20px;
+}
+
+.pbsg-panel-quiz {
+  border-right: 1px solid var(--pbsg-grey-list);
+}
+
+.pbsg-panel-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--pbsg-grey-mid);
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pbsg-panel-icon {
+  font-size: 16px;
+}
+
+/* Step Footer */
+.pbsg-step-footer {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--pbsg-off-white);
+  border-top: 1px solid var(--pbsg-grey-list);
+}
+
+/* ================================================================
+   QUIZ TYPE SELECTOR
+   ================================================================ */
+
+.pbsg-quiz-type-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pbsg-quiz-type-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border: 2px solid var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius-sm);
+  background: var(--pbsg-white);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pbsg-grey-mid);
+  text-align: center;
+  cursor: pointer;
+  transition: all .15s;
+  line-height: 1.3;
+}
+
+.pbsg-quiz-type-btn:hover {
+  border-color: var(--pbsg-green);
+  color: var(--pbsg-green);
+}
+
+.pbsg-quiz-type-btn.active {
+  border-color: var(--pbsg-green);
+  background: var(--pbsg-green-light);
+  color: var(--pbsg-green);
+}
+
+.pbsg-type-icon {
+  font-size: 20px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+/* ================================================================
+   ANSWER ROWS (Multiple Choice + Single Choice Wrong Answers)
+   ================================================================ */
+
+.pbsg-answers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pbsg-answer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--pbsg-off-white);
+  border: 1px solid var(--pbsg-grey-list);
+  border-radius: var(--pbsg-radius-sm);
+  transition: background .1s;
+}
+
+.pbsg-answer-row:hover {
+  background: #f0f2ec;
+}
+
+.pbsg-answer-row--correct {
+  border-left: 3px solid var(--pbsg-green);
+  background: #f3f8ed;
+}
+
+.pbsg-answer-row--incorrect {
+  border-left: 3px solid var(--pbsg-grey-light);
+}
+
+.pbsg-answer-check {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--pbsg-green);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pbsg-answer-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--pbsg-grey-dark);
+  padding: 4px 0;
+  outline: none;
+}
+
+.pbsg-answer-input::placeholder {
+  color: #bbb;
+}
+
+.pbsg-answer-remove {
+  background: none;
+  border: none;
+  color: var(--pbsg-grey-mid);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  opacity: .5;
+  transition: all .15s;
+}
+
+.pbsg-answer-remove:hover {
+  opacity: 1;
+  color: var(--pbsg-red);
+}
+
+.pbsg-answer-correct-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pbsg-green);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+/* ================================================================
+   SINGLE CHOICE CORRECT ROW
+   ================================================================ */
+
+.pbsg-sc-correct-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f3f8ed;
+  border: 1px solid var(--pbsg-green-border);
+  border-left: 3px solid var(--pbsg-green);
+  border-radius: var(--pbsg-radius-sm);
+  margin-bottom: 8px;
+}
+
+.pbsg-sc-icon {
+  color: var(--pbsg-green);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.pbsg-sc-correct-row input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--pbsg-grey-dark);
+  padding: 4px 0;
+  outline: none;
+}
+
+.pbsg-sc-wrong-remove {
+  background: none;
+  border: none;
+  color: var(--pbsg-grey-mid);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 4px;
+  opacity: .5;
+  transition: all .15s;
+}
+
+.pbsg-sc-wrong-remove:hover {
+  opacity: 1;
+  color: var(--pbsg-red);
+}
+
+/* Single Choice wrong answer inputs */
+.pbsg-sc-wrong-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--pbsg-grey-dark);
+  padding: 4px 0;
+  outline: none;
+}
+
+.pbsg-sc-wrong-input::placeholder {
+  color: #bbb;
+}
+
+/* ================================================================
+   FILL IN THE BLANKS
+   ================================================================ */
+
+.pbsg-blanks-preview {
+  background: var(--pbsg-off-white);
+  border: 1px solid var(--pbsg-grey-list);
+  border-radius: var(--pbsg-radius-sm);
+  padding: 12px 14px;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--pbsg-grey-mid);
+  line-height: 1.8;
+}
+
+.pbsg-blanks-empty {
+  font-style: italic;
+  opacity: .6;
+}
+
+.pbsg-blank-slot {
+  display: inline-block;
+  min-width: 80px;
+  border-bottom: 2px solid var(--pbsg-green);
+  padding: 2px 4px;
+  margin: 0 2px;
+  color: var(--pbsg-green);
+  font-weight: 600;
+  text-align: center;
+}
+
+.pbsg-hint-icon {
+  font-size: 11px;
+  opacity: .7;
+}
+
+.pbsg-blanks-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.pbsg-toggle-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 12px;
+  background: var(--pbsg-off-white);
+  border: 1px solid var(--pbsg-grey-list);
+  border-radius: var(--pbsg-radius-sm);
+  transition: border-color .15s;
+}
+
+.pbsg-toggle-option--active {
+  border-color: var(--pbsg-green-border);
+  border-left: 3px solid var(--pbsg-green);
+}
+
+.pbsg-toggle-option input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--pbsg-green);
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.pbsg-toggle-title {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--pbsg-grey-dark);
+}
+
+.pbsg-toggle-desc {
+  font-size: 12px;
+  color: var(--pbsg-grey-mid);
+  margin-top: 2px;
+}
+
+/* ================================================================
+   VALIDATION MESSAGES
+   ================================================================ */
+
+.pbsg-validation-msg {
+  font-size: 12px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pbsg-validation-msg--ok {
+  color: var(--pbsg-green);
+}
+
+.pbsg-validation-msg--error {
+  color: var(--pbsg-red);
+}
+
+.pbsg-validation-inline {
+  font-size: 12px;
+  color: var(--pbsg-red);
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: #fff0f0;
+  border-radius: var(--pbsg-radius-sm);
+}
+
+/* ================================================================
+   RESOURCE PANEL
+   ================================================================ */
+
+.pbsg-resource-type-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 14px;
+  border: 1px solid var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius-sm);
+  overflow: hidden;
+}
+
+.pbsg-resource-type-toggle label {
+  flex: 1;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pbsg-grey-mid);
+  cursor: pointer;
+  transition: all .15s;
+  border-right: 1px solid var(--pbsg-grey-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.pbsg-resource-type-toggle label:last-child {
+  border-right: none;
+}
+
+.pbsg-resource-type-toggle input {
+  display: none;
+}
+
+.pbsg-resource-type-toggle label.active {
+  background: var(--pbsg-green-light);
+  color: var(--pbsg-green);
+}
+
+.pbsg-resource-preview {
+  margin-top: 12px;
+  background: var(--pbsg-off-white);
+  border: 1px dashed var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius-sm);
+  padding: 16px;
+  text-align: center;
+  color: var(--pbsg-grey-mid);
+  font-size: 13px;
+}
+
+.pbsg-preview-icon {
+  font-size: 32px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.pbsg-upload-zone {
+  margin-top: 12px;
+  background: var(--pbsg-off-white);
+  border: 2px dashed var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius-sm);
+  padding: 24px;
+  text-align: center;
+  color: var(--pbsg-grey-mid);
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.pbsg-upload-zone:hover {
+  border-color: var(--pbsg-green);
+  color: var(--pbsg-green);
+}
+
+/* Drag-over visual state */
+.pbsg-upload-zone--dragover {
+  border-color: var(--pbsg-green) !important;
+  background: rgba(81, 126, 27, 0.05) !important;
+  color: var(--pbsg-green) !important;
+}
+
+.pbsg-upload-icon {
+  font-size: 28px;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.pbsg-upload-size-hint {
+  font-size: 11px;
+  color: var(--pbsg-grey-mid);
+  margin-top: 6px;
+}
+
+/* Upload progress bar */
+.pbsg-upload-progress {
+  margin-top: 10px;
+  height: 4px;
+  background: var(--pbsg-grey-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pbsg-upload-progress-bar {
+  height: 100%;
+  background: var(--pbsg-green);
+  transition: width 0.2s;
+  border-radius: 2px;
+}
+
+/* Upload error message */
+.pbsg-upload-error {
+  color: var(--pbsg-red);
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+/* File info card */
+.pbsg-file-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--pbsg-green-light);
+  border: 1px solid var(--pbsg-green-border);
+  border-radius: var(--pbsg-radius-sm);
+}
+
+.pbsg-file-icon {
+  font-size: 20px;
+}
+
+.pbsg-file-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--pbsg-grey-dark);
+}
+
+.pbsg-file-meta {
+  font-size: 12px;
+  color: var(--pbsg-grey-mid);
+}
+
+.pbsg-file-info .pbsg-btn-ghost {
+  margin-left: auto;
+}
+
+/* ================================================================
+   EXISTING H5P LINK
+   ================================================================ */
+
+.pbsg-existing-h5p-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pbsg-grey-list);
+  font-size: 12px;
+  color: var(--pbsg-grey-mid);
+}
+
+.pbsg-existing-h5p-link a {
+  color: var(--pbsg-green);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pbsg-existing-h5p-link a:hover {
+  text-decoration: underline;
+}
+
+/* Linked H5P state */
+.pbsg-linked-h5p {
+  padding: 16px;
+  background: var(--pbsg-off-white);
+  border: 1px solid var(--pbsg-grey-list);
+  border-radius: var(--pbsg-radius-sm);
+  text-align: center;
+}
+
+.pbsg-linked-h5p-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.pbsg-linked-icon {
+  font-size: 20px;
+}
+
+.pbsg-linked-h5p-actions {
+  font-size: 13px;
+}
+
+.pbsg-linked-h5p-actions a {
+  color: var(--pbsg-green);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pbsg-linked-h5p-actions a:hover {
+  text-decoration: underline;
+}
+
+.pbsg-sep {
+  margin: 0 8px;
+  color: var(--pbsg-grey-light);
+}
+
+/* ================================================================
+   ADD STEP BUTTON
+   ================================================================ */
+
+.pbsg-add-step-area {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0;
+  margin-top: 16px;
+}
+
+.pbsg-add-step-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--pbsg-white);
+  border: 2px dashed var(--pbsg-grey-light);
+  border-radius: var(--pbsg-radius);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pbsg-grey-mid);
+  cursor: pointer;
+  transition: all .15s;
+  width: 100%;
+  justify-content: center;
+}
+
+.pbsg-add-step-btn:hover {
+  border-color: var(--pbsg-green);
+  color: var(--pbsg-green);
+  background: var(--pbsg-green-light);
+}
+
+.pbsg-add-step-plus {
+  font-size: 22px;
+  line-height: 1;
+}
+
+/* ================================================================
+   SORTABLE DRAG STATES
+   ================================================================ */
+
+.pbsg-step-card.sortable-ghost {
+  opacity: 0.4;
+}
+
+.pbsg-step-card.sortable-chosen {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
 }

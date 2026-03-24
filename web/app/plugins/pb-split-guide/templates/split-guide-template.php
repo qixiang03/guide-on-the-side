@@ -54,13 +54,40 @@ $title = get_the_title($page_id);
 
 $intro_raw = get_post_field('post_content', $page_id);
 $intro_html = apply_filters('the_content', $intro_raw);
-$has_intro = trim(wp_strip_all_tags($intro_raw)) !== '';
+$has_intro_legacy = trim(wp_strip_all_tags($intro_raw)) !== '';
+
+// Structured intro fields (Phase 7)
+$intro_description  = get_post_meta($page_id, '_pbsg_intro_description', true);
+$intro_obj_raw      = get_post_meta($page_id, '_pbsg_intro_objectives', true);
+$intro_objectives   = is_string($intro_obj_raw) ? json_decode($intro_obj_raw, true) : [];
+if (!is_array($intro_objectives)) $intro_objectives = [];
+$intro_objectives   = array_filter($intro_objectives);
+$intro_duration     = get_post_meta($page_id, '_pbsg_intro_duration', true);
+$intro_prerequisites = get_post_meta($page_id, '_pbsg_intro_prerequisites', true);
+$cover_image_id     = (int) get_post_meta($page_id, '_pbsg_cover_image_id', true);
+$cover_image_url    = $cover_image_id ? wp_get_attachment_image_url($cover_image_id, 'large') : '';
+
+$has_structured_intro = !empty($intro_description) || !empty($intro_objectives);
+$has_intro = $has_structured_intro || $has_intro_legacy;
+$step_count = is_array($steps) ? count($steps) : 0;
 
 
 
 
 
 $ajax_url = admin_url('admin-ajax.php');
+
+// Resolve effective layout ratio (Stretch Goal 5a)
+$site_default_ratio = (int) get_option(PB_Split_Guide_Plugin::OPTION_DEFAULT_RATIO, PB_Split_Guide_Plugin::RATIO_DEFAULT);
+$site_default_ratio = max(PB_Split_Guide_Plugin::RATIO_MIN, min(PB_Split_Guide_Plugin::RATIO_MAX, $site_default_ratio));
+$per_guide_ratio    = get_post_meta($page_id, PB_Split_Guide_Plugin::META_LEFT_RATIO, true);
+$left_ratio  = ($per_guide_ratio !== '' && $per_guide_ratio !== false)
+               ? max(PB_Split_Guide_Plugin::RATIO_MIN, min(PB_Split_Guide_Plugin::RATIO_MAX, (int) $per_guide_ratio))
+               : $site_default_ratio;
+$right_ratio = 100 - $left_ratio;
+
+// Check if user-resizable is enabled (Stretch Goal 5b)
+$user_resizable = get_post_meta($page_id, PB_Split_Guide_Plugin::META_USER_RESIZABLE, true) === '1';
 
 // Enrich tutorial data
 $steps_enriched = [];
@@ -108,17 +135,71 @@ foreach ($steps as $s) {
 
   <?php if ($has_intro): ?>
     <div id="pbsgIntroScreen" class="pbsg-intro-screen">
-      <div class="pbsg-intro-card">
-        <div class="pbsg-intro-content">
-          <?php echo $intro_html; ?>
-        </div>
+      <?php if ($has_structured_intro): ?>
+        <div class="pbsg-intro-card pbsg-intro-card--structured">
 
-        <div class="pbsg-intro-actions">
-          <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
-            Start Tutorial
-          </button>
+          <?php if ($cover_image_url): ?>
+            <div class="pbsg-intro-cover">
+              <img src="<?php echo esc_url($cover_image_url); ?>" alt="" />
+            </div>
+          <?php endif; ?>
+
+          <?php if ($intro_description): ?>
+            <p class="pbsg-intro-description"><?php echo esc_html($intro_description); ?></p>
+          <?php endif; ?>
+
+          <?php if (!empty($intro_objectives)): ?>
+            <div class="pbsg-intro-objectives">
+              <h3>What You'll Learn</h3>
+              <ul>
+                <?php foreach ($intro_objectives as $obj): ?>
+                  <li><?php echo esc_html($obj); ?></li>
+                <?php endforeach; ?>
+              </ul>
+            </div>
+          <?php endif; ?>
+
+          <div class="pbsg-intro-meta">
+            <?php if ($intro_duration): ?>
+              <span class="pbsg-intro-duration">
+                &#x23F1; <?php echo esc_html($intro_duration); ?>
+              </span>
+            <?php endif; ?>
+
+            <?php if ($step_count > 0): ?>
+              <span class="pbsg-intro-steps-count">
+                &#x1F4CB; <?php echo $step_count; ?> step<?php echo $step_count !== 1 ? 's' : ''; ?>
+              </span>
+            <?php endif; ?>
+          </div>
+
+          <?php if ($intro_prerequisites): ?>
+            <div class="pbsg-intro-prereqs">
+              <h4>Prerequisites</h4>
+              <p><?php echo esc_html($intro_prerequisites); ?></p>
+            </div>
+          <?php endif; ?>
+
+          <div class="pbsg-intro-actions">
+            <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
+              Start Tutorial
+            </button>
+          </div>
+
         </div>
-      </div>
+      <?php else: ?>
+        <div class="pbsg-intro-card">
+          <div class="pbsg-intro-content">
+            <?php echo $intro_html; ?>
+          </div>
+
+          <div class="pbsg-intro-actions">
+            <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
+              Start Tutorial
+            </button>
+          </div>
+        </div>
+      <?php endif; ?>
     </div>
   <?php endif; ?>
 
@@ -127,7 +208,7 @@ foreach ($steps as $s) {
   id="pbsgMainContent"
   <?php if ($has_intro) echo 'style="display:none;"'; ?>
 >
-<div class="pbsg-container">
+<div class="pbsg-container" style="--pbsg-left-ratio:<?php echo esc_attr($left_ratio); ?>;--pbsg-right-ratio:<?php echo esc_attr($right_ratio); ?>">
 
   <!-- LEFT: QUIZ -->
   <aside class="pbsg-left">
@@ -185,6 +266,19 @@ foreach ($steps as $s) {
 
     </div>
   </aside>
+
+  <?php if ($user_resizable): ?>
+  <!-- RESIZE HANDLE (Stretch Goal 5b) -->
+  <div class="pbsg-resize-handle" id="pbsgResizeHandle"
+       role="separator" aria-orientation="vertical"
+       aria-label="Resize panel divider"
+       aria-valuenow="<?php echo esc_attr($left_ratio); ?>"
+       aria-valuemin="<?php echo esc_attr(PB_Split_Guide_Plugin::RATIO_MIN); ?>"
+       aria-valuemax="<?php echo esc_attr(PB_Split_Guide_Plugin::RATIO_MAX); ?>"
+       tabindex="0">
+    <div class="pbsg-resize-grip"></div>
+  </div>
+  <?php endif; ?>
 
   <!-- RIGHT: TUTORIAL -->
   <section class="pbsg-right">

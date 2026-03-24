@@ -353,6 +353,9 @@ class PBSGAnalyticsDashboardApiTest extends TestCase
             'second_attempt_correct'=> 20,
             'total_time_seconds'    => 3000,
             'total_answered'        => 75,
+            'incorrect_attempts'    => 20,
+            'total_retries'         => 30,
+            'max_retries_single_session' => 5,
             'created_at'            => '2026-01-01 00:00:00',
             'updated_at'            => '2026-03-01 00:00:00',
         ];
@@ -386,6 +389,9 @@ class PBSGAnalyticsDashboardApiTest extends TestCase
             'second_attempt_correct'=> 30,
             'total_time_seconds'    => 6000,
             'total_answered'        => 100,
+            'incorrect_attempts'    => 50,
+            'total_retries'         => 80,
+            'max_retries_single_session' => 4,
             'created_at'            => '2026-01-01 00:00:00',
             'updated_at'            => '2026-03-01 00:00:00',
         ];
@@ -414,6 +420,9 @@ class PBSGAnalyticsDashboardApiTest extends TestCase
             'second_attempt_correct'=> 1,
             'total_time_seconds'    => 300,
             'total_answered'        => 5,
+            'incorrect_attempts'    => 5,
+            'total_retries'         => 3,
+            'max_retries_single_session' => 2,
             'created_at'            => '2026-01-01 00:00:00',
             'updated_at'            => '2026-03-01 00:00:00',
         ];
@@ -422,6 +431,42 @@ class PBSGAnalyticsDashboardApiTest extends TestCase
 
         $this->assertArrayHasKey('date_scope', $data);
         $this->assertTrue($data['date_scope']['all_time']);
+    }
+
+    /**
+     * @covers PBSG_Analytics::get_question_detail
+     */
+    public function test_question_detail_returns_retry_stats(): void
+    {
+        $this->wpdb->returns['get_row'] = [
+            'id'                    => 1,
+            'tutorial_page_id'      => 42,
+            'h5p_content_id'        => 10,
+            'question_index'        => 0,
+            'question_text'         => 'Test',
+            'total_attempts'        => 100,
+            'correct_count'         => 80,
+            'incorrect_count'       => 20,
+            'giveup_count'          => 0,
+            'first_attempt_correct' => 50,
+            'second_attempt_correct'=> 20,
+            'total_time_seconds'    => 3000,
+            'total_answered'        => 75,
+            'incorrect_attempts'    => 20,
+            'total_retries'         => 30,
+            'max_retries_single_session' => 5,
+            'created_at'            => '2026-01-01 00:00:00',
+            'updated_at'            => '2026-03-01 00:00:00',
+        ];
+
+        $data = PBSG_Analytics::get_question_detail(42, 10, 0);
+
+        $this->assertArrayHasKey('retry_stats', $data);
+        $retry = $data['retry_stats'];
+        $this->assertSame(20, $retry['incorrect_attempts']);
+        $this->assertSame(30, $retry['total_retries']);
+        $this->assertSame(5, $retry['max_retries_single_session']);
+        $this->assertSame(0.4, $retry['avg_retries_per_completion']);
     }
 
     /* ---------------------------------------------------------------

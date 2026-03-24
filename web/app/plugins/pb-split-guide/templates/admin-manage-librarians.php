@@ -3,7 +3,8 @@
  * Template: Manage Librarians admin page.
  *
  * Expected variables:
- * - $librarians   : array of librarian data
+ * - $librarians   : array of active librarian data
+ * - $deactivated  : array of deactivated (former) librarian data
  * - $sub_action   : string ('list' or 'manage')
  * - $edit_id      : int (user ID when editing)
  * - $notice_type  : string ('success' or 'error')
@@ -155,8 +156,14 @@ if ( ! defined( 'ABSPATH' ) ) {
             <div class="pbsg-deactivate-section">
                 <h3 class="pbsg-deactivate-title"><?php esc_html_e( 'Deactivate Librarian', 'pb-split-guide' ); ?></h3>
                 <p class="pbsg-deactivate-desc">
-                    <?php esc_html_e( 'Deactivating a librarian removes their admin access. Their account will remain but they will not be able to log in to the admin panel.', 'pb-split-guide' ); ?>
+                    <?php esc_html_e( 'Deactivating removes this user\'s Librarian role and all Guide on the Side permissions. They will no longer be able to create or manage tutorials, view analytics, or access H5P content. Their WordPress account will remain as a Subscriber with no admin panel access.', 'pb-split-guide' ); ?>
                 </p>
+
+                <?php if ( ! empty( $reassignment_targets ) ) : ?>
+                <p class="pbsg-deactivate-desc">
+                    <?php esc_html_e( 'Optionally, you can transfer ownership of their tutorials to another user before deactivating.', 'pb-split-guide' ); ?>
+                </p>
+                <?php endif; ?>
 
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="pbsg-deactivate-form" id="pbsg-deactivate-form">
                     <?php wp_nonce_field( 'pbsg_deactivate_librarian' ); ?>
@@ -165,9 +172,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
                     <?php if ( ! empty( $reassignment_targets ) ) : ?>
                     <div class="pbsg-form-field">
-                        <label for="pbsg-reassign"><?php esc_html_e( 'Reassign tutorials to:', 'pb-split-guide' ); ?></label>
+                        <label for="pbsg-reassign"><?php esc_html_e( 'Transfer tutorials to:', 'pb-split-guide' ); ?></label>
                         <select id="pbsg-reassign" name="reassign_to">
-                            <option value="0"><?php esc_html_e( '— Do not reassign —', 'pb-split-guide' ); ?></option>
+                            <option value="0"><?php esc_html_e( '— Keep current ownership —', 'pb-split-guide' ); ?></option>
                             <?php foreach ( $reassignment_targets as $target ) : ?>
                                 <option value="<?php echo esc_attr( $target['ID'] ); ?>">
                                     <?php echo esc_html( $target['display_name'] ); ?>
@@ -182,6 +189,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                     </button>
                 </form>
             </div>
+
         </div>
 
         <?php else : ?>
@@ -259,5 +267,59 @@ if ( ! defined( 'ABSPATH' ) ) {
             </table>
         <?php endif; ?>
     </div>
+
+    <!-- Deactivated Librarians -->
+    <?php if ( ! empty( $deactivated ) ) : ?>
+    <div class="pbsg-librarians-card">
+        <h2 class="pbsg-card-title">
+            <?php esc_html_e( 'Deactivated Librarians', 'pb-split-guide' ); ?>
+            <span class="pbsg-badge pbsg-badge--muted"><?php echo count( $deactivated ); ?></span>
+        </h2>
+
+        <p class="pbsg-deactivate-desc" style="margin-top:-12px; margin-bottom:16px;">
+            <?php esc_html_e( 'Former librarians whose access has been revoked. You can reactivate them to restore full Librarian permissions.', 'pb-split-guide' ); ?>
+        </p>
+
+        <table class="pbsg-librarians-table">
+            <thead>
+                <tr>
+                    <th><?php esc_html_e( 'Name', 'pb-split-guide' ); ?></th>
+                    <th><?php esc_html_e( 'Email', 'pb-split-guide' ); ?></th>
+                    <th><?php esc_html_e( 'Deactivated', 'pb-split-guide' ); ?></th>
+                    <th><?php esc_html_e( 'Actions', 'pb-split-guide' ); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ( $deactivated as $dlib ) : ?>
+                <tr>
+                    <td>
+                        <strong><?php echo esc_html( $dlib['display_name'] ); ?></strong>
+                        <br />
+                        <span class="pbsg-username"><?php echo esc_html( $dlib['user_login'] ); ?></span>
+                    </td>
+                    <td>
+                        <a href="mailto:<?php echo esc_attr( $dlib['user_email'] ); ?>">
+                            <?php echo esc_html( $dlib['user_email'] ); ?>
+                        </a>
+                    </td>
+                    <td>
+                        <?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $dlib['deactivated_on'] ) ) ); ?>
+                    </td>
+                    <td class="pbsg-actions-cell">
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="display:inline;">
+                            <?php wp_nonce_field( 'pbsg_reactivate_librarian' ); ?>
+                            <input type="hidden" name="pbsg_librarian_action" value="reactivate" />
+                            <input type="hidden" name="user_id" value="<?php echo esc_attr( $dlib['ID'] ); ?>" />
+                            <button type="submit" class="pbsg-btn pbsg-btn-sm pbsg-btn-primary">
+                                <?php esc_html_e( 'Reactivate', 'pb-split-guide' ); ?>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <?php endif; ?>
 
 </div>
