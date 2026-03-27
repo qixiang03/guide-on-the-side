@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: Accessibility Dashboard
- * Description: Adds enhanced accessibility features with per-user customization
- * Version: 1.0.0
- * Author: Team 8
+ * PBSG Accessibility Dashboard — Additional Accessibility Settings for User Profile.
+ *
+ * @package    PB_Split_Guide
+ * @subpackage Accessibility
+ * @since      0.6.0
  */
-
 if (!defined('ABSPATH')) {
     exit;
 }
@@ -53,7 +53,8 @@ class Pressbooks_Accessibility_Enhancer {
         add_filter('pb_pdf_css_override', array($this, 'add_pdf_accessibility'));
         add_filter('pb_epub_css_override', array($this, 'add_epub_accessibility'));
     }
-    
+
+
     /**
      * Enqueue custom fonts from Google Fonts if UPEI Library Default is selected
      */
@@ -159,7 +160,7 @@ class Pressbooks_Accessibility_Enhancer {
         
         if ($user_id && get_user_meta($user_id, 'ae_enable_custom', true)) {
             return array(
-                'color' => get_user_meta($user_id, 'ae_focus_color', true) ?: '#0066cc',
+                'color' => get_user_meta($user_id, 'ae_focus_color', true) ?: '#8c1f04',
                 'width' => get_user_meta($user_id, 'ae_focus_width', true) ?: '3px',
                 'enabled' => true
             );
@@ -167,7 +168,7 @@ class Pressbooks_Accessibility_Enhancer {
         
         // Default settings
         return array(
-            'color' => '#0066cc',
+            'color' => '#8c1f04',
             'width' => '3px',
             'enabled' => false
         );
@@ -258,10 +259,10 @@ body.keyboard-navigation *:focus {
 <?php if ($font_family && $font_family !== 'default') : ?>
     <?php if ($font_family === 'upei-default') : ?>
 /* UPEI Library Default Typography */
-body, p, span, div, li, td, th {
+body, p, span, div, li, td, th, strong {
     font-family: 'Roboto', sans-serif !important;
 }
-h1, h2, h3, h4, h5, h6, strong, b, .entry-title {
+h1, h2, h3, h4, h5, h6, b, .entry-title {
     font-family: 'Lusitana', serif !important;
 }
 button, input, select, textarea, .nav, .menu, a.button, .page-navigation a, .a11y-skip-link {
@@ -516,10 +517,10 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
             <div class="ae-preview-box">
                 <p>Test your focus settings (press Tab to navigate):</p>
                 <div class="ae-test-elements" style="<?php echo $preview_style; ?>">
-                    <button aria-label="Button Focus Test Element" type="button" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>Test Button</button>
-                    <input aria-label="Text Focus Test Element" type="text" placeholder="Test Input" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
-                    <a aria-label="Link Focus Test Element" href="#test">Test Link</a>
-                    <select aria-label="Dropdown Focus Test Element"<?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
+                    <button type="button" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>Test Button</button>
+                    <input type="text" placeholder="Test Input" <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
+                    <a href="#test">Test Link</a>
+                    <select <?php if($font_family === 'upei-default') echo 'style="font-family: \'Roboto Condensed\', sans-serif;"'; ?>>
                         <option>Test Dropdown</option>
                     </select>
                 </div>
@@ -573,7 +574,6 @@ body, h1, h2, h3, h4, h5, h6, p, a, span, div, li, td, th, button, input, select
         $shortcut_fields = ['ae_shortcut_prev', 'ae_shortcut_next', 'ae_shortcut_quiz', 'ae_shortcut_tutorial'];
         foreach ($shortcut_fields as $field) {
             if (isset($_POST[$field])) {
-                // Keep the raw string (allowing 'ArrowLeft', 'a', etc) but remove potentially dangerous characters.
                 $key = sanitize_text_field(wp_unslash($_POST[$field]));
                 update_user_meta($user_id, $field, $key);
             }

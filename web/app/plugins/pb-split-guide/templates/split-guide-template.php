@@ -130,7 +130,7 @@ foreach ($steps as $s) {
 <div class="pbsg-container">
 
   <!-- LEFT: QUIZ -->
-  <aside class="pbsg-left">
+  <div class="pbsg-left">
     <div class="pbsg-left-inner">
 
       <div class="pbsg-quiz-header">
@@ -138,9 +138,7 @@ foreach ($steps as $s) {
     <!-- Menu button -->
     <div class="pbsg-menu-wrap">
       <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
-        <span class="pbsg-menu-icon">☰</span>
-        <span class="pbsg-menu-arrow">▾</span>
-        <span class="pbsg-menu-text">Menu</span>
+        ☰▾ Menu
       </button>
 
       <!-- Dropdown -->
@@ -184,7 +182,7 @@ foreach ($steps as $s) {
       </div>
 
     </div>
-  </aside>
+  </div>
 
   <!-- RIGHT: TUTORIAL -->
   <section class="pbsg-right">

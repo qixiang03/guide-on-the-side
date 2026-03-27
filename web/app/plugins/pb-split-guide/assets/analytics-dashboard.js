@@ -970,7 +970,7 @@
             const dateTo   = $( '#pbsg-date-to' ).val();
             if ( dateFrom ) exportUrl += '&date_from=' + encodeURIComponent( dateFrom );
             if ( dateTo )   exportUrl += '&date_to=' + encodeURIComponent( dateTo );
-            html += '<a href="' + exportUrl + '" class="pbsg-btn pbsg-btn-primary pbsg-btn-sm">↓ Export Comparison CSV</a>';
+            html += '<a href="' + exportUrl + '" class="button pbsg-btn pbsg-btn-primary pbsg-btn-sm">↓ Export Comparison CSV</a>';
             html += '</div>';
         }
 
@@ -1043,7 +1043,11 @@
             const alreadyUsed = compareIds.indexOf( t.id ) !== -1 && t.id !== selectedId;
             if ( !alreadyUsed ) {
                 const sel = t.id === selectedId ? ' selected' : '';
-                html += '<option value="' + t.id + '"' + sel + '>' + escapeHtml( t.title ) + '</option>';
+                if (t.title.length == 0) {
+                    html += '<option value="' + t.id + '"' + sel + '>' + '(no title)' + '</option>';
+                } else {
+                    html += '<option value="' + t.id + '"' + sel + '>' + escapeHtml( t.title ) + '</option>';
+                }
             }
         } );
         html += '</select>';
@@ -1057,7 +1061,11 @@
             const alreadyUsed = compareIds.indexOf( t.id ) !== -1 && t.id !== selectedId;
             if ( !alreadyUsed ) {
                 const sel = t.id === selectedId ? ' selected' : '';
-                html += '<option value="' + t.id + '"' + sel + '>' + escapeHtml( t.title ) + '</option>';
+                if (t.title.length == 0) {
+                    html += '<option value="' + t.id + '"' + sel + '>' + '(no title)' + '</option>';
+                } else {
+                    html += '<option value="' + t.id + '"' + sel + '>' + escapeHtml( t.title ) + '</option>';
+                }            
             }
         } );
         return html;

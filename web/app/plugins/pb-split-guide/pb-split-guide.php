@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PB Split Guide (Multi-step H5P + Tutorial)
  * Description: Adds a Tutorial Page with a split-screen Template. Supports multiple steps (each step = H5P quiz + tutorial source) with Prev/Next navigation on the same page.
- * Version: 0.5.0
+ * Version: 0.6.0
  * Author: Team 8
  */
 
@@ -18,6 +18,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/steps-normalizer.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path( __FILE__ ) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
+require_once plugin_dir_path( __FILE__ ) . 'accessibility-dashboard/class-pbsg-accessibility-dashboard.php';
 
 
 class PB_Split_Guide_Plugin {
