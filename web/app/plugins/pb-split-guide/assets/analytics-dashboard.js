@@ -818,7 +818,7 @@
                 html += '<div class="col-name">' + escapeHtml( tData.name ) + '</div>';
                 html += '<div class="col-meta">' + escapeHtml( tData.meta ) + '</div>';
                 html += '<button type="button" class="pbsg-col-change-btn" data-col="' + i + '">Change ▾</button>';
-                html += '<select class="col-swap-select pbsg-compare-select" data-col="' + i + '">';
+                html += '<select aria-label="Tutorial Select" class="col-swap-select pbsg-compare-select" data-col="' + i + '">';
                 html += buildTutorialOptions( i, tid );
                 html += '</select>';
                 html += '</div>';
@@ -828,7 +828,7 @@
                 html += '<div class="empty-plus">＋</div>';
                 html += '<div class="empty-label">Add Tutorial</div>';
                 html += '</div>';
-                html += '<select class="pbsg-compare-select col-select" data-col="' + i + '">';
+                html += '<select aria-label="Tutorial Select" class="pbsg-compare-select col-select" data-col="' + i + '">';
                 html += buildTutorialOptions( i, 0 );
                 html += '</select>';
                 html += '</div>';

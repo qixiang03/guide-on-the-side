@@ -391,10 +391,10 @@
     letter-spacing: 0.3px;
 }
 
-.pbsg-badge.green { background: #e8f5e2; color: var(--pbsg-secondary); }
-.pbsg-badge.amber { background: #fef3e0; color: var(--pbsg-amber); }
-.pbsg-badge.red   { background: #fde8e5; color: var(--pbsg-primary); }
-.pbsg-badge.blue  { background: #e3f0fa; color: var(--pbsg-blue); }
+.pbsg-badge.green { background: #e8f5e2; }
+.pbsg-badge.amber { background: #fef3e0; }
+.pbsg-badge.red   { background: #fde8e5; }
+.pbsg-badge.blue  { background: #e3f0fa; }
 
 /* =========================================================================
    SPARKLINES (CSS-only mini bar charts)
