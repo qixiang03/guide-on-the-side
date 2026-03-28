@@ -172,8 +172,6 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   border: 2px solid #cfd8dc !important;
   border-radius: 12px !important;
 
-  background: #f3f4f6 !important;
-  color: #111827 !important;
 
   font-size: 16px !important;
   font-weight: 500 !important;
@@ -182,10 +180,6 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   transition: all 0.2s ease !important;
 }
 
-.pbsg-menu-btn:hover{
-  background: #e5e7eb !important;
-  border-color: #9ca3af !important;
-}
 
 .pbsg-menu-icon{
   font-size: 18px !important;
@@ -236,18 +230,15 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   padding: 10px 10px !important;
   border: 0 !important;
   background: transparent !important;
+  color: #222;
   border-radius: 10px !important;
   cursor: pointer !important;
   font-size: 15px !important;
-  color: #111827 !important;
+  outline: 1px solid #222;
 }
 
-.pbsg-menu-item:hover{
-  background: rgba(59,130,246,.10) !important;
-}
 
 .pbsg-menu-item.is-current{
-  background: rgba(16,185,129,.12) !important;
   font-weight: 600 !important;
 }
 
@@ -347,8 +338,6 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 
   padding: 8px 12px !important;
   border: 1px solid rgba(0, 0, 0, 0.18) !important;
-  background: #fff !important;
-  color: #222 !important;
 
   border-radius: 8px !important;
   cursor: pointer !important;
@@ -357,9 +346,8 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   font-weight: 600 !important;
   white-space: nowrap !important;
 }
-.pbsg-focus-btn:hover {
-  background: #f6f6f6 !important;
-}
+
+
 
 .pbsg-right .pbsg-iframe-wrap {
   flex: 1 1 auto !important;
@@ -511,8 +499,6 @@ body.pbsg-standalone .pbsg-container {
   min-height: 0 !important;     /* critical */
   overflow: hidden !important;
   margin: 0 auto;
-  padding: 0 20px 20px 20px;   /* left/right + bottom space */
-  gap: 20px;
 }
 
 /* ==========================================
@@ -566,7 +552,7 @@ body.pbsg-standalone .pbsg-wrap{
 .pbsg-progressbar-fill{
   height: 100%;
   width: 0%;
-  background: #0ea5e9; /* blue-ish like your screenshot */
+  background: #0ea5e9;
   border-radius: 999px;
   transition: width 200ms ease;
 }
@@ -706,7 +692,6 @@ body.pbsg-standalone .pbsg-wrap{
 }
 
 .pbsg-course-card-title a {
-  color: #b5121b;
   text-decoration: none;
 }
 
@@ -772,8 +757,6 @@ body.pbsg-standalone .pbsg-wrap{
   padding: 12px 28px;
   border: none;
   border-radius: 10px;
-  background: #d97d73;
-  color: #fff;
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
@@ -906,7 +889,6 @@ body.pbsg-standalone .pbsg-wrap{
   font-size: 36px;
   font-weight: 600;
   text-align: center;
-  color: #d33b2f;
 }
 
 .pbsg-summary-actions {

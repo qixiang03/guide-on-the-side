@@ -107,19 +107,19 @@ class PBSG_Analytics_Dashboard {
             <!-- Page Header -->
             <div class="pbsg-header">
                 <div class="pbsg-header-left">
-                    <h1 class="pbsg-page-title">
+                    <h1 class="h1 pbsg-page-title">
                         <?php esc_html_e( 'Tutorial Analytics', 'pb-split-guide' ); ?>
                     </h1>
-                    <p class="pbsg-subtitle">
+                    <p class="p pbsg-subtitle">
                         <?php esc_html_e( 'Anonymous usage metrics across all Guide on the Side tutorials', 'pb-split-guide' ); ?>
                     </p>
                 </div>
                 <div class="pbsg-header-right">
-                    <button type="button" class="pbsg-btn pbsg-btn-secondary pbsg-btn-sm" id="pbsg-refresh-btn">
+                    <button type="button" class="button pbsg-btn pbsg-btn-sm" id="pbsg-refresh-btn">
                         ⟳ <?php esc_html_e( 'Refresh', 'pb-split-guide' ); ?>
                     </button>
                     <a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=pbsg_export_csv&type=overview' ) ); ?>"
-                       class="pbsg-btn pbsg-btn-primary pbsg-btn-sm" id="pbsg-export-btn">
+                       class="button pbsg-btn pbsg-btn-sm" id="pbsg-export-btn">
                         ↓ <?php esc_html_e( 'Export CSV', 'pb-split-guide' ); ?>
                     </a>
                 </div>
@@ -128,26 +128,26 @@ class PBSG_Analytics_Dashboard {
             <!-- View Navigation Tabs -->
             <nav class="pbsg-nav-tabs" role="tablist">
                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=pbsg-analytics&tab=overview' ) ); ?>"
-                   class="pbsg-tab <?php echo ( 'overview' === $current_view ) ? 'active' : ''; ?>"
+                   class="a pbsg-tab <?php echo ( 'overview' === $current_view ) ? 'active' : ''; ?>"
                    role="tab">
                     <?php esc_html_e( 'Overview', 'pb-split-guide' ); ?>
                 </a>
                 <?php if ( $tutorial_id ) : ?>
                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=pbsg-analytics&tab=tutorial&tutorial_id=' . $tutorial_id ) ); ?>"
-                   class="pbsg-tab <?php echo ( 'tutorial' === $current_view ) ? 'active' : ''; ?>"
+                   class="a pbsg-tab <?php echo ( 'tutorial' === $current_view ) ? 'active' : ''; ?>"
                    role="tab">
                     <?php esc_html_e( 'Tutorial Detail', 'pb-split-guide' ); ?>
                 </a>
                 <?php endif; ?>
                 <?php if ( $h5p_id || $q_index ) : ?>
                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=pbsg-analytics&tab=question&tutorial_id=' . $tutorial_id . '&h5p_id=' . $h5p_id . '&q_index=' . $q_index ) ); ?>"
-                   class="pbsg-tab <?php echo ( 'question' === $current_view ) ? 'active' : ''; ?>"
+                   class="a pbsg-tab <?php echo ( 'question' === $current_view ) ? 'active' : ''; ?>"
                    role="tab">
                     <?php esc_html_e( 'Question Detail', 'pb-split-guide' ); ?>
                 </a>
                 <?php endif; ?>
                 <a href="<?php echo esc_url( admin_url( 'admin.php?page=pbsg-analytics&tab=compare' ) ); ?>"
-                   class="pbsg-tab <?php echo ( 'compare' === $current_view ) ? 'active' : ''; ?>"
+                   class="a pbsg-tab <?php echo ( 'compare' === $current_view ) ? 'active' : ''; ?>"
                    role="tab">
                     <?php esc_html_e( 'Compare', 'pb-split-guide' ); ?>
                 </a>
@@ -179,9 +179,9 @@ class PBSG_Analytics_Dashboard {
 
             <!-- Filter Bar -->
             <div class="pbsg-filter-bar" id="pbsg-filter-bar">
-                <label for="pbsg-date-from"><?php esc_html_e( 'Date Range', 'pb-split-guide' ); ?></label>
+                <label class="label" for="pbsg-date-from"><?php esc_html_e( 'Date Range', 'pb-split-guide' ); ?></label>
                 <input type="date" id="pbsg-date-from" value="<?php echo esc_attr( date( 'Y-m-d', strtotime( '-30 days' ) ) ); ?>">
-                <span class="pbsg-filter-sep"><?php esc_html_e( 'to', 'pb-split-guide' ); ?></span>
+                <span class="span pbsg-filter-sep"><?php esc_html_e( 'to', 'pb-split-guide' ); ?></span>
                 <input type="date" id="pbsg-date-to" value="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
 
                 <?php if ( in_array( $current_view, array( 'overview', 'tutorial', 'compare' ), true ) ) : ?>
@@ -197,7 +197,7 @@ class PBSG_Analytics_Dashboard {
                 <?php endif; ?>
 
                 <span class="pbsg-filter-spacer"></span>
-                <button type="button" class="pbsg-btn pbsg-btn-primary pbsg-btn-sm" id="pbsg-apply-filters">
+                <button type="button" class="button pbsg-btn pbsg-btn-primary pbsg-btn-sm" id="pbsg-apply-filters">
                     <?php esc_html_e( 'Apply', 'pb-split-guide' ); ?>
                 </button>
             </div>
