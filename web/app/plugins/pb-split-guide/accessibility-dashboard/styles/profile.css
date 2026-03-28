@@ -1,0 +1,186 @@
+/**
+ * Accessibility Dashboard - Profile Page Styles
+ * Styles for the accessibility settings section on user profile pages
+ */
+
+/* Main profile section container */
+.ae-profile-section {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+/* Section heading */
+.ae-profile-section h2, .ae-profile-section h3 {
+    margin-top: 0;
+    color: #23282d;
+}
+
+.ae-profile-section h2 {
+    border-bottom: 2px solid #0073aa;
+    padding-bottom: 10px;
+}
+
+.ae-profile-section h3 {
+    margin-top: 15px;
+    margin-bottom: 10px;
+}
+
+/* Description paragraph */
+.ae-profile-section > p {
+    color: #555;
+    margin-bottom: 20px;
+}
+
+/* Field row styling */
+.ae-field-row {
+    margin-bottom: 15px;
+}
+
+.ae-field-row label {
+    display: inline-block;
+    width: 200px;
+    font-weight: 600;
+}
+
+/* Color picker input */
+.ae-field-row input[type="color"],
+#ae_focus_color {
+    width: 60px;
+    height: 40px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+/* Text input for width and keys */
+.ae-field-row input[type="text"],
+#ae_focus_width,
+.ae-shortcut-row input[type="text"] {
+    width: 100px;
+}
+
+/* Font Selection Select Dropdown */
+#ae_font_family {
+    min-width: 250px;
+    max-width: 100%;
+}
+
+/* Description text under inputs */
+.ae-field-row .description,
+.ae-profile-section .description {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-style: italic;
+    font-size: 13px;
+}
+
+/* Preview box */
+.ae-preview-box {
+    background: white;
+    border: 1px solid #ddd;
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ae-preview-box > p {
+    margin: 0 0 15px 0;
+    font-weight: 600;
+    color: #23282d;
+}
+
+/* Test elements container */
+.ae-test-elements {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.ae-test-elements button,
+.ae-test-elements input,
+.ae-test-elements a,
+.ae-test-elements select {
+    margin: 0;
+}
+
+.ae-test-elements button {
+    padding: 6px 12px;
+    background: #0073aa;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.ae-test-elements button:hover {
+    background: #005a87;
+}
+
+.ae-test-elements input[type="text"] {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    min-width: 150px;
+}
+
+.ae-test-elements a {
+    color: #0073aa;
+    text-decoration: none;
+    padding: 6px 10px;
+    border-radius: 3px;
+}
+
+.ae-test-elements a:hover {
+    text-decoration: underline;
+}
+
+.ae-test-elements select {
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+/* Checkbox label styling */
+#ae_enable_custom + label,
+#ae_enable_shortcuts + label {
+    font-weight: normal;
+}
+
+/* Hidden rows (when checkbox is unchecked) */
+#ae_color_row[style*="display: none"],
+#ae_width_row[style*="display: none"] {
+    display: none;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 782px) {
+    .ae-field-row label {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    
+    .ae-field-row .description {
+        margin-left: 0;
+    }
+    
+    .ae-test-elements {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .ae-test-elements button,
+    .ae-test-elements input,
+    .ae-test-elements a,
+    .ae-test-elements select {
+        width: 100%;
+        text-align: center;
+    }
+}
+
