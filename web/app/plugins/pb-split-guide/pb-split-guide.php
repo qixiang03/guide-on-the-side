@@ -24,6 +24,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-export-import.php'
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
+require_once plugin_dir_path(__FILE__) . 'accessibility-dashboard/class-pbsg-accessibility-dashboard.php';
 
 
 class PB_Split_Guide_Plugin {

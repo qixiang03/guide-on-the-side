@@ -1,5 +1,7 @@
 (function () {
-  
+
+document.body.classList.add('tutorial-active');
+
 const h5pFrame = document.getElementById('pbsgH5PFrame');
 const tutFrame = document.getElementById('pbsgTutorialFrame');
 const openLink = document.getElementById('pbsgOpenLink');
@@ -469,7 +471,7 @@ function renderTutorial(step){
 
   // Reset stage to iframe by default
   tutorialStage.innerHTML = `
-    <iframe id="pbsgTutorialFrame" class="pbsg-iframe"
+    <iframe aria-label="Tutorial Frame" id="pbsgTutorialFrame" class="pbsg-iframe"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
       allowfullscreen></iframe>
   `;
@@ -668,6 +670,34 @@ focusQuizBtn.onclick = ()=>toggleFocus('quiz');
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape') clearFocus();
 });
+
+// ===== Accessibility: Custom Keyboard Shortcuts =====
+(function initCustomShortcuts() {
+  if (typeof window.aeShortcuts === 'undefined') return;
+  const shortcuts = window.aeShortcuts;
+  document.addEventListener('keydown', function(event) {
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName)
+        || event.target.isContentEditable) return;
+    switch (event.key) {
+      case shortcuts.prev:
+        event.preventDefault();
+        if (prevBtn && !prevBtn.disabled) prevBtn.click();
+        break;
+      case shortcuts.next:
+        event.preventDefault();
+        if (nextBtn && !nextBtn.disabled) nextBtn.click();
+        break;
+      case shortcuts.focus_quiz:
+        event.preventDefault();
+        toggleFocus('quiz');
+        break;
+      case shortcuts.focus_tutorial:
+        event.preventDefault();
+        toggleFocus('tutorial');
+        break;
+    }
+  });
+})();
 
 if (startTutorialBtn && introScreen && mainContent) {
   startTutorialBtn.onclick = () => {
