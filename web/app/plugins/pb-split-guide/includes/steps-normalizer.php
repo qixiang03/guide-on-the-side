@@ -80,15 +80,18 @@ final class PBSG_Steps_Normalizer
             $branch_tutorial_url  = isset($s['branch_tutorial_url']) ? self::sanitize_url((string)$s['branch_tutorial_url']) : '';
             $branch_tutorial_attachment_id = isset($s['branch_tutorial_attachment_id']) ? (int)$s['branch_tutorial_attachment_id'] : 0;
             if ($branch_tutorial_attachment_id < 0) $branch_tutorial_attachment_id = 0;
-            if (!in_array($branch_tutorial_type, ['url', 'file'], true)) {
+
+            if (!in_array($branch_tutorial_type, ['url', 'file', 'tutorial'], true)) {
                 $branch_tutorial_type = ($branch_tutorial_attachment_id > 0)
                     ? 'file'
                     : ($branch_tutorial_url ? 'url' : '');
             }
+
             if ($branch_tutorial_type === 'file' && $branch_tutorial_attachment_id <= 0) {
                 $branch_tutorial_type = $branch_tutorial_url ? 'url' : '';
             }
-            if ($branch_tutorial_type === 'url' && !$branch_tutorial_url) {
+
+            if (in_array($branch_tutorial_type, ['url', 'tutorial'], true) && !$branch_tutorial_url) {
                 $branch_tutorial_type = '';
             }
 
@@ -118,7 +121,7 @@ final class PBSG_Steps_Normalizer
                 'branch_title'                 => $branch_title,
                 'branch_intro'                 => $branch_intro,
                 'branch_tutorial_type'         => $branch_tutorial_type,
-                'branch_tutorial_url'          => $branch_tutorial_type === 'url' ? $branch_tutorial_url : '',
+                'branch_tutorial_url'          => in_array($branch_tutorial_type, ['url', 'tutorial'], true) ? $branch_tutorial_url : '',
                 'branch_tutorial_attachment_id' => $branch_tutorial_type === 'file' ? $branch_tutorial_attachment_id : 0,
                 'branch_tutorial_file_name'    => isset($s['branch_tutorial_file_name']) ? self::sanitize_text((string)$s['branch_tutorial_file_name']) : '',
                 'branch_tutorial_file_url'     => isset($s['branch_tutorial_file_url']) ? self::sanitize_url((string)$s['branch_tutorial_file_url']) : '',

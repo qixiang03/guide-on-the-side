@@ -987,7 +987,50 @@ body.tutorial-active #colophon {
 .pbsg-branch-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn {
+  min-width: 180px;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn:hover {
+  transform: translateY(-2px);
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-start {
+  background: #8b0000;
+  border-color: #8b0000;
+  color: #fff;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-start:hover {
+  background: #a30000;
+  border-color: #a30000;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-finished {
+  background: #c40000;
+  border-color: #c40000;
+  color: #fff;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-finished:hover {
+  background: #dd0000;
+  border-color: #dd0000;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-skip,
+.pbsg-branch-actions .pbsg-branch-btn-return {
+  min-width: 180px;
 }
 .pbsg-branch-modal {
   position: fixed;

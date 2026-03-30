@@ -327,7 +327,7 @@ foreach ($steps as $s) {
         <div class="pbsg-branch-actions">
           <button type="button" class="button button-primary" id="pbsgBranchOpen">Start</button>
           <button type="button" class="button" id="pbsgBranchSkip" style="display:none;">Skip</button>
-          <button type="button" class="button button-primary" id="pbsgBranchComplete" style="display:none;">I Finished This Sub-Tutorial</button>
+          <button type="button" class="button button-primary" id="pbsgBranchComplete" style="display:none;">Finished</button>
           <button type="button" class="button" id="pbsgBranchReturn" style="display:none;">Back to Main Tutorial</button>
         </div>
       </div>

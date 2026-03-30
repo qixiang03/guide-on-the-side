@@ -99,9 +99,11 @@ const passedSteps = new Set(); // remember which steps are already correct
 
 const triggeredBranchSteps = new Set();
 const completedBranchSteps = new Set();
+const startedBranchSteps = new Set();
 
 let activeBranchStep = null;
 let branchReturnTarget = null;
+let activeBranchWindow = null;
 
 let h5pObs = null;
 let h5pClickHandler = null;
@@ -134,7 +136,7 @@ function hasBranch(step) {
     step.branch.mode !== 'none' &&
     step.branch.tutorial &&
     (
-      (step.branch.tutorial.type === 'url' && step.branch.tutorial.url) ||
+      ((step.branch.tutorial.type === 'url' || step.branch.tutorial.type === 'tutorial') && step.branch.tutorial.url) ||
       (step.branch.tutorial.type === 'file' && step.branch.tutorial.file_url)
     )
   );
@@ -211,14 +213,14 @@ function showBranchPrompt(stepIndex) {
 
   if (branchReturnBtn) branchReturnBtn.style.display = 'none';
 
-  if (step.branch.mode === 'mandatory') {
-    if (branchCompleteBtn) {
-      branchCompleteBtn.textContent = 'I Finished This Sub-Tutorial';
-      branchCompleteBtn.style.display = 'inline-block';
-    }
-    if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-    if (branchCloseBtn) branchCloseBtn.style.display = 'none';
-  } else {
+if (step.branch.mode === 'mandatory') {
+  if (branchCompleteBtn) {
+    branchCompleteBtn.textContent = 'Finished';
+    branchCompleteBtn.style.display = completedBranchSteps.has(stepIndex) ? 'inline-block' : 'none';
+  }
+  if (branchSkipBtn) branchSkipBtn.style.display = 'none';
+  if (branchCloseBtn) branchCloseBtn.style.display = 'none';
+} else {
     if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
     if (branchSkipBtn) {
       branchSkipBtn.textContent = 'Skip';
@@ -235,7 +237,7 @@ function renderBranchTutorial(stepIndex) {
   if (!hasBranch(step)) return;
 
   let url = '';
-  if (step.branch.tutorial.type === 'url') {
+  if (step.branch.tutorial.type === 'url' || step.branch.tutorial.type === 'tutorial') {
     url = step.branch.tutorial.url || '';
   } else if (step.branch.tutorial.type === 'file') {
     url = step.branch.tutorial.file_url || '';
@@ -243,11 +245,20 @@ function renderBranchTutorial(stepIndex) {
 
   if (!url) return;
 
-  window.open(url, '_blank', 'noopener,noreferrer');
+  startedBranchSteps.add(stepIndex);
+
+  // pass parent step info to the sub tutorial window
+  try {
+    const u = new URL(url, window.location.origin);
+    u.searchParams.set('pbsg_branch_parent_step', String(stepIndex));
+    url = u.toString();
+  } catch (e) {}
+
+  activeBranchWindow = window.open(url, '_blank');
 
   if (step.branch.mode === 'mandatory') {
-    if (branchOpenBtn) branchOpenBtn.style.display = 'none';
-    if (branchCompleteBtn) branchCompleteBtn.style.display = 'inline-block';
+    if (branchOpenBtn) branchOpenBtn.style.display = 'inline-block';
+    if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
     if (branchSkipBtn) branchSkipBtn.style.display = 'none';
   } else {
     closeBranchModal();
@@ -265,6 +276,29 @@ function isCurrentStepBlockedByMandatoryBranch() {
   if (!triggeredBranchSteps.has(i)) return false;
   return !completedBranchSteps.has(i);
 }
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin) return;
+
+  const data = event.data || {};
+  if (data.type !== 'pbsg_branch_completed') return;
+
+  const stepIndex = parseInt(data.stepIndex, 10);
+  if (!Number.isFinite(stepIndex)) return;
+
+  completedBranchSteps.add(stepIndex);
+
+  if (activeBranchStep === stepIndex) {
+    if (branchCompleteBtn) {
+      branchCompleteBtn.textContent = 'Finished';
+      branchCompleteBtn.style.display = 'inline-block';
+    }
+    if (branchOpenBtn) {
+      branchOpenBtn.style.display = 'inline-block';
+      branchOpenBtn.textContent = 'Start';
+    }
+  }
+});
 
 
 // Heuristics to detect "correct" in H5P iframe document.
@@ -336,7 +370,14 @@ function isCheckButton(el){
   if (text === 'check') return true;
   if (text === 'check answer') return true;
 
-  return false;
+  return (
+    cls.includes('check') ||
+    cls.includes('submit') ||
+    cls.includes('answer') ||
+    text.includes('check') ||
+    text.includes('submit')
+  );
+
 }
 
 function attachH5PWatcher(stepIndex){
@@ -388,8 +429,10 @@ function attachH5PWatcher(stepIndex){
       passedSteps.delete(stepIndex);
 
       if (shouldTriggerBranch(stepIndex)) {
-        triggeredBranchSteps.add(stepIndex);
-        showBranchPrompt(stepIndex);
+        if (!triggeredBranchSteps.has(stepIndex)) {
+          triggeredBranchSteps.add(stepIndex);
+          showBranchPrompt(stepIndex);
+        }
 
         if (step.branch.mode === 'mandatory' && !completedBranchSteps.has(stepIndex)) {
           lockNext(true);
@@ -594,11 +637,18 @@ async function markCompletedOnce() {
 
 
 async function finalizeCompletionIfReady() {
-  if (!window.PBSG_CERT?.isLoggedIn) return false;
   if (i !== steps.length - 1) return false;
   if (!allQuizzesPassed()) return false;
 
-  return await markCompletedOnce();
+  const ok = window.PBSG_CERT?.isLoggedIn
+    ? await markCompletedOnce()
+    : true;
+
+  if (ok) {
+    notifyParentBranchCompleted();
+  }
+
+  return ok;
 }
 
 
@@ -921,25 +971,21 @@ if (branchCompleteBtn) {
   branchCompleteBtn.onclick = () => {
     if (activeBranchStep === null) return;
 
-    completedBranchSteps.add(activeBranchStep);
     const completedStep = activeBranchStep;
     const step = steps[completedStep];
+
+    // do not allow manual fake completion
+    if (!completedBranchSteps.has(completedStep)) {
+      return;
+    }
 
     resetBranchUI();
 
     if (completedStep === i) {
-      if (step.branch.mode === 'mandatory') {
-        if (passedSteps.has(i)) {
-          lockNext(false);
-        } else {
-          lockNext(true);
-        }
+      if (passedSteps.has(i)) {
+        lockNext(false);
       } else {
-        if (passedSteps.has(i)) {
-          lockNext(false);
-        } else {
-          lockNext(true);
-        }
+        lockNext(true);
       }
     }
   };
@@ -1076,6 +1122,24 @@ if (startTutorialBtn && introScreen && mainContent) {
 
     render();
   };
+}
+
+
+function notifyParentBranchCompleted() {
+  const params = new URLSearchParams(window.location.search);
+  const parentStep = params.get('pbsg_branch_parent_step');
+
+  if (!parentStep) return;
+
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage(
+      {
+        type: 'pbsg_branch_completed',
+        stepIndex: parentStep
+      },
+      window.location.origin
+    );
+  }
 }
 
 function showSummaryScreen(){

@@ -84,6 +84,7 @@ class PB_Split_Guide_Plugin {
     add_action('wp_ajax_pbsg_create_h5p', [$this, 'ajax_create_h5p']);
     add_action('wp_ajax_pbsg_get_h5p_content', [$this, 'ajax_get_h5p_content']);
     add_action('wp_ajax_pbsg_upload_file', [$this, 'ajax_upload_file']);
+    add_action('wp_ajax_pbsg_list_tutorials', [$this, 'ajax_list_tutorials']);
 
     // Rename "Pages" to "Tutorials" — use gettext filter (like Pressbooks does
     // for "Sites" → "Books") so it works everywhere regardless of menu rebuild order.
@@ -1529,6 +1530,7 @@ class PB_Split_Guide_Plugin {
     'templateNonce'   => wp_create_nonce('pbsg_template_picker'),
     'exportNonce'     => wp_create_nonce('pbsg_export_import'),
     'uploadNonce'     => wp_create_nonce('pbsg_upload_file'),
+    'tutorialNonce'   => wp_create_nonce('pbsg_list_tutorials'),
     'isNewPage'       => ($hook === 'post-new.php'),
     'currentTemplate' => $current_template,
     'h5pAvailable'    => PBSG_H5P_Factory::is_h5p_available(),
@@ -1769,6 +1771,45 @@ class PB_Split_Guide_Plugin {
       'library' => $row['library_name'],
     ]);
   }
+
+  public function ajax_list_tutorials() {
+    check_ajax_referer('pbsg_list_tutorials', 'nonce');
+
+    if (!current_user_can('edit_pages')) {
+      wp_send_json_error(['message' => 'Permission denied.'], 403);
+    }
+
+    $args = [
+      'post_type'      => 'page',
+      'post_status'    => ['publish', 'private', 'draft', 'pending'],
+      'posts_per_page' => 200,
+      'orderby'        => 'title',
+      'order'          => 'ASC',
+      'meta_key'       => '_wp_page_template',
+      'meta_value'     => self::TEMPLATE_SLUG,
+    ];
+
+    if (class_exists('PBSG_Roles') && PBSG_Roles::is_librarian() && !PBSG_Roles::is_admin()) {
+      $args['author'] = get_current_user_id();
+    }
+
+    $posts = get_posts($args);
+    $data = [];
+
+    foreach ($posts as $p) {
+      $data[] = [
+        'id'    => $p->ID,
+        'title' => get_the_title($p->ID) ?: ('Tutorial #' . $p->ID),
+        'url'   => get_permalink($p->ID),
+        'status'=> $p->post_status,
+      ];
+    }
+
+    wp_send_json_success($data);
+  }
+
+
+
 }
 
 new PB_Split_Guide_Plugin();

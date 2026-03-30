@@ -1120,24 +1120,36 @@ jQuery(function ($) {
           </div>
         </div>
         <hr style="margin:16px 0;" />
+        
         <div style="margin:10px 0; display:flex; gap:16px;">
-          <label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="pbsg_branch_tut_type" value="url" ${step.branch_tutorial_type !== 'file' ? 'checked' : ''} /> URL</label>
-          <label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="pbsg_branch_tut_type" value="file" ${step.branch_tutorial_type === 'file' ? 'checked' : ''} /> Upload / Select File</label>
+          <label style="display:flex; gap:6px; align-items:center;">
+            <input type="radio" name="pbsg_branch_tut_type" value="url" ${step.branch_tutorial_type !== 'tutorial' ? 'checked' : ''} />
+            URL
+          </label>
+          <label style="display:flex; gap:6px; align-items:center;">
+            <input type="radio" name="pbsg_branch_tut_type" value="tutorial" ${step.branch_tutorial_type === 'tutorial' ? 'checked' : ''} />
+            Select Existing Tutorial
+          </label>
         </div>
+
         <div id="pbsg-branch-url-block" style="margin-top:10px;">
           <p style="margin:0 0 6px;"><strong>Branch URL</strong></p>
           <input type="url" id="pbsg-branch-url" style="width:100%;" placeholder="https://example.com/review" value="${esc(step.branch_tutorial_url)}" />
         </div>
-        <div id="pbsg-branch-file-block" style="margin-top:10px; display:none;">
-          <p style="margin:0 0 6px;"><strong>Branch file</strong></p>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <button type="button" class="button" id="pbsg-branch-pick-file">Choose / Upload File</button>
-            <span id="pbsg-branch-file-label" style="opacity:.85;">${esc(step.branch_tutorial_file_name || (step.branch_tutorial_attachment_id ? ('Attachment #' + step.branch_tutorial_attachment_id) : 'No file selected'))}</span>
+
+        <div id="pbsg-branch-tutorial-block" style="margin-top:10px; display:none;">
+          <p style="margin:0 0 6px;"><strong>Branch tutorial</strong></p>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           </div>
-          <input type="hidden" id="pbsg-branch-attachment-id" value="${step.branch_tutorial_attachment_id || 0}" />
-          <input type="hidden" id="pbsg-branch-file-name" value="${esc(step.branch_tutorial_file_name || '')}" />
-          <input type="hidden" id="pbsg-branch-file-url" value="${esc(step.branch_tutorial_file_url || '')}" />
+          <div id="pbsg-branch-tutorial-picker-wrap" style="margin-top:10px;">
+          <select id="pbsg-branch-tutorial-select" style="width:100%;">
+            <option value="">Loading tutorials...</option>
+          </select>
         </div>
+
+          <input type="hidden" id="pbsg-branch-tutorial-url" value="${esc(step.branch_tutorial_url || '')}" />
+        </div>
+
         <div style="margin-top:14px; display:flex; gap:8px;">
           <button type="button" class="button button-primary" id="pbsg-branch-save">Save</button>
           <button type="button" class="button" id="pbsg-branch-cancel">Cancel</button>
@@ -1152,25 +1164,57 @@ jQuery(function ($) {
 
     function refreshBranchBlocks() {
       const t = $('input[name="pbsg_branch_tut_type"]:checked').val();
-      if (t === 'file') { $('#pbsg-branch-url-block').hide(); $('#pbsg-branch-file-block').show(); }
-      else { $('#pbsg-branch-file-block').hide(); $('#pbsg-branch-url-block').show(); }
+      if (t === 'tutorial') {
+        $('#pbsg-branch-url-block').hide();
+        $('#pbsg-branch-tutorial-block').show();
+      } else {
+        $('#pbsg-branch-tutorial-block').hide();
+        $('#pbsg-branch-url-block').show();
+      }
     }
+
     refreshBranchBlocks();
+    loadTutorialOptions(step.branch_tutorial_url || '');
+
+    if (step.branch_tutorial_type === 'tutorial' && step.branch_tutorial_url) {
+      $('#pbsg-branch-tutorial-url').val(step.branch_tutorial_url);
+    }
+
     $(document).off('change.pbsgBranchType').on('change.pbsgBranchType', 'input[name="pbsg_branch_tut_type"]', refreshBranchBlocks);
 
     $('#pbsg-branch-cancel').on('click', function () { tb_remove(); });
 
-    $('#pbsg-branch-pick-file').on('click', function (e) {
-      e.preventDefault();
-      const frame = wp.media({ title: 'Select or Upload Branch Review File', button: { text: 'Use this file' }, multiple: false });
-      frame.on('select', function () {
-        const attachment = frame.state().get('selection').first().toJSON();
-        $('#pbsg-branch-attachment-id').val(attachment.id || 0);
-        $('#pbsg-branch-file-name').val(attachment.filename || attachment.title || '');
-        $('#pbsg-branch-file-url').val(attachment.url || '');
-        $('#pbsg-branch-file-label').text(attachment.filename || attachment.title || ('Attachment #' + (attachment.id || '')));
+   function loadTutorialOptions(selectedUrl = '') {
+      const $select = $('#pbsg-branch-tutorial-select');
+      $select.html('<option value="">Loading tutorials...</option>');
+
+      $.post(PBSG_ADMIN.ajaxUrl, {
+        action: 'pbsg_list_tutorials',
+        nonce: PBSG_ADMIN.tutorialNonce
+      }).done(function (resp) {
+        if (!resp || !resp.success || !Array.isArray(resp.data)) {
+          $select.html('<option value="">No tutorials found</option>');
+          return;
+        }
+
+        let options = '<option value="">Select a tutorial...</option>';
+        resp.data.forEach(function (item) {
+          const selected = selectedUrl && selectedUrl === item.url ? 'selected' : '';
+          options += `<option value="${esc(item.url)}" ${selected}>${esc(item.title)} (${esc(item.status)})</option>`;
+        });
+        $select.html(options);
+
+      }).fail(function () {
+        $select.html('<option value="">Failed to load tutorials</option>');
       });
-      frame.open();
+    }
+
+    $('#pbsg-branch-tutorial-select').on('change', function () {
+      const $opt = $('#pbsg-branch-tutorial-select option:selected');
+      const url = $opt.val() || '';
+      const label = $opt.text() || 'No tutorial selected';
+
+      $('#pbsg-branch-tutorial-url').val(url);
     });
 
     $('#pbsg-branch-save').on('click', function () {
@@ -1186,13 +1230,14 @@ jQuery(function ($) {
       step.branch_intro = $('#pbsg-branch-intro').val() || '';
 
       const t = $('input[name="pbsg_branch_tut_type"]:checked').val();
-      if (t === 'file') {
-        const attId = parseInt($('#pbsg-branch-attachment-id').val(), 10) || 0;
-        step.branch_tutorial_type = attId ? 'file' : '';
-        step.branch_tutorial_attachment_id = attId;
-        step.branch_tutorial_file_name = $('#pbsg-branch-file-name').val() || '';
-        step.branch_tutorial_file_url = $('#pbsg-branch-file-url').val() || '';
-        step.branch_tutorial_url = '';
+
+      if (t === 'tutorial') {
+        const url = $('#pbsg-branch-tutorial-url').val() || '';
+        step.branch_tutorial_type = url ? 'tutorial' : '';
+        step.branch_tutorial_url = url;
+        step.branch_tutorial_attachment_id = 0;
+        step.branch_tutorial_file_name = '';
+        step.branch_tutorial_file_url = '';
       } else {
         const url = $('#pbsg-branch-url').val() || '';
         step.branch_tutorial_type = url ? 'url' : '';
@@ -1201,6 +1246,7 @@ jQuery(function ($) {
         step.branch_tutorial_file_name = '';
         step.branch_tutorial_file_url = '';
       }
+
       steps[currentBranchRowIdx] = step;
       setSteps(steps);
       renderStepCards();
