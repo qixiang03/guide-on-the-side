@@ -232,7 +232,7 @@ jQuery(function ($) {
           <div class="pbsg-step-header">
             <span class="pbsg-drag-handle" title="Drag to reorder">&#x2807;</span>
             <span class="pbsg-step-number">${num}</span>
-            <input class="pbsg-step-title-input" type="text" value="${esc(s.title)}" placeholder="Step title (optional)" data-idx="${idx}" />
+            <input class="pbsg-step-title-input" type="text" value="${esc(s.title)}" placeholder="Page title (optional)" data-idx="${idx}" />
             <div class="pbsg-step-badges">
               ${quizBadge}${resBadge}
             </div>

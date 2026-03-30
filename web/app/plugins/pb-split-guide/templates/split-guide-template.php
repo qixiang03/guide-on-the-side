@@ -262,7 +262,7 @@ foreach ($steps as $s) {
               >
                 <?php
                   $num = $idx + 1;
-                  $label = !empty($step['title']) ? $step['title'] : "Step $num";
+                  $label = !empty($step['title']) ? $step['title'] : "Page $num";
                   echo esc_html($num . '. ' . $label);
                 ?>
               </button>

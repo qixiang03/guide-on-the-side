@@ -924,7 +924,7 @@ class PB_Split_Guide_Plugin {
       <div class="pbsg-add-step-area" style="display:flex; gap:10px; align-items:center; margin-top:12px;">
         <button type="button" id="pbsg-add-step" class="pbsg-add-step-btn">
           <span class="pbsg-add-step-plus">+</span>
-          Add Step
+          Add Page
         </button>
         <button type="button" class="button" id="pbsg-save-as-template">Save as Template</button>
       </div>
