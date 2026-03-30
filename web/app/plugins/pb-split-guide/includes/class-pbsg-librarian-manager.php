@@ -136,6 +136,9 @@ class PBSG_Librarian_Manager {
             case 'reactivate':
                 self::handle_reactivate();
                 break;
+            case 'assign_librarian_from_manage':
+                self::handle_assign_librarian_from_manage();
+                break;
         }
     }
 
@@ -290,6 +293,48 @@ class PBSG_Librarian_Manager {
             __( 'Librarian "%s" has been reactivated.', 'pb-split-guide' ),
             $user->display_name
         ) );
+    }
+
+    /**
+     * Handle assigning the librarian role from the Manage panel fallback.
+     *
+     * Adds pbsg_librarian alongside existing roles (does not replace),
+     * then redirects back to the Manage panel for that user.
+     */
+    private static function handle_assign_librarian_from_manage() {
+        if ( ! wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'pbsg_assign_librarian_from_manage' ) ) {
+            wp_die( __( 'Security check failed.', 'pb-split-guide' ) );
+        }
+
+        $user_id = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
+
+        if ( ! $user_id ) {
+            self::redirect_with_notice( 'error', __( 'Invalid user.', 'pb-split-guide' ) );
+            return;
+        }
+
+        $user = get_userdata( $user_id );
+        if ( ! $user ) {
+            self::redirect_with_notice( 'error', __( 'User not found.', 'pb-split-guide' ) );
+            return;
+        }
+
+        // Add librarian role alongside existing roles (does not replace)
+        $user->add_role( PBSG_Roles::LIBRARIAN_ROLE );
+
+        // Redirect back to the Manage panel — role check now passes
+        wp_safe_redirect( add_query_arg( [
+            'page'       => self::PAGE_SLUG,
+            'sub_action' => 'manage',
+            'edit_id'    => $user_id,
+            'notice'     => 'success',
+            'msg'        => urlencode( sprintf(
+                /* translators: %s: display name */
+                __( '"%s" has been assigned the Librarian role.', 'pb-split-guide' ),
+                $user->display_name
+            ) ),
+        ], admin_url( 'admin.php' ) ) );
+        exit;
     }
 
     /**

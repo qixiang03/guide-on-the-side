@@ -24,7 +24,6 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-export-import.php'
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
-require_once plugin_dir_path(__FILE__) . 'accessibility-dashboard/class-pbsg-accessibility-dashboard.php';
 
 
 class PB_Split_Guide_Plugin {
@@ -916,17 +915,23 @@ class PB_Split_Guide_Plugin {
       </div>
 
       <!-- ══════════ Steps Section ══════════ -->
-      <div id="pbsg-steps-container" class="pbsg-steps-container">
-        <!-- Steps are rendered by JS -->
-      </div>
-
-      <div class="pbsg-add-step-area" style="display:flex; gap:10px; align-items:center; margin-top:12px;">
-        <button type="button" id="pbsg-add-step" class="pbsg-add-step-btn">
-          <span class="pbsg-add-step-plus">+</span>
-          Add Step
-        </button>
-        <button type="button" class="button" id="pbsg-save-as-template">Save as Template</button>
-      </div>
+      <p><strong>Steps</strong> (each step = one H5P quiz + one tutorial source)</p>
+      <table class="widefat striped" id="pbsg-steps-table" style="margin-top:8px;">
+        <thead>
+          <tr>
+          <th style="width: 22%;">Step title (optional)</th>
+          <th style="width: 20%;">H5P</th>
+          <th style="width: 24%;">Tutorial Source</th>
+          <th style="width: 24%;">Branch Review</th>
+          <th style="width: 10%;">Actions</th>
+        </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p style="margin-top:10px;">
+        <button type="button" class="button" id="pbsg-add-step">Add Step</button>
+        <button type="button" class="button" id="pbsg-save-as-template" style="margin-left:8px;">Save as Template</button>
+      </p>
 
       <input type="hidden" class="pbsg-hidden"
              id="pbsg_steps_json"
@@ -1572,85 +1577,6 @@ class PB_Split_Guide_Plugin {
   }
 }
 
-  // ── Template Picker (Sprint 7 SG3 & SG4) ───────────────────────────────
-  /**
-   * Redirect post-new.php?post_type=page → template picker page.
-   */
-  public function maybe_redirect_to_template_picker() {
-    $post_type = isset($_GET['post_type']) ? sanitize_key($_GET['post_type']) : 'post';
-    if ($post_type !== 'page') return;
-    if (!current_user_can('edit_pages')) return;
-    wp_safe_redirect(admin_url('admin.php?page=pbsg-new-tutorial'));
-    exit;
-  }
-
-  public function register_template_picker_page() {
-    add_submenu_page(
-      null,               // hidden — no parent
-      'New Tutorial',
-      'New Tutorial',
-      'edit_pages',
-      'pbsg-new-tutorial',
-      [$this, 'render_template_picker_page']
-    );
-  }
-
-  public function render_template_picker_page() {
-    if (!current_user_can('edit_pages')) {
-      wp_die(__('You do not have permission to access this page.'));
-    }
-    require plugin_dir_path(__FILE__) . 'templates/admin-new-tutorial.php';
-  }
-
-  public function ajax_get_templates() {
-    check_ajax_referer('pbsg_template_picker', 'nonce');
-    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
-    wp_send_json_success(['templates' => PBSG_Template_Manager::get_templates()]);
-  }
-
-  public function ajax_save_as_template() {
-    check_ajax_referer('pbsg_template_picker', 'nonce');
-    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
-
-    $post_id     = isset($_POST['post_id'])     ? absint($_POST['post_id'])                                          : 0;
-    $name        = isset($_POST['name'])        ? sanitize_text_field(wp_unslash($_POST['name']))                   : '';
-    $description = isset($_POST['description']) ? sanitize_textarea_field(wp_unslash($_POST['description']))        : '';
-    $category    = isset($_POST['category'])    ? sanitize_text_field(wp_unslash($_POST['category']))               : '';
-
-    if (!$post_id || !$name) {
-      wp_send_json_error(['message' => 'Name and post_id are required.']);
-    }
-    if (!current_user_can('edit_post', $post_id)) {
-      wp_send_json_error(['message' => 'You cannot edit this post.'], 403);
-    }
-
-    $steps_json  = isset($_POST['steps_json'])  ? wp_unslash($_POST['steps_json'])                              : null;
-    $header_note = isset($_POST['header_note']) ? sanitize_text_field(wp_unslash($_POST['header_note']))        : null;
-
-    $id = PBSG_Template_Manager::save_as_template($post_id, $name, $description, $category, $steps_json, $header_note);
-    if (!$id) wp_send_json_error(['message' => 'Could not save template.']);
-    wp_send_json_success(['id' => $id, 'message' => 'Template saved successfully.']);
-  }
-
-  public function ajax_create_from_template() {
-    check_ajax_referer('pbsg_template_picker', 'nonce');
-    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
-
-    $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
-    $title       = isset($_POST['title'])       ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
-
-    $post_id = PBSG_Template_Manager::create_from_template($template_id, $title);
-    if (is_wp_error($post_id)) {
-      wp_send_json_error(['message' => $post_id->get_error_message()]);
-    }
-    wp_send_json_success([
-      'post_id'  => $post_id,
-      'edit_url' => get_edit_post_link($post_id, 'url'),
-    ]);
-  }
-
-  // ── H5P & File Upload ─────────────────────────────────────────────────
-
   /**
    * AJAX handler for drag-and-drop file uploads.
    * Uses media_handle_upload() so the file enters the WP media library
@@ -1773,11 +1699,8 @@ class PB_Split_Guide_Plugin {
 
 new PB_Split_Guide_Plugin();
 
-register_activation_hook( __FILE__, function() {
-  PBSG_Roles::activate();
-  PBSG_Analytics::create_tables();
-  PBSG_Template_Manager::create_tables();
-} );
+register_activation_hook( __FILE__, array( 'PBSG_Roles', 'activate' ) );
+register_activation_hook( __FILE__, array( 'PBSG_Analytics', 'create_tables' ) );
 register_deactivation_hook( __FILE__, array( 'PBSG_Roles', 'deactivate' ) );
 
 PBSG_Roles::init();
@@ -1786,4 +1709,3 @@ PBSG_Analytics_Dashboard::init();
 PBSG_Certificate::init();
 PBSG_Admin_Menu_Filter::init();
 PBSG_Librarian_Manager::init();
-PBSG_Export_Import::init();

@@ -192,9 +192,63 @@ if ( ! defined( 'ABSPATH' ) ) {
 
         </div>
 
+        <?php elseif ( $edit_user ) : ?>
+            <?php
+            // User exists but does not have the librarian role — show info panel
+            $user_roles = ! empty( $edit_user->roles ) ? implode( ', ', array_map( 'ucfirst', $edit_user->roles ) ) : __( 'None', 'pb-split-guide' );
+            ?>
+            <div class="pbsg-librarians-card pbsg-edit-panel">
+                <h2 class="pbsg-card-title"><?php esc_html_e( 'User exists but is not a Librarian', 'pb-split-guide' ); ?></h2>
+
+                <table class="pbsg-info-table" role="presentation">
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Display Name', 'pb-split-guide' ); ?></th>
+                        <td><?php echo esc_html( $edit_user->display_name ); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Username', 'pb-split-guide' ); ?></th>
+                        <td><?php echo esc_html( $edit_user->user_login ); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Email', 'pb-split-guide' ); ?></th>
+                        <td><a href="mailto:<?php echo esc_attr( $edit_user->user_email ); ?>"><?php echo esc_html( $edit_user->user_email ); ?></a></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Current Role(s)', 'pb-split-guide' ); ?></th>
+                        <td><?php echo esc_html( $user_roles ); ?></td>
+                    </tr>
+                </table>
+
+                <p class="pbsg-profile-hint" style="margin-top:16px;">
+                    <?php esc_html_e( 'This user exists but does not have the Librarian role on this site. This can happen when a user is created via Pressbooks or WordPress natively, or if their role was changed manually.', 'pb-split-guide' ); ?>
+                </p>
+
+                <div class="pbsg-fallback-actions" style="margin-top:16px; display:flex; gap:12px;">
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>">
+                        <?php wp_nonce_field( 'pbsg_assign_librarian_from_manage' ); ?>
+                        <input type="hidden" name="pbsg_librarian_action" value="assign_librarian_from_manage" />
+                        <input type="hidden" name="user_id" value="<?php echo esc_attr( $edit_id ); ?>" />
+                        <button type="submit" class="pbsg-btn pbsg-btn-secondary">
+                            <?php esc_html_e( 'Assign Librarian Role', 'pb-split-guide' ); ?>
+                        </button>
+                    </form>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . PBSG_Librarian_Manager::PAGE_SLUG ) ); ?>" class="pbsg-btn pbsg-btn-secondary">
+                        <?php esc_html_e( 'Back to List', 'pb-split-guide' ); ?>
+                    </a>
+                </div>
+            </div>
+
         <?php else : ?>
-            <div class="notice notice-error">
-                <p><?php esc_html_e( 'Librarian not found or user is not a librarian.', 'pb-split-guide' ); ?></p>
+            <div class="pbsg-librarians-card pbsg-edit-panel">
+                <h2 class="pbsg-card-title"><?php esc_html_e( 'User Not Found', 'pb-split-guide' ); ?></h2>
+                <p class="pbsg-profile-hint">
+                    <?php esc_html_e( 'This user could not be found. They may have been deleted from WordPress.', 'pb-split-guide' ); ?>
+                </p>
+                <div style="margin-top:16px;">
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . PBSG_Librarian_Manager::PAGE_SLUG ) ); ?>" class="pbsg-btn pbsg-btn-secondary">
+                        <?php esc_html_e( 'Back to List', 'pb-split-guide' ); ?>
+                    </a>
+                </div>
             </div>
         <?php endif; ?>
 
