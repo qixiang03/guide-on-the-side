@@ -9,7 +9,7 @@ They are designed to be repeatable by any team member.
 
 - Platform: Pressbooks local dev environment
 - Browser: Chrome (latest)
-- User roles tested: Admin / Librain / Student
+- User roles tested: Admin / Librarian / Student
 
 ## Conventions
 
@@ -444,3 +444,148 @@ They are designed to be repeatable by any team member.
 **Notes**
 
 -
+
+---
+
+## TC-14 — Template Picker: Create New Tutorial from Template
+
+**Preconditions**
+
+- Logged in as Admin or Librarian with permission to create pages/tutorials.
+- At least one saved template exists (or system default template is available).
+
+**Steps**
+
+1. Go to **Tutorials** (Pages) and use the flow to add a new tutorial (e.g. “Add New Tutorial” / template picker if enabled).
+2. Choose a template from the picker (not “blank” if testing template copy).
+3. Enter a title when prompted and confirm creation.
+4. Open the new draft in the editor and confirm steps/header note match the template (or empty step for blank).
+
+**Expected Result**
+
+- A new **draft** page is created with the Split Guide template.
+- Editor loads without fatal errors; step structure is as expected.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+- Automated alignment: `PBSG_Template_Manager::create_from_template`, `ajax_create_from_template` — see `tests/Unit/PBSGTemplateManagerTest.php`, `tests/Unit/PBSGPluginAjaxHandlersTest.php`.
+
+---
+
+## TC-15 — Save Current Tutorial as Template
+
+**Preconditions**
+
+- Logged in as Admin or Librarian.
+- A draft or published Split Guide tutorial exists with at least one configured step.
+
+**Steps**
+
+1. Open the tutorial in the block/editor screen used for Split Guide steps.
+2. Use **Save as template** (or equivalent) from the template picker UI; enter name, optional description/category.
+3. Confirm success message.
+4. Start “new from template” flow and verify the new template appears in the list.
+
+**Expected Result**
+
+- Template is saved; appears in template list; steps and header note are preserved.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+- Automated alignment: `ajax_save_as_template`, `PBSG_Template_Manager::save_as_template` — see `tests/Unit/PBSGPluginAjaxHandlersTest.php`, `tests/Unit/PBSGTemplateManagerTest.php`.
+
+---
+
+## TC-16 — Export Tutorial as Portable JSON
+
+**Preconditions**
+
+- Logged in as a user who can edit the target tutorial.
+- A Split Guide tutorial exists (optional: with file attachment steps to validate `att_*` tokens in export).
+
+**Steps**
+
+1. Open the tutorial editor for that page.
+2. Trigger **Export** (export tutorial as JSON / Guide on the Side package).
+3. Save the downloaded `.json` file; open in a text editor and confirm keys such as `pbsg_version`, `title`, `steps`, and (if applicable) `attachments`.
+
+**Expected Result**
+
+- File downloads; JSON is valid; no permission error for authorized editor.
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+- Automated alignment: export permission and missing-post guards — `tests/Unit/PBSGExportImportTest.php` (`handle_export`).
+
+---
+
+## TC-17 — Import Tutorial from JSON (New Draft)
+
+**Preconditions**
+
+- Logged in as a user with `edit_pages` (e.g. Admin / Librarian).
+- A valid export file from TC-16 (or a known-good fixture).
+
+**Steps**
+
+1. Use **Import tutorial** (AJAX/upload flow) and select the `.json` file.
+2. Confirm success and follow the link to edit the new draft.
+3. Verify title, steps, and header note; re-uploaded attachments open correctly if the package included files.
+
+**Expected Result**
+
+- New **draft** tutorial created; edit URL works; invalid file shows a clear error (no white screen).
+
+**Actual Result**
+
+-
+
+**Status (Pass/Fail)**
+
+-
+
+**Notes**
+
+- Automated alignment: `PBSG_Export_Import::handle_import` — `tests/Unit/PBSGExportImportTest.php`.
+
+---
+
+## Reference — Automated coverage (pb-split-guide)
+
+The following complement black-box runs; they do **not** replace browser verification.
+
+| Area | Primary test files |
+|------|-------------------|
+| Plugin wiring / hooks | `tests/Integration/PBSplitGuidePluginSmokeTest.php` (tag-based hook assertions) |
+| Template DB / CRUD | `tests/Unit/PBSGTemplateManagerTest.php` |
+| Export / import AJAX | `tests/Unit/PBSGExportImportTest.php` |
+| H5P factory (params / reverse / errors) | `tests/Unit/PBSGH5PFactoryTest.php` |
+| Plugin AJAX (templates, upload, H5P, list tutorials) | `tests/Unit/PBSGPluginAjaxHandlersTest.php`, `tests/Unit/PBSGH5PAjaxTest.php` |
+| Accessibility (PDF/EPUB CSS hooks) | `tests/Unit/PBSGAccessibilityEnhancerTest.php` |
+| JS — tracker / admin utils / badges | `tests/js/*.test.js` |
+| JS — compare URL ids | `tests/js/analytics-dashboard-compare-url.test.js` |
+| JS — step menu a11y | `tests/js/split-guide-menu.test.js` |
