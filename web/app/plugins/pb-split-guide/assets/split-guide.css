@@ -1069,3 +1069,71 @@ body.tutorial-active #colophon {
   line-height: 1;
   cursor: pointer;
 }
+
+.pbsg-cert-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+}
+
+.pbsg-cert-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+}
+
+.pbsg-cert-modal-dialog {
+  position: relative;
+  width: min(520px, 92vw);
+  margin: 10vh auto 0;
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+.pbsg-cert-modal-dialog h3 {
+  margin: 0 0 12px;
+  font-size: 28px;
+}
+
+.pbsg-cert-label {
+  display: block;
+  margin: 18px 0 8px;
+  font-weight: 600;
+}
+
+.pbsg-cert-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.pbsg-cert-error {
+  margin-top: 10px;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.pbsg-cert-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.pbsg-cert-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  font-size: 30px;
+  line-height: 1;
+  cursor: pointer;
+}
