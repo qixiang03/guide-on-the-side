@@ -25,3 +25,4 @@ build/
 CLAUDE.local.md
 .claude/commands/*
 .cursor/
+docs/superpowers/*

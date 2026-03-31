@@ -52,6 +52,10 @@ class PB_Split_Guide_Plugin {
   const META_BENCHMARKS          = '_pbsg_benchmarks';
   const OPTION_BENCHMARK_DEFAULTS = 'pbsg_benchmark_defaults';
 
+  // Cross-editing & ownership transfer (Sprint 6)
+  const OPTION_CROSS_EDIT    = 'pbsg_cross_edit_enabled';
+  const OPTION_TRANSFER      = 'pbsg_ownership_transfer_enabled';
+
   // Hardcoded fallback benchmark defaults (used when no option saved)
   const BENCHMARK_FALLBACKS = [
     'completion_rate_green'  => 70,
@@ -916,18 +920,7 @@ class PB_Split_Guide_Plugin {
 
       <!-- ══════════ Steps Section ══════════ -->
       <p><strong>Steps</strong> (each step = one H5P quiz + one tutorial source)</p>
-      <table class="widefat striped" id="pbsg-steps-table" style="margin-top:8px;">
-        <thead>
-          <tr>
-          <th style="width: 22%;">Step title (optional)</th>
-          <th style="width: 20%;">H5P</th>
-          <th style="width: 24%;">Tutorial Source</th>
-          <th style="width: 24%;">Branch Review</th>
-          <th style="width: 10%;">Actions</th>
-        </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <div id="pbsg-steps-container" class="pbsg-steps-container"></div>
       <p style="margin-top:10px;">
         <button type="button" class="button" id="pbsg-add-step">Add Step</button>
         <button type="button" class="button" id="pbsg-save-as-template" style="margin-left:8px;">Save as Template</button>
@@ -960,6 +953,16 @@ class PB_Split_Guide_Plugin {
       'type'              => 'string',
       'sanitize_callback' => [$this, 'sanitize_benchmark_defaults'],
       'default'           => wp_json_encode(self::BENCHMARK_FALLBACKS),
+    ]);
+    register_setting('pbsg_guide_settings', self::OPTION_CROSS_EDIT, [
+      'type'              => 'boolean',
+      'sanitize_callback' => 'rest_sanitize_boolean',
+      'default'           => true,
+    ]);
+    register_setting('pbsg_guide_settings', self::OPTION_TRANSFER, [
+      'type'              => 'boolean',
+      'sanitize_callback' => 'rest_sanitize_boolean',
+      'default'           => true,
     ]);
   }
 
@@ -1016,6 +1019,20 @@ class PB_Split_Guide_Plugin {
     }
 
     return $benchmarks;
+  }
+
+  /**
+   * Check if cross-editing is enabled site-wide.
+   */
+  public static function is_cross_edit_enabled(): bool {
+    return (bool) get_option(self::OPTION_CROSS_EDIT, true);
+  }
+
+  /**
+   * Check if ownership transfer is enabled site-wide.
+   */
+  public static function is_transfer_enabled(): bool {
+    return (bool) get_option(self::OPTION_TRANSFER, true);
   }
 
   public function register_guide_settings_page() {
@@ -1238,6 +1255,56 @@ class PB_Split_Guide_Plugin {
               <div style="font-size:11px; color:#646970; margin-top:4px;">Tutorials below these are flagged on the dashboard</div>
             </div>
 
+          </div>
+        </div>
+
+        <!-- ═══ Section 3: Permissions ═══ -->
+        <div class="pbsg-admin-settings-card" style="
+          background: #fff; border: 1px solid #E0E0E0; border-radius: 8px;
+          padding: 24px; max-width: 720px; margin-bottom: 24px;
+        ">
+          <h2 style="margin-top:0; font-size:18px;">&#x1F512; Permissions</h2>
+          <p class="description" style="margin-bottom: 16px;">
+            Control collaboration between librarians. Administrators always have full access regardless of these settings.
+          </p>
+
+          <?php
+          $cross_edit = (bool) get_option(self::OPTION_CROSS_EDIT, true);
+          $transfer   = (bool) get_option(self::OPTION_TRANSFER, true);
+          ?>
+
+          <div style="margin-bottom: 16px;">
+            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+              <input type="hidden" name="<?php echo esc_attr(self::OPTION_CROSS_EDIT); ?>" value="0" />
+              <input type="checkbox"
+                     id="pbsg_cross_edit_toggle"
+                     name="<?php echo esc_attr(self::OPTION_CROSS_EDIT); ?>"
+                     value="1"
+                     <?php checked($cross_edit); ?>
+                     data-original="<?php echo $cross_edit ? '1' : '0'; ?>"
+                     style="margin-top:3px;" />
+              <span>
+                <strong>Allow cross-editing</strong><br>
+                <span class="description">Librarians can edit tutorials created by other librarians. They cannot delete or change the publish status of tutorials they don't own.</span>
+              </span>
+            </label>
+          </div>
+
+          <div>
+            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer;">
+              <input type="hidden" name="<?php echo esc_attr(self::OPTION_TRANSFER); ?>" value="0" />
+              <input type="checkbox"
+                     id="pbsg_transfer_toggle"
+                     name="<?php echo esc_attr(self::OPTION_TRANSFER); ?>"
+                     value="1"
+                     <?php checked($transfer); ?>
+                     data-original="<?php echo $transfer ? '1' : '0'; ?>"
+                     style="margin-top:3px;" />
+              <span>
+                <strong>Allow ownership transfer</strong><br>
+                <span class="description">Librarians can transfer ownership of their own tutorials to other librarians or administrators.</span>
+              </span>
+            </label>
           </div>
         </div>
 
@@ -1493,87 +1560,106 @@ class PB_Split_Guide_Plugin {
   }
 
   public function enqueue_admin_assets($hook) {
-  if (!in_array($hook, ['post.php', 'post-new.php'], true)) return;
-
   $screen = get_current_screen();
-  if (!$screen || $screen->post_type !== 'page') return;
 
-  add_thickbox();
-  wp_enqueue_media();
+  // Post editor assets — only on page post type
+  if (in_array($hook, ['post.php', 'post-new.php'], true) && $screen && $screen->post_type === 'page') {
+    add_thickbox();
+    wp_enqueue_media();
 
-  // SortableJS — optional, loaded independently so it doesn't block the main script
-  wp_enqueue_script(
-    'sortablejs',
-    'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js',
-    [],
-    '1.15.6',
-    true
-  );
+    // SortableJS — optional, loaded independently so it doesn't block the main script
+    wp_enqueue_script(
+      'sortablejs',
+      'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js',
+      [],
+      '1.15.6',
+      true
+    );
 
-  wp_enqueue_script(
-    'pbsg_admin_js',
-    plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
-    ['jquery', 'thickbox'],
-    '0.7.0',
-    true
-  );
+    wp_enqueue_script(
+      'pbsg_admin_js',
+      plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
+      ['jquery', 'thickbox'],
+      '0.7.0',
+      true
+    );
 
-  wp_enqueue_style(
-    'pbsg-admin',
-    plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
-    [],
-    '2.1.1'  // bumped to force cache bust
-  );
+    wp_enqueue_style(
+      'pbsg-admin',
+      plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
+      [],
+      '2.1.1'  // bumped to force cache bust
+    );
 
-  $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
-  wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
-    'templateSlug'    => self::TEMPLATE_SLUG,
-    'metaBoxId'       => 'pbsg_settings',
-    'ajaxUrl'         => admin_url('admin-ajax.php'),
-    'nonce'           => wp_create_nonce('pbsg_h5p_picker'),
-    'templateNonce'   => wp_create_nonce('pbsg_template_picker'),
-    'exportNonce'     => wp_create_nonce('pbsg_export_import'),
-    'uploadNonce'     => wp_create_nonce('pbsg_upload_file'),
-    'isNewPage'       => ($hook === 'post-new.php'),
-    'currentTemplate' => $current_template,
-    'h5pAvailable'    => PBSG_H5P_Factory::is_h5p_available(),
-    'maxUploadSize'   => wp_max_upload_size(),
-    'maxUploadLabel'  => size_format(wp_max_upload_size()),
-  ]);
+    $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
+    wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
+      'templateSlug'    => self::TEMPLATE_SLUG,
+      'metaBoxId'       => 'pbsg_settings',
+      'ajaxUrl'         => admin_url('admin-ajax.php'),
+      'nonce'           => wp_create_nonce('pbsg_h5p_picker'),
+      'templateNonce'   => wp_create_nonce('pbsg_template_picker'),
+      'exportNonce'     => wp_create_nonce('pbsg_export_import'),
+      'uploadNonce'     => wp_create_nonce('pbsg_upload_file'),
+      'isNewPage'       => ($hook === 'post-new.php'),
+      'currentTemplate' => $current_template,
+      'h5pAvailable'    => PBSG_H5P_Factory::is_h5p_available(),
+      'maxUploadSize'   => wp_max_upload_size(),
+      'maxUploadLabel'  => size_format(wp_max_upload_size()),
+    ]);
 
-  // Extra inline script: force the template on Add New Tutorial page.
-  if ($hook === 'post-new.php') {
-    $template_slug = esc_js(self::TEMPLATE_SLUG);
+    // Extra inline script: force the template on Add New Tutorial page.
+    if ($hook === 'post-new.php') {
+      $template_slug = esc_js(self::TEMPLATE_SLUG);
 
-    wp_add_inline_script('pbsg_admin_js', "
-      jQuery(function($){
-        function pbsgForceTemplateNow() {
-          var \$template = $('#page_template');
-          if (!\$template.length) return false;
+      wp_add_inline_script('pbsg_admin_js', "
+        jQuery(function($){
+          function pbsgForceTemplateNow() {
+            var \$template = $('#page_template');
+            if (!\$template.length) return false;
 
-          var hasOption = \$template.find('option[value=\"{$template_slug}\"]').length > 0;
-          if (!hasOption) return false;
+            var hasOption = \$template.find('option[value=\"{$template_slug}\"]').length > 0;
+            if (!hasOption) return false;
 
-          if (\$template.val() !== '{$template_slug}') {
-            \$template.val('{$template_slug}').trigger('change');
+            if (\$template.val() !== '{$template_slug}') {
+              \$template.val('{$template_slug}').trigger('change');
+            }
+
+            return true;
           }
 
-          return true;
-        }
+          var tries = 0;
+          var timer = setInterval(function() {
+            tries++;
+            if (pbsgForceTemplateNow() || tries >= 40) {
+              clearInterval(timer);
+            }
+          }, 250);
 
-        var tries = 0;
-        var timer = setInterval(function() {
-          tries++;
-          if (pbsgForceTemplateNow() || tries >= 40) {
-            clearInterval(timer);
-          }
-        }, 250);
-
-        $(window).on('load', function() {
-          pbsgForceTemplateNow();
+          $(window).on('load', function() {
+            pbsgForceTemplateNow();
+          });
         });
-      });
-    ", 'after');
+      ", 'after');
+    }
+  } // end post editor assets
+
+  // Cross-edit JS — needed on Guide Settings page + My Tutorials page + post editor
+  $cross_edit_screens = ['pbsg-my-tutorials', 'pbsg-guide-settings'];
+  $current_page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : '';
+  if (in_array($current_page, $cross_edit_screens, true) || $hook === 'post.php' || $hook === 'post-new.php') {
+    wp_enqueue_style(
+      'pbsg-admin-cross-edit',
+      plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.css',
+      [],
+      '0.6.0'
+    );
+    wp_enqueue_script(
+      'pbsg-admin-cross-edit',
+      plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.js',
+      ['jquery'],
+      '0.6.0',
+      true
+    );
   }
 }
 
@@ -1611,6 +1697,92 @@ class PB_Split_Guide_Plugin {
       'filename' => $filename,
     ]);
   }
+
+  // ── Template Picker ────────────────────────────────────────────────────────
+
+  /**
+   * Redirect post-new.php?post_type=page → template picker page.
+   */
+  public function maybe_redirect_to_template_picker() {
+    $post_type = isset($_GET['post_type']) ? sanitize_key($_GET['post_type']) : 'post';
+    if ($post_type !== 'page') return;
+    if (!current_user_can('edit_pages')) return;
+
+    wp_safe_redirect(admin_url('admin.php?page=pbsg-new-tutorial'));
+    exit;
+  }
+
+  public function register_template_picker_page() {
+    add_submenu_page(
+      null,               // hidden — no parent
+      'New Tutorial',
+      'New Tutorial',
+      'edit_pages',
+      'pbsg-new-tutorial',
+      [$this, 'render_template_picker_page']
+    );
+  }
+
+  public function render_template_picker_page() {
+    if (!current_user_can('edit_pages')) {
+      wp_die(__('You do not have permission to access this page.'));
+    }
+    require plugin_dir_path(__FILE__) . 'templates/admin-new-tutorial.php';
+  }
+
+  public function ajax_get_templates() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    wp_send_json_success(['templates' => PBSG_Template_Manager::get_templates()]);
+  }
+
+  public function ajax_save_as_template() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    $post_id     = isset($_POST['post_id'])     ? absint($_POST['post_id'])                                          : 0;
+    $name        = isset($_POST['name'])        ? sanitize_text_field(wp_unslash($_POST['name']))                   : '';
+    $description = isset($_POST['description']) ? sanitize_textarea_field(wp_unslash($_POST['description']))        : '';
+    $category    = isset($_POST['category'])    ? sanitize_text_field(wp_unslash($_POST['category']))               : '';
+
+    if (!$post_id || !$name) {
+      wp_send_json_error(['message' => 'Name and post_id are required.']);
+    }
+
+    if (!current_user_can('edit_post', $post_id)) {
+      wp_send_json_error(['message' => 'You cannot edit this post.'], 403);
+    }
+
+    $steps_json  = isset($_POST['steps_json'])  ? wp_unslash($_POST['steps_json'])                              : null;
+    $header_note = isset($_POST['header_note']) ? sanitize_text_field(wp_unslash($_POST['header_note']))        : null;
+
+    $id = PBSG_Template_Manager::save_as_template($post_id, $name, $description, $category, $steps_json, $header_note);
+    if (!$id) wp_send_json_error(['message' => 'Could not save template.']);
+
+    wp_send_json_success(['id' => $id, 'message' => 'Template saved successfully.']);
+  }
+
+  public function ajax_create_from_template() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
+    $title       = isset($_POST['title'])       ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
+
+    $post_id = PBSG_Template_Manager::create_from_template($template_id, $title);
+
+    if (is_wp_error($post_id)) {
+      wp_send_json_error(['message' => $post_id->get_error_message()]);
+    }
+
+    wp_send_json_success([
+      'post_id'  => $post_id,
+      'edit_url' => get_edit_post_link($post_id, 'url'),
+    ]);
+  }
+
+  // ── H5P ───────────────────────────────────────────────────────────────────
 
   public function ajax_list_h5p() {
     check_ajax_referer('pbsg_h5p_picker', 'nonce');

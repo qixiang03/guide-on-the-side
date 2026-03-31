@@ -46,6 +46,9 @@ class PBSG_Librarian_Manager {
         // Add GOTS role column to the Network Users list table
         add_filter( 'wpmu_users_columns', array( __CLASS__, 'add_role_column' ) );
         add_filter( 'manage_users_custom_column', array( __CLASS__, 'render_role_column' ), 10, 3 );
+
+        // Customize the new-user welcome email for librarians
+        add_filter( 'wp_new_user_notification_email', array( __CLASS__, 'customize_librarian_welcome_email' ), 10, 3 );
     }
 
     /**
@@ -103,7 +106,7 @@ class PBSG_Librarian_Manager {
             'pbsg-librarian-manager',
             $plugin_url . 'assets/admin/admin-librarians.js',
             array( 'jquery' ),
-            '1.0.0',
+            '1.1.0',
             true
         );
 
@@ -154,8 +157,6 @@ class PBSG_Librarian_Manager {
         $email      = isset( $_POST['email'] ) ? sanitize_email( $_POST['email'] ) : '';
         $first_name = isset( $_POST['first_name'] ) ? sanitize_text_field( $_POST['first_name'] ) : '';
         $last_name  = isset( $_POST['last_name'] ) ? sanitize_text_field( $_POST['last_name'] ) : '';
-        $password   = isset( $_POST['password'] ) ? $_POST['password'] : '';
-        $send_email = isset( $_POST['send_email'] ) && $_POST['send_email'] === '1';
 
         // Validation
         if ( empty( $username ) ) {
@@ -178,11 +179,8 @@ class PBSG_Librarian_Manager {
             return;
         }
 
-        // Generate password if not provided
-        if ( empty( $password ) ) {
-            $password   = wp_generate_password( 16, true, true );
-            $send_email = true; // Must email if auto-generated
-        }
+        // Always auto-generate password — librarian must set their own via the reset link
+        $password = wp_generate_password( 16, true, true );
 
         $user_id = wp_insert_user( array(
             'user_login'   => $username,
@@ -199,13 +197,12 @@ class PBSG_Librarian_Manager {
             return;
         }
 
-        if ( $send_email ) {
-            wp_new_user_notification( $user_id, null, 'user' );
-        }
+        // Always send credential email with password reset link
+        wp_new_user_notification( $user_id, null, 'user' );
 
         self::redirect_with_notice( 'success', sprintf(
             /* translators: %s: username */
-            __( 'Librarian "%s" registered successfully.', 'pb-split-guide' ),
+            __( 'Librarian %s registered successfully.', 'pb-split-guide' ),
             $username
         ) );
     }
@@ -256,7 +253,7 @@ class PBSG_Librarian_Manager {
 
         self::redirect_with_notice( 'success', sprintf(
             /* translators: %s: display name */
-            __( 'Librarian "%s" has been deactivated.', 'pb-split-guide' ),
+            __( 'Librarian %s has been deactivated.', 'pb-split-guide' ),
             $user->display_name
         ) );
     }
@@ -290,7 +287,7 @@ class PBSG_Librarian_Manager {
 
         self::redirect_with_notice( 'success', sprintf(
             /* translators: %s: display name */
-            __( 'Librarian "%s" has been reactivated.', 'pb-split-guide' ),
+            __( 'Librarian %s has been reactivated.', 'pb-split-guide' ),
             $user->display_name
         ) );
     }
@@ -330,7 +327,7 @@ class PBSG_Librarian_Manager {
             'notice'     => 'success',
             'msg'        => urlencode( sprintf(
                 /* translators: %s: display name */
-                __( '"%s" has been assigned the Librarian role.', 'pb-split-guide' ),
+                __( '%s has been assigned the Librarian role.', 'pb-split-guide' ),
                 $user->display_name
             ) ),
         ], admin_url( 'admin.php' ) ) );
@@ -348,9 +345,10 @@ class PBSG_Librarian_Manager {
         $sub_action = isset( $_GET['sub_action'] ) ? sanitize_text_field( $_GET['sub_action'] ) : 'list';
         $edit_id    = isset( $_GET['edit_id'] ) ? absint( $_GET['edit_id'] ) : 0;
 
-        // Get all librarians (active + deactivated)
+        // Get all librarians (active + deactivated) and promotable users
         $librarians  = self::get_librarians();
         $deactivated = self::get_deactivated_librarians();
+        $promotable  = self::get_promotable_users();
 
         // Get notice from redirect
         $notice_type = isset( $_GET['notice_type'] ) ? sanitize_text_field( $_GET['notice_type'] ) : '';
@@ -454,6 +452,56 @@ class PBSG_Librarian_Manager {
         }
 
         return $targets;
+    }
+
+    /**
+     * Get users eligible for promotion to librarian role.
+     *
+     * Returns all users who are NOT admins, NOT already librarians,
+     * and NOT deactivated former librarians (subscribers with pbsg_deactivated meta).
+     *
+     * @return array
+     */
+    public static function get_promotable_users(): array {
+        // Get all users on this site (exclude super admins via post-filter)
+        $all_users = get_users( array(
+            'orderby' => 'display_name',
+            'order'   => 'ASC',
+        ) );
+
+        $promotable = array();
+        foreach ( $all_users as $user ) {
+            // Skip super admins
+            if ( is_super_admin( $user->ID ) ) {
+                continue;
+            }
+
+            // Skip administrators
+            if ( in_array( 'administrator', $user->roles, true ) ) {
+                continue;
+            }
+
+            // Skip existing librarians
+            if ( in_array( PBSG_Roles::LIBRARIAN_ROLE, $user->roles, true ) ) {
+                continue;
+            }
+
+            // Skip deactivated former librarians (they appear in the Deactivated section)
+            $deactivated = get_user_meta( $user->ID, 'pbsg_deactivated', true );
+            if ( ! empty( $deactivated ) ) {
+                continue;
+            }
+
+            $promotable[] = array(
+                'ID'           => $user->ID,
+                'user_login'   => $user->user_login,
+                'display_name' => $user->display_name,
+                'user_email'   => $user->user_email,
+                'roles'        => ! empty( $user->roles ) ? implode( ', ', array_map( 'ucfirst', $user->roles ) ) : __( 'None', 'pb-split-guide' ),
+            );
+        }
+
+        return $promotable;
     }
 
     /**
@@ -604,7 +652,7 @@ class PBSG_Librarian_Manager {
 
         self::redirect_with_notice( 'success', sprintf(
             /* translators: %s: username */
-            __( 'User "%s" has been assigned the Librarian role.', 'pb-split-guide' ),
+            __( 'User %s has been assigned the Librarian role.', 'pb-split-guide' ),
             $user->user_login
         ) );
     }
@@ -654,6 +702,93 @@ class PBSG_Librarian_Manager {
         }
 
         return '<span class="pbsg-role-badge pbsg-role-none">&mdash;</span>';
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Custom Welcome Email for Librarians
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Customize the WordPress new-user notification email for librarian accounts.
+     *
+     * Replaces the generic WordPress welcome email with a Guide on the Side
+     * specific message that explains the librarian role and what they can do.
+     *
+     * Hooked on: wp_new_user_notification_email (WP 4.9+)
+     *
+     * @param array   $email  {
+     *     Email components.
+     *     @type string $to      Recipient email address.
+     *     @type string $subject Email subject.
+     *     @type string $message Email body.
+     *     @type string $headers Email headers.
+     * }
+     * @param WP_User $user    The new user object.
+     * @param string  $blogname The site title.
+     * @return array Modified email components.
+     */
+    public static function customize_librarian_welcome_email( $email, $user, $blogname ) {
+        // Only customize for librarian accounts
+        if ( ! in_array( PBSG_Roles::LIBRARIAN_ROLE, (array) $user->roles, true ) ) {
+            return $email;
+        }
+
+        $first_name  = $user->first_name ?: $user->display_name;
+        $login_url   = wp_login_url();
+        $site_name   = $blogname;
+
+        // Generate a fresh password reset key and URL
+        $reset_key = get_password_reset_key( $user );
+        if ( is_wp_error( $reset_key ) ) {
+            // Fallback: direct them to the lost-password form
+            $reset_url = wp_lostpassword_url();
+        } else {
+            $reset_url = network_site_url(
+                "wp-login.php?action=rp&key=$reset_key&login=" . rawurlencode( $user->user_login ),
+                'login'
+            );
+        }
+
+        // Build the custom email subject
+        $email['subject'] = sprintf(
+            /* translators: %s: site name */
+            __( '[%s] Your Guide on the Side Librarian Account', 'pb-split-guide' ),
+            $site_name
+        );
+
+        // Build the custom email body
+        $email['message'] = sprintf(
+            __(
+                "Hi %1\$s,\r\n"
+                . "\r\n"
+                . "A librarian account has been created for you on %2\$s — the Guide on the Side tutorial system for the library.\r\n"
+                . "\r\n"
+                . "Your username: %3\$s\r\n"
+                . "Login page: %4\$s\r\n"
+                . "\r\n"
+                . "To get started, please set your password by visiting the link below:\r\n"
+                . "%5\$s\r\n"
+                . "\r\n"
+                . "This link will expire in 24 hours. If it expires, you can request a new one from the login page using the \"Lost your password?\" link.\r\n"
+                . "\r\n"
+                . "Once logged in, you will be able to:\r\n"
+                . "- Create and manage interactive library tutorials\r\n"
+                . "- Add H5P quiz questions to guide students\r\n"
+                . "- View tutorial analytics and student performance\r\n"
+                . "\r\n"
+                . "If you have any questions, please contact your library administrator.\r\n"
+                . "\r\n"
+                . "— %2\$s\r\n",
+                'pb-split-guide'
+            ),
+            $first_name,           // %1$s
+            $site_name,            // %2$s
+            $user->user_login,     // %3$s
+            $login_url,            // %4$s
+            $reset_url             // %5$s
+        );
+
+        return $email;
     }
 
     /**
