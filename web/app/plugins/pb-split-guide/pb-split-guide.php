@@ -87,6 +87,8 @@ class PB_Split_Guide_Plugin {
     add_action('wp_ajax_pbsg_create_h5p', [$this, 'ajax_create_h5p']);
     add_action('wp_ajax_pbsg_get_h5p_content', [$this, 'ajax_get_h5p_content']);
     add_action('wp_ajax_pbsg_upload_file', [$this, 'ajax_upload_file']);
+    add_action('wp_ajax_pbsg_transfer_ownership', [$this, 'ajax_transfer_ownership']);
+    add_action('wp_ajax_pbsg_get_transfer_targets', [$this, 'ajax_get_transfer_targets']);
 
     // Rename "Pages" to "Tutorials" — use gettext filter (like Pressbooks does
     // for "Sites" → "Books") so it works everywhere regardless of menu rebuild order.
@@ -1660,6 +1662,13 @@ class PB_Split_Guide_Plugin {
       '0.6.0',
       true
     );
+    wp_localize_script('pbsg-admin-cross-edit', 'pbsgCrossEdit', [
+      'ajaxUrl' => admin_url('admin-ajax.php'),
+      'nonce'   => wp_create_nonce('pbsg_transfer_ownership'),
+      'isAdmin' => PBSG_Roles::is_admin(),
+      'transferEnabled' => self::is_transfer_enabled(),
+      'currentUserId' => get_current_user_id(),
+    ]);
   }
 }
 
@@ -1696,6 +1705,106 @@ class PB_Split_Guide_Plugin {
       'url'      => $url,
       'filename' => $filename,
     ]);
+  }
+
+  /**
+   * AJAX: Transfer tutorial ownership.
+   *
+   * Validates nonce, ownership, toggle state, target user role.
+   * Admins can always transfer; librarians only when toggle is ON and they own the tutorial.
+   */
+  public function ajax_transfer_ownership() {
+    check_ajax_referer('pbsg_transfer_ownership', '_wpnonce');
+
+    $post_ids     = isset($_POST['post_ids']) ? array_map('absint', (array) $_POST['post_ids']) : [];
+    $new_owner_id = isset($_POST['new_owner_id']) ? absint($_POST['new_owner_id']) : 0;
+
+    if (empty($post_ids) || !$new_owner_id) {
+      wp_send_json_error(['message' => __('Invalid request parameters.', 'pb-split-guide')]);
+    }
+
+    $is_admin = PBSG_Roles::is_admin();
+    $current_user_id = get_current_user_id();
+
+    // Check transfer toggle (admins exempt)
+    if (!$is_admin && !self::is_transfer_enabled()) {
+      wp_send_json_error(['message' => __('Ownership transfer is disabled.', 'pb-split-guide')]);
+    }
+
+    // Validate target user has librarian or admin role on this site
+    $target_user = get_userdata($new_owner_id);
+    if (!$target_user) {
+      wp_send_json_error(['message' => __('Target user not found.', 'pb-split-guide')]);
+    }
+    $valid_roles = [PBSG_Roles::LIBRARIAN_ROLE, 'administrator'];
+    $has_valid_role = !empty(array_intersect($valid_roles, $target_user->roles));
+    if (!$has_valid_role) {
+      wp_send_json_error(['message' => __('Target user must be a librarian or administrator.', 'pb-split-guide')]);
+    }
+
+    // Validate each post
+    $transferred = [];
+    foreach ($post_ids as $post_id) {
+      $post = get_post($post_id);
+      if (!$post || $post->post_type !== 'page') {
+        wp_send_json_error(['message' => sprintf(__('Post %d is not a valid page.', 'pb-split-guide'), $post_id)]);
+      }
+
+      // Must be a Split Guide tutorial
+      if (!PBSG_Roles::is_tutorial($post_id)) {
+        wp_send_json_error(['message' => sprintf(__('Post %d is not a tutorial.', 'pb-split-guide'), $post_id)]);
+      }
+
+      // Non-admins must own the tutorial
+      if (!$is_admin && (int) $post->post_author !== $current_user_id) {
+        wp_send_json_error(['message' => sprintf(__('You do not own the tutorial "%s".', 'pb-split-guide'), get_the_title($post_id))]);
+      }
+
+      // No self-transfer
+      if ((int) $post->post_author === $new_owner_id) {
+        wp_send_json_error(['message' => sprintf(__('"%s" is already owned by that user.', 'pb-split-guide'), get_the_title($post_id))]);
+      }
+
+      $transferred[] = $post_id;
+    }
+
+    // Execute transfer
+    global $wpdb;
+    foreach ($transferred as $post_id) {
+      $wpdb->update(
+        $wpdb->posts,
+        ['post_author' => $new_owner_id],
+        ['ID' => $post_id],
+        ['%d'],
+        ['%d']
+      );
+      clean_post_cache($post_id);
+    }
+
+    wp_send_json_success([
+      'message'     => sprintf(
+        _n(
+          '%d tutorial transferred successfully.',
+          '%d tutorials transferred successfully.',
+          count($transferred),
+          'pb-split-guide'
+        ),
+        count($transferred)
+      ),
+      'transferred' => $transferred,
+    ]);
+  }
+
+  /**
+   * AJAX: Get eligible transfer targets (librarians + admins).
+   */
+  public function ajax_get_transfer_targets() {
+    check_ajax_referer('pbsg_transfer_ownership', '_wpnonce');
+
+    $exclude_id = get_current_user_id();
+    $targets = PBSG_Librarian_Manager::get_reassignment_targets($exclude_id);
+
+    wp_send_json_success(['targets' => $targets]);
   }
 
   // ── Template Picker ────────────────────────────────────────────────────────
