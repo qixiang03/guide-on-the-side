@@ -1510,7 +1510,7 @@ class PB_Split_Guide_Plugin {
     'pbsg_admin_js',
     plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
     ['jquery', 'thickbox'],
-    '0.7.0',
+    '0.7.1',
     true
   );
 
@@ -1522,6 +1522,9 @@ class PB_Split_Guide_Plugin {
   );
 
   $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
+  $post_id          = get_the_ID();
+  $post_title       = $post_id ? get_the_title($post_id) : '';
+
   wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
     'templateSlug'    => self::TEMPLATE_SLUG,
     'metaBoxId'       => 'pbsg_settings',
@@ -1536,6 +1539,27 @@ class PB_Split_Guide_Plugin {
     'h5pAvailable'    => PBSG_H5P_Factory::is_h5p_available(),
     'maxUploadSize'   => wp_max_upload_size(),
     'maxUploadLabel'  => size_format(wp_max_upload_size()),
+    // Tutorial title for navigation guard (trimmed; may be empty on new post).
+    'postTitle'       => is_string($post_title) ? trim($post_title) : '',
+    /*
+     * Confirm / beforeunload strings for admin-split-guide.js.
+     * Translators: keep placeholders %1$d (step number), %2$s (step title), %s (tutorial title).
+     */
+    'strings'         => [
+      'confirmRemoveStep' => __(
+        'Are you sure you want to remove Step %1$d: %2$s? Quiz and resource settings for this step will be lost.',
+        'pb-split-guide'
+      ),
+      'untitledStep'      => __('(Untitled step)', 'pb-split-guide'),
+      'leaveWithTitle'    => __(
+        'You have unsaved changes to "%s". Leave without saving?',
+        'pb-split-guide'
+      ),
+      'leaveGeneric'      => __(
+        'You have unsaved changes to this tutorial. Leave without saving?',
+        'pb-split-guide'
+      ),
+    ],
   ]);
 
   // Extra inline script: force the template on Add New Tutorial page.

@@ -98,11 +98,29 @@ jQuery(function ($) {
     _isDirty = false;
   }
 
+  function pbsgAdminI18n() {
+    return (typeof PBSG_ADMIN !== 'undefined' && PBSG_ADMIN.strings) ? PBSG_ADMIN.strings : {};
+  }
+
+  /** Shorten user-entered text for native confirm() dialogs. */
+  function truncateForConfirm(str, maxLen) {
+    const s = String(str || '');
+    const n = maxLen || 80;
+    if (s.length <= n) return s;
+    return s.slice(0, n - 1) + '\u2026';
+  }
+
   // Browser navigation guard
   $(window).on('beforeunload', function () {
-    if (_isDirty) {
-      return 'You have unsaved changes. Are you sure you want to leave?';
+    if (!_isDirty) return;
+    const str = pbsgAdminI18n();
+    const title = (typeof PBSG_ADMIN !== 'undefined' && PBSG_ADMIN.postTitle)
+      ? String(PBSG_ADMIN.postTitle).trim()
+      : '';
+    if (title && str.leaveWithTitle) {
+      return str.leaveWithTitle.replace('%s', title);
     }
+    return str.leaveGeneric || 'You have unsaved changes to this tutorial. Leave without saving?';
   });
 
   function norm(s) {
@@ -524,8 +542,21 @@ jQuery(function ($) {
 
   $(document).on('click', '.pbsg-remove-step', function () {
     const idx = parseInt($(this).data('idx'), 10);
-    if (isNaN(idx) || !confirm('Remove this step?')) return;
-    const steps = getSteps().map(norm); steps.splice(idx, 1); setSteps(steps); renderStepCards();
+    if (isNaN(idx)) return;
+    const steps = getSteps().map(norm);
+    const step = steps[idx];
+    const str = pbsgAdminI18n();
+    const untitled = str.untitledStep || '(Untitled step)';
+    const rawLabel = (step && String(step.title || '').trim()) ? String(step.title).trim() : untitled;
+    const label = truncateForConfirm(rawLabel, 80);
+    const stepNum = idx + 1;
+    const template = str.confirmRemoveStep
+      || 'Are you sure you want to remove Step %1$d: %2$s? Quiz and resource settings for this step will be lost.';
+    const msg = template.replace('%1$d', String(stepNum)).replace('%2$s', label);
+    if (!window.confirm(msg)) return;
+    steps.splice(idx, 1);
+    setSteps(steps);
+    renderStepCards();
   });
 
   $(document).on('click', '.pbsg-step-chevron, .pbsg-collapse-step', function () {

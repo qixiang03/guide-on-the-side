@@ -165,7 +165,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                 </p>
                 <?php endif; ?>
 
-                <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="pbsg-deactivate-form" id="pbsg-deactivate-form">
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="pbsg-deactivate-form" id="pbsg-deactivate-form"
+                    data-display-name="<?php echo esc_attr( $edit_user->display_name ); ?>"
+                    data-user-login="<?php echo esc_attr( $edit_user->user_login ); ?>">
                     <?php wp_nonce_field( 'pbsg_deactivate_librarian' ); ?>
                     <input type="hidden" name="pbsg_librarian_action" value="deactivate" />
                     <input type="hidden" name="user_id" value="<?php echo esc_attr( $edit_id ); ?>" />
@@ -306,7 +308,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                         <?php echo esc_html( date_i18n( get_option( 'date_format' ), strtotime( $dlib['deactivated_on'] ) ) ); ?>
                     </td>
                     <td class="pbsg-actions-cell">
-                        <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="display:inline;">
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="pbsg-reactivate-form" style="display:inline;"
+                            data-display-name="<?php echo esc_attr( $dlib['display_name'] ); ?>"
+                            data-user-login="<?php echo esc_attr( $dlib['user_login'] ); ?>">
                             <?php wp_nonce_field( 'pbsg_reactivate_librarian' ); ?>
                             <input type="hidden" name="pbsg_librarian_action" value="reactivate" />
                             <input type="hidden" name="user_id" value="<?php echo esc_attr( $dlib['ID'] ); ?>" />
