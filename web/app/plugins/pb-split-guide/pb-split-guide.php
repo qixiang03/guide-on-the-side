@@ -427,6 +427,22 @@ class PB_Split_Guide_Plugin {
       'normal',
       'high'
     );
+
+    // Owner metabox and Tutorial Attributes removal — only for Split Guide tutorials
+    $template = get_post_meta($post->ID, '_wp_page_template', true);
+    if ($template === self::TEMPLATE_SLUG) {
+      add_meta_box(
+        'pbsg_owner_box',
+        __('Tutorial Owner', 'pb-split-guide'),
+        [$this, 'render_owner_metabox'],
+        'page',
+        'side',
+        'high'
+      );
+
+      // Hide Tutorial Attributes (Page Attributes) — not meaningful for tutorials
+      remove_meta_box('pageparentdiv', 'page', 'side');
+    }
   }
 
     public function register_admin_menu() {
@@ -1011,6 +1027,37 @@ class PB_Split_Guide_Plugin {
           <p><strong>H5P plugin not detected.</strong> Inline quiz authoring requires the H5P plugin.
           You can still link existing H5P content by ID, or install the H5P plugin to enable inline quiz creation.</p>
         </div>
+      <?php endif; ?>
+    </div>
+    <?php
+  }
+
+  /**
+   * Render the Tutorial Owner metabox in the editor sidebar.
+   * Shows current owner and a "Transfer" button if the user can transfer.
+   */
+  public function render_owner_metabox($post) {
+    $owner = get_userdata((int) $post->post_author);
+    $owner_name = $owner ? $owner->display_name : __('Unknown', 'pb-split-guide');
+    $is_admin = PBSG_Roles::is_admin();
+    $is_owner = (int) $post->post_author === get_current_user_id();
+    $can_transfer = $is_admin || ($is_owner && self::is_transfer_enabled());
+    ?>
+    <div class="pbsg-owner-metabox">
+      <p style="margin:0 0 8px;">
+        <strong><?php esc_html_e('Owner:', 'pb-split-guide'); ?></strong>
+        <?php echo esc_html($owner_name); ?>
+        <?php if ($is_owner && !$is_admin) : ?>
+          <span class="pbsg-owner-badge pbsg-owner-badge--self" style="margin-left:6px;">You</span>
+        <?php endif; ?>
+      </p>
+      <?php if ($can_transfer) : ?>
+        <button type="button" class="button pbsg-transfer-single"
+                data-post-id="<?php echo esc_attr($post->ID); ?>"
+                data-post-title="<?php echo esc_attr(get_the_title($post->ID)); ?>"
+                style="width:100%;">
+          <?php esc_html_e('Transfer Ownership', 'pb-split-guide'); ?>
+        </button>
       <?php endif; ?>
     </div>
     <?php
