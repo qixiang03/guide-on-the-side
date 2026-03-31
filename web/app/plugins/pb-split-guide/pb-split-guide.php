@@ -1015,12 +1015,17 @@ class PB_Split_Guide_Plugin {
       </div>
 
       <!-- ══════════ Steps Section ══════════ -->
-      <p><strong>Steps</strong> (each step = one H5P quiz + one tutorial source)</p>
-      <div id="pbsg-steps-container" class="pbsg-steps-container"></div>
-      <p style="margin-top:10px;">
-        <button type="button" class="button" id="pbsg-add-step">Add Step</button>
-        <button type="button" class="button" id="pbsg-save-as-template" style="margin-left:8px;">Save as Template</button>
-      </p>
+      <div id="pbsg-steps-container" class="pbsg-steps-container">
+        <!-- Steps are rendered by JS -->
+      </div>
+
+      <div class="pbsg-add-step-area" style="display:flex; gap:10px; align-items:center; margin-top:12px;">
+        <button type="button" id="pbsg-add-step" class="pbsg-add-step-btn">
+          <span class="pbsg-add-step-plus">+</span>
+          Add Quiz Step
+        </button>
+        <button type="button" class="button" id="pbsg-save-as-template">Save as Template</button>
+      </div>
 
       <input type="hidden" class="pbsg-hidden"
              id="pbsg_steps_json"
@@ -1719,7 +1724,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'thickbox'],
-      '0.7.0',
+      '0.7.1',
       true
     );
 
@@ -1731,6 +1736,9 @@ class PB_Split_Guide_Plugin {
     );
 
     $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
+    $post_id          = get_the_ID();
+    $post_title       = $post_id ? get_the_title($post_id) : '';
+
     wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
       'templateSlug'    => self::TEMPLATE_SLUG,
       'metaBoxId'       => 'pbsg_settings',
@@ -1739,11 +1747,28 @@ class PB_Split_Guide_Plugin {
       'templateNonce'   => wp_create_nonce('pbsg_template_picker'),
       'exportNonce'     => wp_create_nonce('pbsg_export_import'),
       'uploadNonce'     => wp_create_nonce('pbsg_upload_file'),
+      'tutorialNonce'   => wp_create_nonce('pbsg_list_tutorials'),
       'isNewPage'       => ($hook === 'post-new.php'),
       'currentTemplate' => $current_template,
       'h5pAvailable'    => PBSG_H5P_Factory::is_h5p_available(),
       'maxUploadSize'   => wp_max_upload_size(),
       'maxUploadLabel'  => size_format(wp_max_upload_size()),
+      'postTitle'       => is_string($post_title) ? trim($post_title) : '',
+      'strings'         => [
+        'confirmRemoveStep' => __(
+          'Are you sure you want to remove Step %1$d: %2$s? Quiz and resource settings for this step will be lost.',
+          'pb-split-guide'
+        ),
+        'untitledStep'      => __('(Untitled step)', 'pb-split-guide'),
+        'leaveWithTitle'    => __(
+          'You have unsaved changes to "%s". Leave without saving?',
+          'pb-split-guide'
+        ),
+        'leaveGeneric'      => __(
+          'You have unsaved changes to this tutorial. Leave without saving?',
+          'pb-split-guide'
+        ),
+      ],
     ]);
 
     // Extra inline script: force the template on Add New Tutorial page.

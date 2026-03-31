@@ -276,6 +276,13 @@ if (!function_exists('current_user_can')) {
     }
 }
 
+if (!function_exists('is_super_admin')) {
+    function is_super_admin($user_id = false): bool
+    {
+        return (bool) WPStubs::returnFor('is_super_admin', false);
+    }
+}
+
 if (!function_exists('check_ajax_referer')) {
     function check_ajax_referer(string $action = '', $query_arg = false, bool $die = true)
     {
