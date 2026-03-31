@@ -251,9 +251,9 @@ foreach ($steps as $s) {
 
       <!-- Dropdown -->
       <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
-        <ul class="pbsg-menu-list">
+        <div class="pbsg-menu-list">
           <?php foreach ($steps_enriched as $idx => $step): ?>
-            <li>
+            
               <button
                 type="button"
                 class="pbsg-menu-item"
@@ -266,9 +266,9 @@ foreach ($steps as $s) {
                   echo esc_html($num . '. ' . $label);
                 ?>
               </button>
-            </li>
+            
           <?php endforeach; ?>
-        </ul>
+        </div>
       </div>
     </div>
 
@@ -280,7 +280,7 @@ foreach ($steps as $s) {
 </div>
 
       <div class="pbsg-iframe-wrap">
-        <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe"></iframe>
+        <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe" tabindex="0"></iframe>
       </div>
 
       <div class="pbsg-nav">

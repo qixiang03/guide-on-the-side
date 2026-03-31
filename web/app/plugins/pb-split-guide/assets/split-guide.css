@@ -106,6 +106,10 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   flex: var(--pbsg-left-ratio) 1 0% !important;
   min-width: 200px !important;
   background: #fff !important;
+  margin-left: 5%;
+  margin-right: 5%;
+  margin-top: 2%;
+  margin-bottom: 2%;
 
   /* Allow inner flex children to size properly */
   min-height: 0 !important;
@@ -230,13 +234,16 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   padding: 10px 10px !important;
   border: 0 !important;
   background: transparent !important;
-  color: #222;
+  color: #222 !important;
   border-radius: 10px !important;
   cursor: pointer !important;
   font-size: 15px !important;
   outline: 1px solid #222;
 }
 
+.pbsg-menu-item.is-current:hover{
+  background-color: rgba(34, 34, 34, 0.2) !important;
+}
 
 .pbsg-menu-item.is-current{
   font-weight: 600 !important;
@@ -428,6 +435,7 @@ body.pbsg-focus-quiz .pbsg-left {
   width: 80vw !important;
   height: 80vh !important;
   transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
   z-index: 999999 !important;
 
   background: #fff !important;
@@ -461,7 +469,7 @@ body.pbsg-focus-quiz .pbsg-iframe-wrap {
   .pbsg-left,
   .pbsg-right {
     flex: 0 0 auto !important;
-    width: 100% !important;
+    max-width: 100% !important;
     min-width: 0 !important;
   }
 
