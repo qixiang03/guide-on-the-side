@@ -21,22 +21,23 @@ $base_url         = admin_url('admin.php?page=pbsg-my-tutorials');
 <div class="wrap pbsg-admin-tutorials-page">
   <h1 style="margin-bottom:6px;">My Tutorials</h1>
 
-  <?php if (!$is_admin) : ?>
   <div class="nav-tab-wrapper" style="margin-bottom:20px;">
-    <a href="<?php echo esc_url(add_query_arg('tab', 'recent', $base_url)); ?>"
-       class="nav-tab <?php echo $current_tab === 'recent' ? 'nav-tab-active' : ''; ?>">
-      Recently Worked On
-    </a>
-    <a href="<?php echo esc_url(add_query_arg('tab', 'owned', $base_url)); ?>"
-       class="nav-tab <?php echo $current_tab === 'owned' ? 'nav-tab-active' : ''; ?>">
-      My Tutorials
-    </a>
+    <?php if ($is_admin) : ?>
+      <a href="<?php echo esc_url(remove_query_arg('tab', $base_url)); ?>"
+         class="nav-tab nav-tab-active">
+        All Tutorials
+      </a>
+    <?php else : ?>
+      <a href="<?php echo esc_url(add_query_arg('tab', 'recent', $base_url)); ?>"
+         class="nav-tab <?php echo $current_tab === 'recent' ? 'nav-tab-active' : ''; ?>">
+        Recently Worked On
+      </a>
+      <a href="<?php echo esc_url(add_query_arg('tab', 'owned', $base_url)); ?>"
+         class="nav-tab <?php echo $current_tab === 'owned' ? 'nav-tab-active' : ''; ?>">
+        My Tutorials
+      </a>
+    <?php endif; ?>
   </div>
-  <?php else : ?>
-  <div class="nav-tab-wrapper" style="margin-bottom:20px;">
-    <a href="#" class="nav-tab nav-tab-active">All Tutorials</a>
-  </div>
-  <?php endif; ?>
 
   <?php if (empty($tutorials)) : ?>
     <div class="notice notice-info inline">
@@ -52,7 +53,7 @@ $base_url         = admin_url('admin.php?page=pbsg-my-tutorials');
     </div>
   <?php else : ?>
 
-    <?php if ($transfer_enabled && !$is_admin) : ?>
+    <?php if ($transfer_enabled) : ?>
     <div style="margin-bottom:14px;">
       <label>
         <input type="checkbox" id="pbsg-select-all-tutorials" />
@@ -136,19 +137,20 @@ $base_url         = admin_url('admin.php?page=pbsg-my-tutorials');
              data-post-id="<?php echo esc_attr($item['id']); ?>"
              data-post-title="<?php echo esc_attr($item['title']); ?>">
 
-          <?php if ($transfer_enabled && $item['is_owner']) : ?>
-          <div style="padding:8px 18px 0; text-align:right;">
-            <input type="checkbox" class="pbsg-tutorial-checkbox" value="<?php echo esc_attr($item['id']); ?>"
-                   data-title="<?php echo esc_attr($item['title']); ?>" />
+          <div class="pbsg-admin-tutorial-thumb" style="position:relative;">
+            <?php if ($transfer_enabled && $item['is_owner']) : ?>
+            <input type="checkbox" class="pbsg-tutorial-checkbox"
+                   value="<?php echo esc_attr($item['id']); ?>"
+                   data-title="<?php echo esc_attr($item['title']); ?>"
+                   style="position:absolute; top:8px; right:8px; z-index:2; width:18px; height:18px; cursor:pointer;" />
+            <?php endif; ?>
+            <a href="<?php echo esc_url($item['link']); ?>" style="display:block; width:100%; height:100%;">
+              <img
+                src="<?php echo esc_url($item['cover']); ?>"
+                alt="<?php echo esc_attr($item['title']); ?>"
+              />
+            </a>
           </div>
-          <?php endif; ?>
-
-          <a class="pbsg-admin-tutorial-thumb" href="<?php echo esc_url($item['link']); ?>">
-            <img
-              src="<?php echo esc_url($item['cover']); ?>"
-              alt="<?php echo esc_attr($item['title']); ?>"
-            />
-          </a>
 
           <div class="pbsg-admin-tutorial-body">
             <h2 class="pbsg-admin-tutorial-title">

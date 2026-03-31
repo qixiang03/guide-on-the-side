@@ -90,6 +90,11 @@ class PB_Split_Guide_Plugin {
     add_action('wp_ajax_pbsg_transfer_ownership', [$this, 'ajax_transfer_ownership']);
     add_action('wp_ajax_pbsg_get_transfer_targets', [$this, 'ajax_get_transfer_targets']);
 
+    // Bulk action: Transfer Ownership on the Tutorials (Pages) list table
+    add_filter('bulk_actions-edit-page', [$this, 'register_transfer_bulk_action']);
+    add_filter('handle_bulk_actions-edit-page', [$this, 'handle_transfer_bulk_action'], 10, 3);
+    add_action('admin_notices', [$this, 'transfer_bulk_action_notice']);
+
     // Rename "Pages" to "Tutorials" — use gettext filter (like Pressbooks does
     // for "Sites" → "Books") so it works everywhere regardless of menu rebuild order.
     if (function_exists('is_admin') && is_admin()) {
@@ -1777,10 +1782,11 @@ class PB_Split_Guide_Plugin {
     }
   } // end post editor assets
 
-  // Cross-edit JS — needed on Guide Settings page + My Tutorials page + post editor
+  // Cross-edit JS — needed on Guide Settings, My Tutorials, post editor, and Pages list
   $cross_edit_screens = ['pbsg-my-tutorials', 'pbsg-guide-settings'];
   $current_page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : '';
-  if (in_array($current_page, $cross_edit_screens, true) || $hook === 'post.php' || $hook === 'post-new.php') {
+  $is_pages_list = ($hook === 'edit.php' && $screen && $screen->post_type === 'page');
+  if (in_array($current_page, $cross_edit_screens, true) || $hook === 'post.php' || $hook === 'post-new.php' || $is_pages_list) {
     wp_enqueue_style(
       'pbsg-admin-cross-edit',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.css',
@@ -1794,12 +1800,23 @@ class PB_Split_Guide_Plugin {
       '0.6.0',
       true
     );
+    // Check for pending bulk transfer from Pages list
+    $bulk_transfer_ids = [];
+    if ( isset($_GET['pbsg_bulk_transfer']) && $_GET['pbsg_bulk_transfer'] === '1' ) {
+      $stored = get_transient( 'pbsg_bulk_transfer_' . get_current_user_id() );
+      if ( is_array($stored) ) {
+        $bulk_transfer_ids = $stored;
+        delete_transient( 'pbsg_bulk_transfer_' . get_current_user_id() );
+      }
+    }
+
     wp_localize_script('pbsg-admin-cross-edit', 'pbsgCrossEdit', [
       'ajaxUrl' => admin_url('admin-ajax.php'),
       'nonce'   => wp_create_nonce('pbsg_transfer_ownership'),
       'isAdmin' => PBSG_Roles::is_admin(),
       'transferEnabled' => self::is_transfer_enabled(),
       'currentUserId' => get_current_user_id(),
+      'bulkTransferIds' => $bulk_transfer_ids,
     ]);
   }
 }
@@ -1937,6 +1954,74 @@ class PB_Split_Guide_Plugin {
     $targets = PBSG_Librarian_Manager::get_reassignment_targets($exclude_id);
 
     wp_send_json_success(['targets' => $targets]);
+  }
+
+  // ── Bulk Action: Transfer Ownership on Pages list ─────────────────────────
+
+  /**
+   * Add "Transfer Ownership" to the Pages (Tutorials) list table bulk actions.
+   */
+  public function register_transfer_bulk_action( $bulk_actions ) {
+    if ( PBSG_Roles::is_admin() || self::is_transfer_enabled() ) {
+      $bulk_actions['pbsg_transfer_ownership'] = __( 'Transfer Ownership', 'pb-split-guide' );
+    }
+    return $bulk_actions;
+  }
+
+  /**
+   * Handle the "Transfer Ownership" bulk action from Pages list.
+   * Redirects to My Tutorials page with a modal trigger param.
+   */
+  public function handle_transfer_bulk_action( $redirect_to, $doaction, $post_ids ) {
+    if ( $doaction !== 'pbsg_transfer_ownership' ) {
+      return $redirect_to;
+    }
+
+    // Filter to only tutorials the current user can transfer
+    $is_admin = PBSG_Roles::is_admin();
+    $current_user_id = get_current_user_id();
+    $valid_ids = [];
+
+    foreach ( $post_ids as $post_id ) {
+      $post_id = absint( $post_id );
+      if ( ! PBSG_Roles::is_tutorial( $post_id ) ) {
+        continue; // Skip non-tutorial pages
+      }
+      $post = get_post( $post_id );
+      if ( ! $post ) continue;
+
+      // Non-admins can only transfer their own
+      if ( ! $is_admin && (int) $post->post_author !== $current_user_id ) {
+        continue;
+      }
+      $valid_ids[] = $post_id;
+    }
+
+    if ( empty( $valid_ids ) ) {
+      return add_query_arg( 'pbsg_transfer_error', 'no_valid', $redirect_to );
+    }
+
+    // Store in transient for the modal to pick up
+    set_transient( 'pbsg_bulk_transfer_' . $current_user_id, $valid_ids, 300 );
+
+    return add_query_arg( [
+      'page'               => 'pbsg-my-tutorials',
+      'pbsg_bulk_transfer' => '1',
+    ], admin_url( 'admin.php' ) );
+  }
+
+  /**
+   * Show notice if transfer bulk action had no valid tutorials.
+   */
+  public function transfer_bulk_action_notice() {
+    if ( ! isset( $_GET['pbsg_transfer_error'] ) ) return;
+
+    $error = sanitize_text_field( $_GET['pbsg_transfer_error'] );
+    if ( $error === 'no_valid' ) {
+      echo '<div class="notice notice-warning is-dismissible"><p>';
+      esc_html_e( 'No eligible tutorials found for transfer. You can only transfer tutorials you own.', 'pb-split-guide' );
+      echo '</p></div>';
+    }
   }
 
   // ── Template Picker ────────────────────────────────────────────────────────

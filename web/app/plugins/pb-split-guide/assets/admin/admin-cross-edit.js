@@ -239,5 +239,19 @@
   $(document).ready(function () {
     initSettingsConfirmation();
     initMyTutorialsPage();
+
+    // Auto-open transfer modal when redirected from Pages list bulk action
+    if (typeof pbsgCrossEdit !== 'undefined' && pbsgCrossEdit.bulkTransferIds && pbsgCrossEdit.bulkTransferIds.length > 0) {
+      var ids = pbsgCrossEdit.bulkTransferIds.map(function (id) { return parseInt(id, 10); });
+      var titles = ids.map(function () { return 'Selected tutorial'; });
+      // Try to get real titles from page cards if available
+      ids.forEach(function (id, i) {
+        var $card = $('[data-post-id="' + id + '"]');
+        if ($card.length) {
+          titles[i] = $card.data('post-title') || titles[i];
+        }
+      });
+      openTransferModal(ids, titles);
+    }
   });
 })(jQuery);

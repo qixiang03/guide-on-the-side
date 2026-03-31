@@ -143,7 +143,10 @@ jQuery(function ($) {
   // ═══════════════════════════════════════════════════════════
   function isSplitGuide() {
     const $t = $('#page_template');
-    return $t.length > 0 && $t.val() === PBSG_ADMIN.templateSlug;
+    // If the template dropdown exists, use it; otherwise fall back to server-side value
+    // (dropdown may be absent when Tutorial Attributes metabox is hidden)
+    if ($t.length > 0) return $t.val() === PBSG_ADMIN.templateSlug;
+    return PBSG_ADMIN.currentTemplate === PBSG_ADMIN.templateSlug;
   }
   function toggleMetaBox() {
     const $b = $('#' + PBSG_ADMIN.metaBoxId).closest('.postbox');
