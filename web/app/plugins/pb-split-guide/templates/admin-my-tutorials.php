@@ -5,24 +5,64 @@ if (!defined('ABSPATH')) exit;
  * Admin My Tutorials page
  *
  * Expected variables before include:
- * - $tutorials : array of tutorial items
+ * - $tutorials         : array of tutorial items
+ * - $current_tab       : 'recent' or 'owned'
+ * - $is_admin          : bool — whether current user is admin
+ * - $transfer_enabled  : bool — whether transfer actions should show
  */
 
-$tutorials = isset($tutorials) && is_array($tutorials) ? $tutorials : [];
+$tutorials        = isset($tutorials) && is_array($tutorials) ? $tutorials : [];
+$current_tab      = isset($current_tab) ? $current_tab : 'recent';
+$is_admin         = isset($is_admin) ? (bool) $is_admin : false;
+$transfer_enabled = isset($transfer_enabled) ? (bool) $transfer_enabled : false;
+$base_url         = admin_url('admin.php?page=pbsg-my-tutorials');
 ?>
 
 <div class="wrap pbsg-admin-tutorials-page">
   <h1 style="margin-bottom:6px;">My Tutorials</h1>
 
+  <?php if (!$is_admin) : ?>
   <div class="nav-tab-wrapper" style="margin-bottom:20px;">
-    <a href="#" class="nav-tab nav-tab-active">Overview</a>
+    <a href="<?php echo esc_url(add_query_arg('tab', 'recent', $base_url)); ?>"
+       class="nav-tab <?php echo $current_tab === 'recent' ? 'nav-tab-active' : ''; ?>">
+      Recently Worked On
+    </a>
+    <a href="<?php echo esc_url(add_query_arg('tab', 'owned', $base_url)); ?>"
+       class="nav-tab <?php echo $current_tab === 'owned' ? 'nav-tab-active' : ''; ?>">
+      My Tutorials
+    </a>
   </div>
+  <?php else : ?>
+  <div class="nav-tab-wrapper" style="margin-bottom:20px;">
+    <a href="#" class="nav-tab nav-tab-active">All Tutorials</a>
+  </div>
+  <?php endif; ?>
 
   <?php if (empty($tutorials)) : ?>
     <div class="notice notice-info inline">
-      <p>No tutorials found.</p>
+      <p>
+        <?php
+        if ($current_tab === 'owned') {
+          esc_html_e('You don\'t own any tutorials yet.', 'pb-split-guide');
+        } else {
+          esc_html_e('No tutorials found.', 'pb-split-guide');
+        }
+        ?>
+      </p>
     </div>
   <?php else : ?>
+
+    <?php if ($transfer_enabled && !$is_admin) : ?>
+    <div style="margin-bottom:14px;">
+      <label>
+        <input type="checkbox" id="pbsg-select-all-tutorials" />
+        Select all
+      </label>
+      <button type="button" class="button" id="pbsg-bulk-transfer" style="margin-left:10px;" disabled>
+        Transfer Selected
+      </button>
+    </div>
+    <?php endif; ?>
 
     <style>
       .pbsg-admin-tutorials-grid{
@@ -76,18 +116,33 @@ $tutorials = isset($tutorials) && is_array($tutorials) ? $tutorials : [];
       .pbsg-admin-tutorial-meta{
         color:#646970;
         margin-bottom:14px;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
       }
 
       .pbsg-admin-tutorial-actions{
         display:flex;
         gap:10px;
         flex-wrap:wrap;
+        align-items:center;
       }
     </style>
 
     <div class="pbsg-admin-tutorials-grid">
       <?php foreach ($tutorials as $item) : ?>
-        <div class="pbsg-admin-tutorial-card">
+        <div class="pbsg-admin-tutorial-card"
+             data-post-id="<?php echo esc_attr($item['id']); ?>"
+             data-post-title="<?php echo esc_attr($item['title']); ?>">
+
+          <?php if ($transfer_enabled && $item['is_owner']) : ?>
+          <div style="padding:8px 18px 0; text-align:right;">
+            <input type="checkbox" class="pbsg-tutorial-checkbox" value="<?php echo esc_attr($item['id']); ?>"
+                   data-title="<?php echo esc_attr($item['title']); ?>" />
+          </div>
+          <?php endif; ?>
+
           <a class="pbsg-admin-tutorial-thumb" href="<?php echo esc_url($item['link']); ?>">
             <img
               src="<?php echo esc_url($item['cover']); ?>"
@@ -103,7 +158,12 @@ $tutorials = isset($tutorials) && is_array($tutorials) ? $tutorials : [];
             </h2>
 
             <div class="pbsg-admin-tutorial-meta">
-              Tutorial
+              <span class="pbsg-owner-badge <?php echo $item['is_owner'] ? 'pbsg-owner-badge--self' : ''; ?>">
+                <?php echo esc_html($item['owner_name']); ?>
+              </span>
+              <?php if ($item['status'] !== 'publish') : ?>
+                <span style="font-size:12px; color:#D4A017;">(<?php echo esc_html(ucfirst($item['status'])); ?>)</span>
+              <?php endif; ?>
             </div>
 
             <div class="pbsg-admin-tutorial-actions">
@@ -115,6 +175,14 @@ $tutorials = isset($tutorials) && is_array($tutorials) ? $tutorials : [];
                 <a class="button" href="<?php echo esc_url($item['edit_link']); ?>">
                   Edit
                 </a>
+              <?php endif; ?>
+
+              <?php if ($transfer_enabled && $item['is_owner']) : ?>
+                <button type="button" class="button pbsg-transfer-single"
+                        data-post-id="<?php echo esc_attr($item['id']); ?>"
+                        data-post-title="<?php echo esc_attr($item['title']); ?>">
+                  Transfer
+                </button>
               <?php endif; ?>
             </div>
           </div>

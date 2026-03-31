@@ -446,7 +446,14 @@ class PB_Split_Guide_Plugin {
       wp_die(__('You do not have permission to view this page.', 'pb-split-guide'));
     }
 
-    $tutorials = $this->get_my_tutorials_data();
+    $is_admin = PBSG_Roles::is_admin();
+    $current_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'recent';
+    if (!in_array($current_tab, ['recent', 'owned'], true)) {
+      $current_tab = 'recent';
+    }
+
+    $tutorials = $this->get_my_tutorials_data($current_tab);
+    $transfer_enabled = $is_admin || self::is_transfer_enabled();
 
     $template = plugin_dir_path(__FILE__) . 'templates/admin-my-tutorials.php';
 
@@ -457,51 +464,117 @@ class PB_Split_Guide_Plugin {
     }
   }
 
-  private function get_my_tutorials_data() {
+  /**
+   * Get tutorial data for the "My Tutorials" page.
+   *
+   * @param string $tab 'recent' for recently worked on, 'owned' for own tutorials.
+   * @return array
+   */
+  private function get_my_tutorials_data( string $tab = 'recent' ) {
     $tutorials = [];
+    $current_user_id = get_current_user_id();
+    $is_admin = PBSG_Roles::is_admin();
 
-    $query_args = [
-      'post_type'      => 'page',
-      'post_status'    => 'publish',
-      'posts_per_page' => -1,
-      'orderby'        => 'title',
-      'order'          => 'ASC',
-      'meta_key'       => '_wp_page_template',
-      'meta_value'     => self::TEMPLATE_SLUG,
-    ];
-
-    // "My Tutorials" shows only the current user's tutorials for librarians.
-    // Admins see all tutorials here (they can manage everything).
-    if ( PBSG_Roles::is_librarian() && ! PBSG_Roles::is_admin() ) {
-      $query_args['author'] = get_current_user_id();
+    // Admins see all tutorials regardless of tab
+    if ( $is_admin ) {
+      $query_args = [
+        'post_type'      => 'page',
+        'post_status'    => ['publish', 'draft', 'pending'],
+        'posts_per_page' => -1,
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'meta_key'       => '_wp_page_template',
+        'meta_value'     => self::TEMPLATE_SLUG,
+      ];
+    } elseif ( $tab === 'owned' ) {
+      // Tab 2: Only tutorials owned by current user
+      $query_args = [
+        'post_type'      => 'page',
+        'post_status'    => ['publish', 'draft', 'pending'],
+        'posts_per_page' => -1,
+        'orderby'        => 'title',
+        'order'          => 'ASC',
+        'meta_key'       => '_wp_page_template',
+        'meta_value'     => self::TEMPLATE_SLUG,
+        'author'         => $current_user_id,
+      ];
+    } else {
+      // Tab 1 (default): Recently Worked On — own + touched tutorials
+      // First get all tutorials, then filter by touched/owned
+      $query_args = [
+        'post_type'      => 'page',
+        'post_status'    => ['publish', 'draft', 'pending'],
+        'posts_per_page' => -1,
+        'meta_key'       => '_wp_page_template',
+        'meta_value'     => self::TEMPLATE_SLUG,
+      ];
     }
 
     $pages = get_posts( $query_args );
 
-    if (empty($pages)) {
+    if ( empty( $pages ) ) {
       return $tutorials;
     }
 
-    foreach ($pages as $page) {
-      $post_id = (int) $page->ID;
+    foreach ( $pages as $page ) {
+      $post_id  = (int) $page->ID;
+      $is_owner = ( (int) $page->post_author === $current_user_id );
 
-      $cover_id  = (int) get_post_meta($post_id, self::META_COVER_ID, true);
-      $cover_url = '';
-
-      if ($cover_id) {
-        $cover_url = wp_get_attachment_image_url($cover_id, 'large');
+      // For "recent" tab (non-admin), filter to owned or touched
+      if ( ! $is_admin && $tab === 'recent' ) {
+        if ( ! $is_owner ) {
+          $editors = get_post_meta( $post_id, '_pbsg_editors', true );
+          if ( ! is_array( $editors ) || ! isset( $editors[ $current_user_id ] ) ) {
+            continue; // Skip — user hasn't touched this tutorial
+          }
+        }
       }
 
-      if (!$cover_url) {
+      $cover_id  = (int) get_post_meta( $post_id, self::META_COVER_ID, true );
+      $cover_url = '';
+
+      if ( $cover_id ) {
+        $cover_url = wp_get_attachment_image_url( $cover_id, 'large' );
+      }
+
+      if ( ! $cover_url ) {
         $cover_url = 'https://via.placeholder.com/1200x675?text=Tutorial';
       }
 
+      $owner = get_userdata( (int) $page->post_author );
+      $owner_name = $owner ? $owner->display_name : __( 'Unknown', 'pb-split-guide' );
+
+      // Get last_edited timestamp for sorting
+      $last_edited = '';
+      if ( ! $is_admin && $tab === 'recent' ) {
+        if ( $is_owner ) {
+          $last_edited = $page->post_modified;
+        } else {
+          $editors = get_post_meta( $post_id, '_pbsg_editors', true );
+          if ( is_array( $editors ) && isset( $editors[ $current_user_id ] ) ) {
+            $last_edited = $editors[ $current_user_id ]['last_edited'];
+          }
+        }
+      }
+
       $tutorials[] = [
-        'title'     => get_the_title($post_id),
-        'link'      => get_permalink($post_id),
-        'edit_link' => current_user_can('edit_post', $post_id) ? get_edit_post_link($post_id) : '',
-        'cover'     => $cover_url,
+        'id'          => $post_id,
+        'title'       => get_the_title( $post_id ),
+        'link'        => get_permalink( $post_id ),
+        'edit_link'   => current_user_can( 'edit_post', $post_id ) ? get_edit_post_link( $post_id ) : '',
+        'cover'       => $cover_url,
+        'owner_name'  => $owner_name,
+        'is_owner'    => $is_owner || $is_admin,
+        'last_edited' => $last_edited,
+        'status'      => $page->post_status,
       ];
+    }
+
+    // Sort "recent" tab by last_edited descending
+    if ( ! $is_admin && $tab === 'recent' ) {
+      usort( $tutorials, function ( $a, $b ) {
+        return strcmp( $b['last_edited'], $a['last_edited'] );
+      });
     }
 
     return $tutorials;
@@ -1431,6 +1504,18 @@ class PB_Split_Guide_Plugin {
     }
 
     update_post_meta($post_id, self::META_STEPS, wp_json_encode($clean));
+
+    // Track editors who have touched this tutorial (for "Recently Worked On" tab)
+    $editors = get_post_meta($post_id, '_pbsg_editors', true);
+    if (!is_array($editors)) {
+      $editors = [];
+    }
+    $current_user_id = get_current_user_id();
+    $editors[$current_user_id] = [
+      'user_id'     => $current_user_id,
+      'last_edited' => current_time('mysql'),
+    ];
+    update_post_meta($post_id, '_pbsg_editors', $editors);
 
     $note = isset($_POST['pbsg_header_note']) ? sanitize_text_field($_POST['pbsg_header_note']) : '';
     update_post_meta($post_id, self::META_NOTE, $note);
