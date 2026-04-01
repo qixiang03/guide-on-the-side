@@ -13,10 +13,14 @@
         var $registerPanel = $('#pbsg-register-panel');
         var $toggleBtn = $('#pbsg-toggle-register-form');
         var $cancelBtn = $('#pbsg-cancel-register');
+        var $promotePanel = $('#pbsg-promote-panel');
+        var $promoteToggleBtn = $('#pbsg-toggle-promote-form');
+        var $promoteCancelBtn = $('#pbsg-cancel-promote');
         var $deactivateForm = $('#pbsg-deactivate-form');
 
-        // Toggle registration form
+        // Toggle registration form (close promote panel if open)
         $toggleBtn.on('click', function () {
+            $promotePanel.slideUp(200);
             $registerPanel.slideToggle(200, function () {
                 if ($registerPanel.is(':visible')) {
                     $registerPanel.find('input[name="username"]').trigger('focus');
@@ -29,6 +33,20 @@
             $registerPanel.slideUp(200);
         });
 
+        // Toggle promote form (close register panel if open)
+        $promoteToggleBtn.on('click', function () {
+            $registerPanel.slideUp(200);
+            $promotePanel.slideToggle(200, function () {
+                if ($promotePanel.is(':visible')) {
+                    $promotePanel.find('select[name="user_id"]').trigger('focus');
+                }
+            });
+        });
+
+        // Cancel promote
+        $promoteCancelBtn.on('click', function () {
+            $promotePanel.slideUp(200);
+        });
         /**
          * Build localized confirm string; %1$s and %2$s are replaced in order.
          *
@@ -101,6 +119,21 @@
                 $(this).find('input[name="email"]').trigger('focus');
             }
         });
+
+        /**
+         * Build localized confirm string; %1$s and %2$s are replaced in order.
+         *
+         * @param {string} fmt
+         * @param {string} name
+         * @param {string} login
+         * @return {string}
+         */
+        function formatUserConfirm(fmt, name, login) {
+            if (!fmt) {
+                return '';
+            }
+            return fmt.replace('%1$s', name).replace('%2$s', login);
+        }
 
         /**
          * Basic email validation.

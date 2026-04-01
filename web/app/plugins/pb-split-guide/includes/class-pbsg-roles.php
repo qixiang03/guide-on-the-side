@@ -142,17 +142,17 @@ class PBSG_Roles {
     }
 
     /**
-     * Deny blocked H5P capabilities for librarian users at runtime.
+     * Runtime capability filter for librarian users.
      *
-     * WordPress calls this filter every time current_user_can() is invoked.
-     * For librarians, we force-deny capabilities that H5P auto-maps from
-     * core caps (e.g. edit_others_pages → install_recommended_h5p_libraries).
-     * This prevents librarians from installing new content types from the
-     * H5P Hub while still allowing them to create and edit H5P content.
+     * 1. Denies blocked H5P capabilities (existing behavior).
+     * 2. When cross-edit is ON, grants edit access to other librarians'
+     *    tutorials but blocks delete/publish on posts they don't own.
+     *    ONLY applies to Split Guide tutorials — Pressbooks native pages
+     *    (Home, About, ToC, etc.) are never affected.
      *
      * @param bool[]   $allcaps All capabilities for the user.
      * @param string[] $caps    Required primitive capabilities for the check.
-     * @param array    $args    Arguments: [0] = requested cap, [1] = user ID.
+     * @param array    $args    Arguments: [0] = requested cap, [1] = user ID, [2] = post ID (for meta caps).
      * @param WP_User  $user    The user object.
      * @return bool[] Filtered capabilities.
      */
@@ -161,9 +161,64 @@ class PBSG_Roles {
             return $allcaps;
         }
 
+        // --- Existing: deny blocked H5P caps ---
         foreach ( self::BLOCKED_H5P_CAPS as $cap ) {
             $allcaps[ $cap ] = false;
         }
+
+        // --- Cross-edit capability filtering ---
+        // Only applies when a specific post is being checked (meta cap resolution)
+        if ( empty( $args[2] ) ) {
+            // List-level cap check (no specific post). Grant edit_others_pages
+            // when cross-edit is ON so the list table shows other tutorials.
+            if ( function_exists( 'get_option' ) ) {
+                $cross_edit = (bool) get_option( 'pbsg_cross_edit_enabled', true );
+                if ( ! $cross_edit ) {
+                    // Cross-edit OFF: remove ability to see others' pages in lists
+                    $allcaps['edit_others_pages'] = false;
+                    $allcaps['delete_others_pages'] = false;
+                }
+            }
+            return $allcaps;
+        }
+
+        // Post-specific cap check — get the post ID
+        $post_id = (int) $args[2];
+
+        // Only apply cross-edit logic to Split Guide tutorials
+        if ( ! self::is_tutorial( $post_id ) ) {
+            return $allcaps;
+        }
+
+        $post = get_post( $post_id );
+        if ( ! $post ) {
+            return $allcaps;
+        }
+
+        $is_own = ( (int) $post->post_author === (int) $user->ID );
+        $cross_edit = function_exists( 'get_option' )
+            ? (bool) get_option( 'pbsg_cross_edit_enabled', true )
+            : true;
+
+        if ( ! $is_own ) {
+            if ( $cross_edit ) {
+                // Cross-edit ON: allow editing, block delete/publish
+                $allcaps['edit_others_pages']   = true;
+                $allcaps['edit_published_pages'] = true;
+                // Block destructive actions on others' tutorials
+                $allcaps['delete_others_pages']     = false;
+                $allcaps['delete_published_pages']   = false;
+                $allcaps['delete_pages']             = false;
+                $allcaps['publish_pages']            = false;
+            } else {
+                // Cross-edit OFF: no access to others' tutorials
+                $allcaps['edit_others_pages']        = false;
+                $allcaps['delete_others_pages']       = false;
+                $allcaps['delete_published_pages']    = false;
+                $allcaps['publish_pages']             = false;
+            }
+        }
+        // If $is_own, don't modify caps — librarian keeps full control on own tutorials
 
         return $allcaps;
     }
@@ -194,5 +249,19 @@ class PBSG_Roles {
      */
     public static function is_gots_user(): bool {
         return self::is_admin() || self::is_librarian();
+    }
+
+    /**
+     * Check if a post is a Split Guide tutorial (by template meta).
+     *
+     * @param int $post_id The post ID to check.
+     * @return bool
+     */
+    public static function is_tutorial( int $post_id ): bool {
+        if ( $post_id <= 0 ) {
+            return false;
+        }
+        $template = get_post_meta( $post_id, '_wp_page_template', true );
+        return $template === 'split-guide-template.php';
     }
 }

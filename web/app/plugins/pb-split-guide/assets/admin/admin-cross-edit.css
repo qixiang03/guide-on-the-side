@@ -1,0 +1,61 @@
+/**
+ * Cross-Edit & Transfer — Admin Styles
+ */
+
+/* Transfer modal overlay */
+.pbsg-transfer-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 100100;
+  align-items: center;
+  justify-content: center;
+}
+
+.pbsg-transfer-overlay.pbsg-transfer-overlay--active {
+  display: flex;
+}
+
+.pbsg-transfer-modal {
+  background: #fff;
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.pbsg-transfer-modal h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.pbsg-transfer-modal__actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+/* My Tutorials owner badge */
+.pbsg-owner-badge {
+  display: inline-block;
+  font-size: 12px;
+  color: #646970;
+  background: #f0f0f1;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.pbsg-owner-badge--self {
+  color: #517E1B;
+  background: #e8f0dc;
+}
+
+/* My Tutorials tabs */
+.pbsg-tutorials-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+}

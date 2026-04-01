@@ -263,8 +263,8 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->plugin->save_meta(99, (object) ['ID' => 99]);
 
         $this->assertTrue(WPStubs::wasCalled('update_post_meta'));
-        // 7 calls: steps + note + intro_desc + intro_obj + intro_duration + intro_prereqs + template
-        $this->assertSame(7, WPStubs::callCount('update_post_meta'));
+        // 8 calls: steps + editors + note + intro_desc + intro_obj + intro_duration + intro_prereqs + template
+        $this->assertSame(8, WPStubs::callCount('update_post_meta'));
 
         $stepsCall = WPStubs::callArgs('update_post_meta', 0);
         $this->assertSame(99, $stepsCall[0]);
@@ -276,24 +276,27 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->assertSame('https://upei.ca/tut', $saved[0]['tutorial_url']);
         $this->assertSame(5, $saved[0]['h5p_id']);
 
-        $noteCall = WPStubs::callArgs('update_post_meta', 1);
+        $editorsCall = WPStubs::callArgs('update_post_meta', 1);
+        $this->assertSame('_pbsg_editors', $editorsCall[1]);
+
+        $noteCall = WPStubs::callArgs('update_post_meta', 2);
         $this->assertSame('_pbsg_header_note', $noteCall[1]);
         $this->assertSame('Welcome note', $noteCall[2]);
 
         // Intro fields (empty since not in POST)
-        $introDescCall = WPStubs::callArgs('update_post_meta', 2);
+        $introDescCall = WPStubs::callArgs('update_post_meta', 3);
         $this->assertSame('_pbsg_intro_description', $introDescCall[1]);
 
-        $introObjCall = WPStubs::callArgs('update_post_meta', 3);
+        $introObjCall = WPStubs::callArgs('update_post_meta', 4);
         $this->assertSame('_pbsg_intro_objectives', $introObjCall[1]);
 
-        $introDurCall = WPStubs::callArgs('update_post_meta', 4);
+        $introDurCall = WPStubs::callArgs('update_post_meta', 5);
         $this->assertSame('_pbsg_intro_duration', $introDurCall[1]);
 
-        $introPrereqCall = WPStubs::callArgs('update_post_meta', 5);
+        $introPrereqCall = WPStubs::callArgs('update_post_meta', 6);
         $this->assertSame('_pbsg_intro_prerequisites', $introPrereqCall[1]);
 
-        $templateCall = WPStubs::callArgs('update_post_meta', 6);
+        $templateCall = WPStubs::callArgs('update_post_meta', 7);
         $this->assertSame(99, $templateCall[0]);
         $this->assertSame('_wp_page_template', $templateCall[1]);
         $this->assertSame('split-guide-template.php', $templateCall[2]);
@@ -353,14 +356,17 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->assertFalse(WPStubs::wasCalled('wp_enqueue_script'));
     }
 
-    public function test_enqueue_admin_assets_skips_non_page_post_type(): void
+    public function test_enqueue_admin_assets_skips_editor_assets_for_non_page_post_type(): void
     {
         $screen = (object) ['post_type' => 'post'];
         WPStubs::$returns['get_current_screen'] = $screen;
 
         $this->plugin->enqueue_admin_assets('post.php');
 
-        $this->assertFalse(WPStubs::wasCalled('wp_enqueue_script'));
+        // Editor-specific assets (thickbox, media, admin-split-guide.js) should NOT load
+        $this->assertFalse(WPStubs::wasCalled('add_thickbox'));
+        $this->assertFalse(WPStubs::wasCalled('wp_enqueue_media'));
+        // Cross-edit JS may still load (harmless on non-page types), so we don't assert wp_enqueue_script is false
     }
 
     public function test_enqueue_admin_assets_loads_for_page_editor(): void

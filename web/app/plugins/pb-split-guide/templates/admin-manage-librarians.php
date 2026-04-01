@@ -3,12 +3,13 @@
  * Template: Manage Librarians admin page.
  *
  * Expected variables:
- * - $librarians   : array of active librarian data
- * - $deactivated  : array of deactivated (former) librarian data
- * - $sub_action   : string ('list' or 'manage')
- * - $edit_id      : int (user ID when editing)
- * - $notice_type  : string ('success' or 'error')
- * - $notice_msg   : string
+ * - $librarians      : array of active librarian data
+ * - $deactivated    : array of deactivated (former) librarian data
+ * - $promotable     : array of users eligible for librarian promotion
+ * - $sub_action     : string ('list' or 'manage')
+ * - $edit_id        : int (user ID when editing)
+ * - $notice_type    : string ('success' or 'error')
+ * - $notice_msg     : string
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -32,6 +33,11 @@ if ( ! defined( 'ABSPATH' ) ) {
             <button type="button" class="pbsg-btn pbsg-btn-primary" id="pbsg-toggle-register-form">
                 + <?php esc_html_e( 'Register New Librarian', 'pb-split-guide' ); ?>
             </button>
+            <?php if ( ! empty( $promotable ) ) : ?>
+            <button type="button" class="pbsg-btn pbsg-btn-secondary" id="pbsg-toggle-promote-form">
+                <?php esc_html_e( 'Promote Existing User', 'pb-split-guide' ); ?>
+            </button>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -72,16 +78,9 @@ if ( ! defined( 'ABSPATH' ) ) {
                 </div>
 
                 <div class="pbsg-form-field pbsg-form-field--full">
-                    <label for="pbsg-reg-password"><?php esc_html_e( 'Password', 'pb-split-guide' ); ?></label>
-                    <input type="password" id="pbsg-reg-password" name="password" autocomplete="new-password" />
-                    <p class="description"><?php esc_html_e( 'Leave blank to auto-generate and email credentials to the librarian.', 'pb-split-guide' ); ?></p>
-                </div>
-
-                <div class="pbsg-form-field pbsg-form-field--full">
-                    <label class="pbsg-checkbox-label">
-                        <input type="checkbox" name="send_email" value="1" checked />
-                        <?php esc_html_e( 'Send login credentials via email', 'pb-split-guide' ); ?>
-                    </label>
+                    <p class="description" style="margin:0; padding:8px 12px; background:#f0f6fc; border-left:3px solid #2271b1; color:#1d2327;">
+                        <?php esc_html_e( 'A credential email with a password reset link will be sent to the librarian. They must set their own password before logging in.', 'pb-split-guide' ); ?>
+                    </p>
                 </div>
             </div>
 
@@ -95,6 +94,47 @@ if ( ! defined( 'ABSPATH' ) ) {
             </div>
         </form>
     </div>
+
+    <!-- Promote Existing User Section -->
+    <?php if ( ! empty( $promotable ) ) : ?>
+    <div class="pbsg-librarians-card pbsg-promote-panel" id="pbsg-promote-panel" style="display:none;">
+        <h2 class="pbsg-card-title"><?php esc_html_e( 'Assign Librarian Role to Existing User', 'pb-split-guide' ); ?></h2>
+        <p class="pbsg-deactivate-desc">
+            <?php esc_html_e( 'If a user was created through PressBooks or WordPress natively and you need to give them Librarian access, select them below.', 'pb-split-guide' ); ?>
+        </p>
+
+        <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" class="pbsg-promote-form">
+            <?php wp_nonce_field( 'pbsg_assign_librarian_from_manage' ); ?>
+            <input type="hidden" name="pbsg_librarian_action" value="assign_librarian_from_manage" />
+
+            <div class="pbsg-form-grid">
+                <div class="pbsg-form-field">
+                    <label for="pbsg-promote-user"><?php esc_html_e( 'Select User', 'pb-split-guide' ); ?> <span class="required">*</span></label>
+                    <select id="pbsg-promote-user" name="user_id" required>
+                        <option value=""><?php esc_html_e( '— Select a user —', 'pb-split-guide' ); ?></option>
+                        <?php foreach ( $promotable as $pu ) : ?>
+                            <option value="<?php echo esc_attr( $pu['ID'] ); ?>">
+                                <?php echo esc_html( $pu['display_name'] ); ?>
+                                (<?php echo esc_html( $pu['user_login'] ); ?>)
+                                — <?php echo esc_html( $pu['user_email'] ); ?>
+                                [<?php echo esc_html( $pu['roles'] ); ?>]
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+
+            <div class="pbsg-form-actions" style="margin-top:12px;">
+                <button type="submit" class="pbsg-btn pbsg-btn-primary">
+                    <?php esc_html_e( 'Assign Librarian Role', 'pb-split-guide' ); ?>
+                </button>
+                <button type="button" class="pbsg-btn pbsg-btn-secondary" id="pbsg-cancel-promote">
+                    <?php esc_html_e( 'Cancel', 'pb-split-guide' ); ?>
+                </button>
+            </div>
+        </form>
+    </div>
+    <?php endif; ?>
 
     <?php if ( $sub_action === 'manage' && $edit_id > 0 ) : ?>
         <?php
@@ -194,9 +234,63 @@ if ( ! defined( 'ABSPATH' ) ) {
 
         </div>
 
+        <?php elseif ( $edit_user ) : ?>
+            <?php
+            // User exists but does not have the librarian role — show info panel
+            $user_roles = ! empty( $edit_user->roles ) ? implode( ', ', array_map( 'ucfirst', $edit_user->roles ) ) : __( 'None', 'pb-split-guide' );
+            ?>
+            <div class="pbsg-librarians-card pbsg-edit-panel">
+                <h2 class="pbsg-card-title"><?php esc_html_e( 'User exists but is not a Librarian', 'pb-split-guide' ); ?></h2>
+
+                <table class="pbsg-info-table" role="presentation">
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Display Name', 'pb-split-guide' ); ?></th>
+                        <td><?php echo esc_html( $edit_user->display_name ); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Username', 'pb-split-guide' ); ?></th>
+                        <td><?php echo esc_html( $edit_user->user_login ); ?></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Email', 'pb-split-guide' ); ?></th>
+                        <td><a href="mailto:<?php echo esc_attr( $edit_user->user_email ); ?>"><?php echo esc_html( $edit_user->user_email ); ?></a></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php esc_html_e( 'Current Role(s)', 'pb-split-guide' ); ?></th>
+                        <td><?php echo esc_html( $user_roles ); ?></td>
+                    </tr>
+                </table>
+
+                <p class="pbsg-profile-hint" style="margin-top:16px;">
+                    <?php esc_html_e( 'This user exists but does not have the Librarian role on this site. This can happen when a user is created via Pressbooks or WordPress natively, or if their role was changed manually.', 'pb-split-guide' ); ?>
+                </p>
+
+                <div class="pbsg-fallback-actions" style="margin-top:16px; display:flex; gap:12px;">
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>">
+                        <?php wp_nonce_field( 'pbsg_assign_librarian_from_manage' ); ?>
+                        <input type="hidden" name="pbsg_librarian_action" value="assign_librarian_from_manage" />
+                        <input type="hidden" name="user_id" value="<?php echo esc_attr( $edit_id ); ?>" />
+                        <button type="submit" class="pbsg-btn pbsg-btn-secondary">
+                            <?php esc_html_e( 'Assign Librarian Role', 'pb-split-guide' ); ?>
+                        </button>
+                    </form>
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . PBSG_Librarian_Manager::PAGE_SLUG ) ); ?>" class="pbsg-btn pbsg-btn-secondary">
+                        <?php esc_html_e( 'Back to List', 'pb-split-guide' ); ?>
+                    </a>
+                </div>
+            </div>
+
         <?php else : ?>
-            <div class="notice notice-error">
-                <p><?php esc_html_e( 'Librarian not found or user is not a librarian.', 'pb-split-guide' ); ?></p>
+            <div class="pbsg-librarians-card pbsg-edit-panel">
+                <h2 class="pbsg-card-title"><?php esc_html_e( 'User Not Found', 'pb-split-guide' ); ?></h2>
+                <p class="pbsg-profile-hint">
+                    <?php esc_html_e( 'This user could not be found. They may have been deleted from WordPress.', 'pb-split-guide' ); ?>
+                </p>
+                <div style="margin-top:16px;">
+                    <a href="<?php echo esc_url( admin_url( 'admin.php?page=' . PBSG_Librarian_Manager::PAGE_SLUG ) ); ?>" class="pbsg-btn pbsg-btn-secondary">
+                        <?php esc_html_e( 'Back to List', 'pb-split-guide' ); ?>
+                    </a>
+                </div>
             </div>
         <?php endif; ?>
 
