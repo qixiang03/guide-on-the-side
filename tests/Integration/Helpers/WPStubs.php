@@ -777,9 +777,6 @@ if (!function_exists('sanitize_textarea_field')) {
     function sanitize_textarea_field(string $str): string
     {
         WPStubs::record('sanitize_textarea_field', [$str]);
-if (!function_exists('sanitize_textarea_field')) {
-    function sanitize_textarea_field(string $str): string
-    {
         return trim($str);
     }
 }
