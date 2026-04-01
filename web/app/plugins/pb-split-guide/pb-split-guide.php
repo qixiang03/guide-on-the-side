@@ -1931,7 +1931,7 @@ class PB_Split_Guide_Plugin {
       'bulkTransferIds' => $bulk_transfer_ids,
     ]);
   }
-
+}
 
   /**
    * AJAX handler for drag-and-drop file uploads.
