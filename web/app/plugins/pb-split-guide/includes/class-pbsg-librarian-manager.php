@@ -110,9 +110,34 @@ class PBSG_Librarian_Manager {
             true
         );
 
-        wp_localize_script( 'pbsg-librarian-manager', 'pbsgLibrarians', array(
-            'confirmDeactivate' => __( 'Are you sure you want to deactivate this librarian? They will no longer be able to access the admin panel.', 'pb-split-guide' ),
-        ) );
+        wp_localize_script(
+            'pbsg-librarian-manager',
+            'pbsgLibrarians',
+            array(
+                /*
+                 * Translators: %1$s is the user's display name, %2$s is their login (username).
+                 */
+                'confirmDeactivateFmt' => __(
+                    'Are you sure you want to deactivate %1$s (%2$s)? They will no longer be able to access the admin panel or manage tutorials.',
+                    'pb-split-guide'
+                ),
+                /*
+                 * Translators: %1$s is the user's display name, %2$s is their login (username).
+                 */
+                'confirmReactivateFmt' => __(
+                    'Are you sure you want to reactivate %1$s (%2$s) and restore full Librarian permissions?',
+                    'pb-split-guide'
+                ),
+                'confirmDeactivateFallback' => __(
+                    'Are you sure you want to deactivate this librarian? They will no longer be able to access the admin panel.',
+                    'pb-split-guide'
+                ),
+                'confirmReactivateFallback' => __(
+                    'Are you sure you want to reactivate this librarian?',
+                    'pb-split-guide'
+                ),
+            )
+        );
     }
 
     /**

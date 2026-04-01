@@ -106,6 +106,10 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   flex: var(--pbsg-left-ratio) 1 0% !important;
   min-width: 200px !important;
   background: #fff !important;
+  margin-left: 5%;
+  margin-right: 5%;
+  margin-top: 2%;
+  margin-bottom: 2%;
 
   /* Allow inner flex children to size properly */
   min-height: 0 !important;
@@ -230,13 +234,16 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   padding: 10px 10px !important;
   border: 0 !important;
   background: transparent !important;
-  color: #222;
+  color: #222 !important;
   border-radius: 10px !important;
   cursor: pointer !important;
   font-size: 15px !important;
   outline: 1px solid #222;
 }
 
+.pbsg-menu-item.is-current:hover{
+  background-color: rgba(34, 34, 34, 0.2) !important;
+}
 
 .pbsg-menu-item.is-current{
   font-weight: 600 !important;
@@ -428,6 +435,7 @@ body.pbsg-focus-quiz .pbsg-left {
   width: 80vw !important;
   height: 80vh !important;
   transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
   z-index: 999999 !important;
 
   background: #fff !important;
@@ -461,7 +469,7 @@ body.pbsg-focus-quiz .pbsg-iframe-wrap {
   .pbsg-left,
   .pbsg-right {
     flex: 0 0 auto !important;
-    width: 100% !important;
+    max-width: 100% !important;
     min-width: 0 !important;
   }
 
@@ -987,7 +995,50 @@ body.tutorial-active #colophon {
 .pbsg-branch-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn {
+  min-width: 180px;
+  padding: 14px 28px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn:hover {
+  transform: translateY(-2px);
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-start {
+  background: #8b0000;
+  border-color: #8b0000;
+  color: #fff;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-start:hover {
+  background: #a30000;
+  border-color: #a30000;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-finished {
+  background: #c40000;
+  border-color: #c40000;
+  color: #fff;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-finished:hover {
+  background: #dd0000;
+  border-color: #dd0000;
+}
+
+.pbsg-branch-actions .pbsg-branch-btn-skip,
+.pbsg-branch-actions .pbsg-branch-btn-return {
+  min-width: 180px;
 }
 .pbsg-branch-modal {
   position: fixed;
@@ -1023,6 +1074,74 @@ body.tutorial-active #colophon {
   border: 0;
   background: transparent;
   font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.pbsg-cert-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+}
+
+.pbsg-cert-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+}
+
+.pbsg-cert-modal-dialog {
+  position: relative;
+  width: min(520px, 92vw);
+  margin: 10vh auto 0;
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+
+.pbsg-cert-modal-dialog h3 {
+  margin: 0 0 12px;
+  font-size: 28px;
+}
+
+.pbsg-cert-label {
+  display: block;
+  margin: 18px 0 8px;
+  font-weight: 600;
+}
+
+.pbsg-cert-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.pbsg-cert-error {
+  margin-top: 10px;
+  color: #b42318;
+  font-size: 14px;
+}
+
+.pbsg-cert-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.pbsg-cert-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  font-size: 30px;
   line-height: 1;
   cursor: pointer;
 }

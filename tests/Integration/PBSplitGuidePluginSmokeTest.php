@@ -83,7 +83,11 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->assertContains('wp_ajax_pbsg_list_h5p', $tags);
     }
 
-    public function test_expected_filters_are_registered(): void
+    /**
+     * Assert core hooks from PB_Split_Guide_Plugin::__construct() are present.
+     * Prefer tag checks over exact counts so new hooks do not break CI unnecessarily.
+     */
+    public function test_constructor_registers_expected_plugin_hooks(): void
     {
         $filters = array_column(WPStubs::$hooks['filter'], 'tag');
         foreach (
@@ -96,10 +100,7 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         ) {
             $this->assertContains($tag, $filters, "Missing filter: {$tag}");
         }
-    }
 
-    public function test_expected_actions_are_registered(): void
-    {
         $actions = array_column(WPStubs::$hooks['action'], 'tag');
         foreach (
             [
@@ -120,6 +121,7 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         ) {
             $this->assertContains($tag, $actions, "Missing action: {$tag}");
         }
+
         $this->assertGreaterThanOrEqual(1, count(array_keys(array_filter(
             WPStubs::$hooks['action'],
             static fn (array $h): bool => $h['tag'] === 'admin_init'

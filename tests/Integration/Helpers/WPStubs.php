@@ -67,6 +67,44 @@ if (!defined('ARRAY_N')) {
 if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');
 }
+if (!defined('UPLOAD_ERR_OK')) {
+    define('UPLOAD_ERR_OK', 0);
+}
+if (!defined('UPLOAD_ERR_NO_FILE')) {
+    define('UPLOAD_ERR_NO_FILE', 4);
+}
+
+/**
+ * Minimal WP_Error stand-in for unit tests (WordPress not loaded).
+ */
+if (!class_exists('WP_Error', false)) {
+    class WP_Error
+    {
+        public function __construct(
+            public string $code = '',
+            public string $message = '',
+            public mixed $data = null
+        ) {
+        }
+
+        public function get_error_message(): string
+        {
+            return $this->message;
+        }
+
+        public function get_error_code(): string
+        {
+            return $this->code;
+        }
+    }
+}
+
+if (!function_exists('is_wp_error')) {
+    function is_wp_error(mixed $thing): bool
+    {
+        return $thing instanceof WP_Error;
+    }
+}
 
 /* ------------------------------------------------------------------ */
 /*  WordPress hook system stubs                                       */
@@ -272,6 +310,10 @@ if (!function_exists('wp_create_nonce')) {
 if (!function_exists('current_user_can')) {
     function current_user_can(string $capability, ...$args): bool
     {
+        $resolver = WPStubs::returnFor('current_user_can_resolver', null);
+        if (is_callable($resolver)) {
+            return (bool) $resolver($capability, ...$args);
+        }
         return (bool) WPStubs::returnFor('current_user_can', false);
     }
 }
@@ -735,6 +777,9 @@ if (!function_exists('sanitize_textarea_field')) {
     function sanitize_textarea_field(string $str): string
     {
         WPStubs::record('sanitize_textarea_field', [$str]);
+if (!function_exists('sanitize_textarea_field')) {
+    function sanitize_textarea_field(string $str): string
+    {
         return trim($str);
     }
 }
@@ -763,7 +808,7 @@ if (!function_exists('wp_insert_post')) {
      * @param array<string, mixed> $postarr
      * @return int|WP_Error
      */
-    function wp_insert_post($postarr, bool $wp_error = false, bool $fire_after_hooks = true)
+    function wp_insert_post(array $postarr, bool $wp_error = false, bool $fire_after_hooks = true)
     {
         WPStubs::record('wp_insert_post', [$postarr, $wp_error, $fire_after_hooks]);
         if ($wp_error) {
@@ -772,11 +817,7 @@ if (!function_exists('wp_insert_post')) {
                 return $err;
             }
         }
-        $ret = WPStubs::returnFor('wp_insert_post', 1001);
-        if (is_wp_error($ret)) {
-            return $wp_error ? $ret : 0;
-        }
-        return (int) $ret;
+        return (int) WPStubs::returnFor('wp_insert_post', 1001);
     }
 }
 

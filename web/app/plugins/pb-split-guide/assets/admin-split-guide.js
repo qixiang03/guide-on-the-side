@@ -98,11 +98,29 @@ jQuery(function ($) {
     _isDirty = false;
   }
 
+  function pbsgAdminI18n() {
+    return (typeof PBSG_ADMIN !== 'undefined' && PBSG_ADMIN.strings) ? PBSG_ADMIN.strings : {};
+  }
+
+  /** Shorten user-entered text for native confirm() dialogs. */
+  function truncateForConfirm(str, maxLen) {
+    const s = String(str || '');
+    const n = maxLen || 80;
+    if (s.length <= n) return s;
+    return s.slice(0, n - 1) + '\u2026';
+  }
+
   // Browser navigation guard
   $(window).on('beforeunload', function () {
-    if (_isDirty) {
-      return 'You have unsaved changes. Are you sure you want to leave?';
+    if (!_isDirty) return;
+    const str = pbsgAdminI18n();
+    const title = (typeof PBSG_ADMIN !== 'undefined' && PBSG_ADMIN.postTitle)
+      ? String(PBSG_ADMIN.postTitle).trim()
+      : '';
+    if (title && str.leaveWithTitle) {
+      return str.leaveWithTitle.replace('%s', title);
     }
+    return str.leaveGeneric || 'You have unsaved changes to this tutorial. Leave without saving?';
   });
 
   function norm(s) {
@@ -235,7 +253,7 @@ jQuery(function ($) {
           <div class="pbsg-step-header">
             <span class="pbsg-drag-handle" title="Drag to reorder">&#x2807;</span>
             <span class="pbsg-step-number">${num}</span>
-            <input class="pbsg-step-title-input" type="text" value="${esc(s.title)}" placeholder="Step title (optional)" data-idx="${idx}" />
+            <input class="pbsg-step-title-input" type="text" value="${esc(s.title)}" placeholder="Page title (optional)" data-idx="${idx}" />
             <div class="pbsg-step-badges">
               ${quizBadge}${resBadge}
             </div>
@@ -527,8 +545,21 @@ jQuery(function ($) {
 
   $(document).on('click', '.pbsg-remove-step', function () {
     const idx = parseInt($(this).data('idx'), 10);
-    if (isNaN(idx) || !confirm('Remove this step?')) return;
-    const steps = getSteps().map(norm); steps.splice(idx, 1); setSteps(steps); renderStepCards();
+    if (isNaN(idx)) return;
+    const steps = getSteps().map(norm);
+    const step = steps[idx];
+    const str = pbsgAdminI18n();
+    const untitled = str.untitledStep || '(Untitled step)';
+    const rawLabel = (step && String(step.title || '').trim()) ? String(step.title).trim() : untitled;
+    const label = truncateForConfirm(rawLabel, 80);
+    const stepNum = idx + 1;
+    const template = str.confirmRemoveStep
+      || 'Are you sure you want to remove Step %1$d: %2$s? Quiz and resource settings for this step will be lost.';
+    const msg = template.replace('%1$d', String(stepNum)).replace('%2$s', label);
+    if (!window.confirm(msg)) return;
+    steps.splice(idx, 1);
+    setSteps(steps);
+    renderStepCards();
   });
 
   $(document).on('click', '.pbsg-step-chevron, .pbsg-collapse-step', function () {
@@ -1123,24 +1154,36 @@ jQuery(function ($) {
           </div>
         </div>
         <hr style="margin:16px 0;" />
+        
         <div style="margin:10px 0; display:flex; gap:16px;">
-          <label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="pbsg_branch_tut_type" value="url" ${step.branch_tutorial_type !== 'file' ? 'checked' : ''} /> URL</label>
-          <label style="display:flex; gap:6px; align-items:center;"><input type="radio" name="pbsg_branch_tut_type" value="file" ${step.branch_tutorial_type === 'file' ? 'checked' : ''} /> Upload / Select File</label>
+          <label style="display:flex; gap:6px; align-items:center;">
+            <input type="radio" name="pbsg_branch_tut_type" value="url" ${step.branch_tutorial_type !== 'tutorial' ? 'checked' : ''} />
+            URL
+          </label>
+          <label style="display:flex; gap:6px; align-items:center;">
+            <input type="radio" name="pbsg_branch_tut_type" value="tutorial" ${step.branch_tutorial_type === 'tutorial' ? 'checked' : ''} />
+            Select Existing Tutorial
+          </label>
         </div>
+
         <div id="pbsg-branch-url-block" style="margin-top:10px;">
           <p style="margin:0 0 6px;"><strong>Branch URL</strong></p>
           <input type="url" id="pbsg-branch-url" style="width:100%;" placeholder="https://example.com/review" value="${esc(step.branch_tutorial_url)}" />
         </div>
-        <div id="pbsg-branch-file-block" style="margin-top:10px; display:none;">
-          <p style="margin:0 0 6px;"><strong>Branch file</strong></p>
-          <div style="display:flex; gap:8px; align-items:center;">
-            <button type="button" class="button" id="pbsg-branch-pick-file">Choose / Upload File</button>
-            <span id="pbsg-branch-file-label" style="opacity:.85;">${esc(step.branch_tutorial_file_name || (step.branch_tutorial_attachment_id ? ('Attachment #' + step.branch_tutorial_attachment_id) : 'No file selected'))}</span>
+
+        <div id="pbsg-branch-tutorial-block" style="margin-top:10px; display:none;">
+          <p style="margin:0 0 6px;"><strong>Branch tutorial</strong></p>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           </div>
-          <input type="hidden" id="pbsg-branch-attachment-id" value="${step.branch_tutorial_attachment_id || 0}" />
-          <input type="hidden" id="pbsg-branch-file-name" value="${esc(step.branch_tutorial_file_name || '')}" />
-          <input type="hidden" id="pbsg-branch-file-url" value="${esc(step.branch_tutorial_file_url || '')}" />
+          <div id="pbsg-branch-tutorial-picker-wrap" style="margin-top:10px;">
+          <select id="pbsg-branch-tutorial-select" style="width:100%;">
+            <option value="">Loading tutorials...</option>
+          </select>
         </div>
+
+          <input type="hidden" id="pbsg-branch-tutorial-url" value="${esc(step.branch_tutorial_url || '')}" />
+        </div>
+
         <div style="margin-top:14px; display:flex; gap:8px;">
           <button type="button" class="button button-primary" id="pbsg-branch-save">Save</button>
           <button type="button" class="button" id="pbsg-branch-cancel">Cancel</button>
@@ -1155,25 +1198,57 @@ jQuery(function ($) {
 
     function refreshBranchBlocks() {
       const t = $('input[name="pbsg_branch_tut_type"]:checked').val();
-      if (t === 'file') { $('#pbsg-branch-url-block').hide(); $('#pbsg-branch-file-block').show(); }
-      else { $('#pbsg-branch-file-block').hide(); $('#pbsg-branch-url-block').show(); }
+      if (t === 'tutorial') {
+        $('#pbsg-branch-url-block').hide();
+        $('#pbsg-branch-tutorial-block').show();
+      } else {
+        $('#pbsg-branch-tutorial-block').hide();
+        $('#pbsg-branch-url-block').show();
+      }
     }
+
     refreshBranchBlocks();
+    loadTutorialOptions(step.branch_tutorial_url || '');
+
+    if (step.branch_tutorial_type === 'tutorial' && step.branch_tutorial_url) {
+      $('#pbsg-branch-tutorial-url').val(step.branch_tutorial_url);
+    }
+
     $(document).off('change.pbsgBranchType').on('change.pbsgBranchType', 'input[name="pbsg_branch_tut_type"]', refreshBranchBlocks);
 
     $('#pbsg-branch-cancel').on('click', function () { tb_remove(); });
 
-    $('#pbsg-branch-pick-file').on('click', function (e) {
-      e.preventDefault();
-      const frame = wp.media({ title: 'Select or Upload Branch Review File', button: { text: 'Use this file' }, multiple: false });
-      frame.on('select', function () {
-        const attachment = frame.state().get('selection').first().toJSON();
-        $('#pbsg-branch-attachment-id').val(attachment.id || 0);
-        $('#pbsg-branch-file-name').val(attachment.filename || attachment.title || '');
-        $('#pbsg-branch-file-url').val(attachment.url || '');
-        $('#pbsg-branch-file-label').text(attachment.filename || attachment.title || ('Attachment #' + (attachment.id || '')));
+   function loadTutorialOptions(selectedUrl = '') {
+      const $select = $('#pbsg-branch-tutorial-select');
+      $select.html('<option value="">Loading tutorials...</option>');
+
+      $.post(PBSG_ADMIN.ajaxUrl, {
+        action: 'pbsg_list_tutorials',
+        nonce: PBSG_ADMIN.tutorialNonce
+      }).done(function (resp) {
+        if (!resp || !resp.success || !Array.isArray(resp.data)) {
+          $select.html('<option value="">No tutorials found</option>');
+          return;
+        }
+
+        let options = '<option value="">Select a tutorial...</option>';
+        resp.data.forEach(function (item) {
+          const selected = selectedUrl && selectedUrl === item.url ? 'selected' : '';
+          options += `<option value="${esc(item.url)}" ${selected}>${esc(item.title)} (${esc(item.status)})</option>`;
+        });
+        $select.html(options);
+
+      }).fail(function () {
+        $select.html('<option value="">Failed to load tutorials</option>');
       });
-      frame.open();
+    }
+
+    $('#pbsg-branch-tutorial-select').on('change', function () {
+      const $opt = $('#pbsg-branch-tutorial-select option:selected');
+      const url = $opt.val() || '';
+      const label = $opt.text() || 'No tutorial selected';
+
+      $('#pbsg-branch-tutorial-url').val(url);
     });
 
     $('#pbsg-branch-save').on('click', function () {
@@ -1189,13 +1264,14 @@ jQuery(function ($) {
       step.branch_intro = $('#pbsg-branch-intro').val() || '';
 
       const t = $('input[name="pbsg_branch_tut_type"]:checked').val();
-      if (t === 'file') {
-        const attId = parseInt($('#pbsg-branch-attachment-id').val(), 10) || 0;
-        step.branch_tutorial_type = attId ? 'file' : '';
-        step.branch_tutorial_attachment_id = attId;
-        step.branch_tutorial_file_name = $('#pbsg-branch-file-name').val() || '';
-        step.branch_tutorial_file_url = $('#pbsg-branch-file-url').val() || '';
-        step.branch_tutorial_url = '';
+
+      if (t === 'tutorial') {
+        const url = $('#pbsg-branch-tutorial-url').val() || '';
+        step.branch_tutorial_type = url ? 'tutorial' : '';
+        step.branch_tutorial_url = url;
+        step.branch_tutorial_attachment_id = 0;
+        step.branch_tutorial_file_name = '';
+        step.branch_tutorial_file_url = '';
       } else {
         const url = $('#pbsg-branch-url').val() || '';
         step.branch_tutorial_type = url ? 'url' : '';
@@ -1204,6 +1280,7 @@ jQuery(function ($) {
         step.branch_tutorial_file_name = '';
         step.branch_tutorial_file_url = '';
       }
+
       steps[currentBranchRowIdx] = step;
       setSteps(steps);
       renderStepCards();

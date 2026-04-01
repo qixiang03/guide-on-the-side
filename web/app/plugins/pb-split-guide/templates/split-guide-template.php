@@ -155,7 +155,7 @@ foreach ($steps as $s) {
   </div>
 
 <?php if (empty($steps_enriched) && !$has_intro): ?>
-  <p>No steps configured.</p>
+  <p>No pages configured.</p>
 <?php else: ?>
 
   <?php if ($has_intro): ?>
@@ -193,7 +193,7 @@ foreach ($steps as $s) {
 
             <?php if ($step_count > 0): ?>
               <span class="pbsg-intro-steps-count">
-                &#x1F4CB; <?php echo $step_count; ?> step<?php echo $step_count !== 1 ? 's' : ''; ?>
+                &#x1F4CB; <?php echo $step_count; ?> Page<?php echo $step_count !== 1 ? 's' : ''; ?>
               </span>
             <?php endif; ?>
           </div>
@@ -251,9 +251,9 @@ foreach ($steps as $s) {
 
       <!-- Dropdown -->
       <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
-        <ul class="pbsg-menu-list">
+        <div class="pbsg-menu-list">
           <?php foreach ($steps_enriched as $idx => $step): ?>
-            <li>
+            
               <button
                 type="button"
                 class="pbsg-menu-item"
@@ -262,13 +262,13 @@ foreach ($steps as $s) {
               >
                 <?php
                   $num = $idx + 1;
-                  $label = !empty($step['title']) ? $step['title'] : "Step $num";
+                  $label = !empty($step['title']) ? $step['title'] : "Page $num";
                   echo esc_html($num . '. ' . $label);
                 ?>
               </button>
-            </li>
+            
           <?php endforeach; ?>
-        </ul>
+        </div>
       </div>
     </div>
 
@@ -280,7 +280,7 @@ foreach ($steps as $s) {
 </div>
 
       <div class="pbsg-iframe-wrap">
-        <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe"></iframe>
+        <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe" tabindex="0"></iframe>
       </div>
 
       <div class="pbsg-nav">
@@ -327,7 +327,7 @@ foreach ($steps as $s) {
         <div class="pbsg-branch-actions">
           <button type="button" class="button button-primary" id="pbsgBranchOpen">Start</button>
           <button type="button" class="button" id="pbsgBranchSkip" style="display:none;">Skip</button>
-          <button type="button" class="button button-primary" id="pbsgBranchComplete" style="display:none;">I Finished This Sub-Tutorial</button>
+          <button type="button" class="button button-primary" id="pbsgBranchComplete" style="display:none;">Finished</button>
           <button type="button" class="button" id="pbsgBranchReturn" style="display:none;">Back to Main Tutorial</button>
         </div>
       </div>
@@ -412,23 +412,43 @@ window.PBSG_CERT = {
 
     <?php if ($is_logged_in): ?>
       <div class="pbsg-summary-actions">
-        <input id="pbsgSummaryCertName" type="text" placeholder="Name on certificate (optional)" />
         <button type="button" class="button button-primary" id="pbsgSummaryCertDownload">
-          Download Certificate (PDF)
+          Generate Certificate
         </button>
         <button type="button" class="button" id="pbsgRetakeTutorial">
-          Retake Tutorial
+          Close Tutorial
         </button>
       </div>
     <?php else: ?>
       <div class="pbsg-summary-actions">
-        <p>Please log in to download your certificate.</p>
+        <p>Please log in to generate your certificate.</p>
         <button type="button" class="button" id="pbsgRetakeTutorial">
-          Retake Tutorial
+          Close Tutorial
         </button>
       </div>
     <?php endif; ?>
 
+  </div>
+</div>
+
+<div id="pbsgCertModal" class="pbsg-cert-modal" style="display:none;" aria-hidden="true">
+  <div class="pbsg-cert-modal-backdrop"></div>
+
+  <div class="pbsg-cert-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgCertModalTitle">
+    <button type="button" class="pbsg-cert-modal-close" id="pbsgCertModalClose" aria-label="Close">×</button>
+
+    <h3 id="pbsgCertModalTitle">Generate Certificate</h3>
+    <p>Please enter your name as it should appear on the certificate.</p>
+
+    <label for="pbsgCertModalName" class="pbsg-cert-label">Student Name</label>
+    <input id="pbsgCertModalName" type="text" class="pbsg-cert-input" placeholder="Enter your full name" />
+
+    <div id="pbsgCertModalError" class="pbsg-cert-error" style="display:none;"></div>
+
+    <div class="pbsg-cert-modal-actions">
+      <button type="button" class="button" id="pbsgCertModalCancel">Cancel</button>
+      <button type="button" class="button button-primary" id="pbsgCertModalGenerate">Generate</button>
+    </div>
   </div>
 </div>
 
