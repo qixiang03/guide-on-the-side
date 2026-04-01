@@ -1706,92 +1706,6 @@ class PB_Split_Guide_Plugin {
 
   public function enqueue_admin_assets($hook) {
   $screen = get_current_screen();
-  if (!$screen || $screen->post_type !== 'page') return;
-
-  add_thickbox();
-  wp_enqueue_media();
-
-  // SortableJS — optional, loaded independently so it doesn't block the main script
-  wp_enqueue_script(
-    'sortablejs',
-    'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.6/Sortable.min.js',
-    [],
-    '1.15.6',
-    true
-  );
-
-  wp_enqueue_script(
-    'pbsg_admin_js',
-    plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
-    ['jquery', 'thickbox'],
-    '0.7.1',
-    true
-  );
-
-  wp_enqueue_style(
-    'pbsg-admin',
-    plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
-    [],
-    '2.1.1'  // bumped to force cache bust
-  );
-
-  $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
-  $post_id          = get_the_ID();
-  $post_title       = $post_id ? get_the_title($post_id) : '';
-
-  wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
-    'templateSlug'    => self::TEMPLATE_SLUG,
-    'metaBoxId'       => 'pbsg_settings',
-    'ajaxUrl'         => admin_url('admin-ajax.php'),
-    'nonce'           => wp_create_nonce('pbsg_h5p_picker'),
-    'templateNonce'   => wp_create_nonce('pbsg_template_picker'),
-    'exportNonce'     => wp_create_nonce('pbsg_export_import'),
-    'uploadNonce'     => wp_create_nonce('pbsg_upload_file'),
-    'tutorialNonce'   => wp_create_nonce('pbsg_list_tutorials'),
-    'isNewPage'       => ($hook === 'post-new.php'),
-    'currentTemplate' => $current_template,
-    'h5pAvailable'    => PBSG_H5P_Factory::is_h5p_available(),
-    'maxUploadSize'   => wp_max_upload_size(),
-    'maxUploadLabel'  => size_format(wp_max_upload_size()),
-    // Tutorial title for navigation guard (trimmed; may be empty on new post).
-    'postTitle'       => is_string($post_title) ? trim($post_title) : '',
-    /*
-     * Confirm / beforeunload strings for admin-split-guide.js.
-     * Translators: keep placeholders %1$d (step number), %2$s (step title), %s (tutorial title).
-     */
-    'strings'         => [
-      'confirmRemoveStep' => __(
-        'Are you sure you want to remove Step %1$d: %2$s? Quiz and resource settings for this step will be lost.',
-        'pb-split-guide'
-      ),
-      'untitledStep'      => __('(Untitled step)', 'pb-split-guide'),
-      'leaveWithTitle'    => __(
-        'You have unsaved changes to "%s". Leave without saving?',
-        'pb-split-guide'
-      ),
-      'leaveGeneric'      => __(
-        'You have unsaved changes to this tutorial. Leave without saving?',
-        'pb-split-guide'
-      ),
-    ],
-  ]);
-
-  // Extra inline script: force the template on Add New Tutorial page.
-  if ($hook === 'post-new.php') {
-    $template_slug = esc_js(self::TEMPLATE_SLUG);
-
-    wp_add_inline_script('pbsg_admin_js', "
-      jQuery(function($){
-        function pbsgForceTemplateNow() {
-          var \$template = $('#page_template');
-          if (!\$template.length) return false;
-
-          var hasOption = \$template.find('option[value=\"{$template_slug}\"]').length > 0;
-          if (!hasOption) return false;
-
-          if (\$template.val() !== '{$template_slug}') {
-            \$template.val('{$template_slug}').trigger('change');
-          }
 
   // Post editor assets — only on page post type
   if (in_array($hook, ['post.php', 'post-new.php'], true) && $screen && $screen->post_type === 'page') {
@@ -1825,7 +1739,7 @@ class PB_Split_Guide_Plugin {
     $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
     $post_id          = get_the_ID();
     $post_title       = $post_id ? get_the_title($post_id) : '';
-//
+
     wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
       'templateSlug'    => self::TEMPLATE_SLUG,
       'metaBoxId'       => 'pbsg_settings',
@@ -2335,7 +2249,7 @@ class PB_Split_Guide_Plugin {
     $posts = get_posts($args);
 
     $data = [];
-
+    
     foreach ($posts as $p) {
       $data[] = [
         'id'    => $p->ID,
