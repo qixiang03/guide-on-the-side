@@ -1738,7 +1738,7 @@ class PB_Split_Guide_Plugin {
     $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
     $post_id          = get_the_ID();
     $post_title       = $post_id ? get_the_title($post_id) : '';
-
+//
     wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
       'templateSlug'    => self::TEMPLATE_SLUG,
       'metaBoxId'       => 'pbsg_settings',
@@ -2217,6 +2217,43 @@ class PB_Split_Guide_Plugin {
       'quiz'    => $quiz,
       'library' => $row['library_name'],
     ]);
+  }
+
+  /**
+   * AJAX handler: list all Guide-on-the-Side tutorial pages.
+   *
+   * Returns an array of pages that use the split-guide template.
+   */
+  public function ajax_list_tutorials() {
+    check_ajax_referer('pbsg_list_tutorials', 'nonce');
+
+    if (!current_user_can('edit_pages')) {
+      wp_send_json_error(['message' => 'Forbidden'], 403);
+    }
+
+    global $wpdb;
+    $template_slug = self::TEMPLATE_SLUG;
+
+    $rows = $wpdb->get_results($wpdb->prepare(
+      "SELECT p.ID, p.post_title, p.post_status
+       FROM {$wpdb->posts} p
+       INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+       WHERE pm.meta_key = '_wp_page_template'
+         AND pm.meta_value = %s
+         AND p.post_type = 'page'
+       ORDER BY p.post_title ASC",
+      $template_slug
+    ), ARRAY_A);
+
+    $tutorials = array_map(function ($row) {
+      return [
+        'id'     => (int) $row['ID'],
+        'title'  => $row['post_title'],
+        'status' => $row['post_status'],
+      ];
+    }, $rows ?: []);
+
+    wp_send_json_success($tutorials);
   }
 }
 

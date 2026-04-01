@@ -386,6 +386,48 @@ if (!function_exists('wp_send_json_error')) {
 class WPDieException extends \RuntimeException {}
 
 /* ------------------------------------------------------------------ */
+/*  WP_Error stub                                                     */
+/* ------------------------------------------------------------------ */
+
+if (!class_exists('WP_Error')) {
+    class WP_Error
+    {
+        protected string $code;
+        protected string $message;
+        protected mixed $data;
+
+        public function __construct(string $code = '', string $message = '', mixed $data = '')
+        {
+            $this->code    = $code;
+            $this->message = $message;
+            $this->data    = $data;
+        }
+
+        public function get_error_code(): string
+        {
+            return $this->code;
+        }
+
+        public function get_error_message(): string
+        {
+            return $this->message;
+        }
+
+        public function get_error_data(): mixed
+        {
+            return $this->data;
+        }
+    }
+}
+
+if (!function_exists('is_wp_error')) {
+    function is_wp_error($thing): bool
+    {
+        return $thing instanceof WP_Error;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Enqueue stubs                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -682,5 +724,72 @@ if (!function_exists('add_menu_page')) {
     {
         WPStubs::record('add_menu_page', [$page_title, $menu_title, $capability, $menu_slug, $callback, $icon_url, $position]);
         return $menu_slug;
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sanitization stubs (additional)                                   */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('wp_kses_post')) {
+    function wp_kses_post(string $data): string
+    {
+        WPStubs::record('wp_kses_post', [$data]);
+        return $data; // pass-through for tests
+    }
+}
+
+if (!function_exists('sanitize_textarea_field')) {
+    function sanitize_textarea_field(string $str): string
+    {
+        WPStubs::record('sanitize_textarea_field', [$str]);
+        return trim($str);
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Post creation / file stubs                                        */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('wp_insert_post')) {
+    function wp_insert_post($postarr, bool $wp_error = false, bool $fire_after_hooks = true)
+    {
+        WPStubs::record('wp_insert_post', [$postarr, $wp_error, $fire_after_hooks]);
+        $ret = WPStubs::returnFor('wp_insert_post', 1);
+        if (is_wp_error($ret)) {
+            return $wp_error ? $ret : 0;
+        }
+        return (int) $ret;
+    }
+}
+
+if (!function_exists('media_handle_upload')) {
+    function media_handle_upload(string $file_id, int $post_id, array $post_data = [], array $overrides = [])
+    {
+        WPStubs::record('media_handle_upload', [$file_id, $post_id, $post_data, $overrides]);
+        return WPStubs::returnFor('media_handle_upload', 0);
+    }
+}
+
+if (!function_exists('get_attached_file')) {
+    function get_attached_file(int $attachment_id, bool $unfiltered = false): string|false
+    {
+        WPStubs::record('get_attached_file', [$attachment_id, $unfiltered]);
+        // Allow per-ID return values (e.g. get_attached_file_77)
+        $perIdKey = 'get_attached_file_' . $attachment_id;
+        $val = WPStubs::returnFor($perIdKey, null);
+        if ($val !== null) {
+            return $val;
+        }
+        return WPStubs::returnFor('get_attached_file', false);
+    }
+}
+
+if (!function_exists('get_edit_post_link')) {
+    function get_edit_post_link($post = 0, string $context = 'display'): ?string
+    {
+        WPStubs::record('get_edit_post_link', [$post, $context]);
+        $id = is_object($post) ? $post->ID : (int) $post;
+        return 'https://example.com/wp-admin/post.php?post=' . $id . '&action=edit';
     }
 }

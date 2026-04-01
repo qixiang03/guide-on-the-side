@@ -148,6 +148,16 @@ class MockWpdb
     }
 
     /**
+     * Mock delete() — records delete call.
+     */
+    public function delete(string $table, array $where, $where_format = null)
+    {
+        $this->calls[] = ['method' => 'delete', 'args' => [$table, $where, $where_format]];
+        $this->rows_affected = 1;
+        return $this->findReturn('delete', $table, 1);
+    }
+
+    /**
      * Mock get_charset_collate().
      */
     public function get_charset_collate(): string
