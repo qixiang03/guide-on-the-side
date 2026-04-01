@@ -87,6 +87,7 @@ class PB_Split_Guide_Plugin {
     add_action('wp_ajax_pbsg_create_h5p', [$this, 'ajax_create_h5p']);
     add_action('wp_ajax_pbsg_get_h5p_content', [$this, 'ajax_get_h5p_content']);
     add_action('wp_ajax_pbsg_upload_file', [$this, 'ajax_upload_file']);
+    add_action('wp_ajax_pbsg_list_tutorials', [$this, 'ajax_list_tutorials']);
     add_action('wp_ajax_pbsg_transfer_ownership', [$this, 'ajax_transfer_ownership']);
     add_action('wp_ajax_pbsg_get_transfer_targets', [$this, 'ajax_get_transfer_targets']);
 
@@ -2228,32 +2229,36 @@ class PB_Split_Guide_Plugin {
     check_ajax_referer('pbsg_list_tutorials', 'nonce');
 
     if (!current_user_can('edit_pages')) {
-      wp_send_json_error(['message' => 'Forbidden'], 403);
+      wp_send_json_error(['message' => 'Permission denied.'], 403);
     }
 
-    global $wpdb;
-    $template_slug = self::TEMPLATE_SLUG;
+    $args = [
+      'post_type'      => 'page',
+      'post_status'    => ['publish', 'private', 'draft', 'pending'],
+      'posts_per_page' => 200,
+      'orderby'        => 'title',
+      'order'          => 'ASC',
+      'meta_key'       => '_wp_page_template',
+      'meta_value'     => self::TEMPLATE_SLUG,
+    ];
 
-    $rows = $wpdb->get_results($wpdb->prepare(
-      "SELECT p.ID, p.post_title, p.post_status
-       FROM {$wpdb->posts} p
-       INNER JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
-       WHERE pm.meta_key = '_wp_page_template'
-         AND pm.meta_value = %s
-         AND p.post_type = 'page'
-       ORDER BY p.post_title ASC",
-      $template_slug
-    ), ARRAY_A);
+    if (class_exists('PBSG_Roles') && PBSG_Roles::is_librarian() && !PBSG_Roles::is_admin()) {
+      $args['author'] = get_current_user_id();
+    }
 
-    $tutorials = array_map(function ($row) {
-      return [
-        'id'     => (int) $row['ID'],
-        'title'  => $row['post_title'],
-        'status' => $row['post_status'],
+    $posts = get_posts($args);
+
+    $data = [];
+    foreach ($posts as $p) {
+      $data[] = [
+        'id'    => $p->ID,
+        'title' => get_the_title($p->ID) ?: ('Tutorial #' . $p->ID),
+        'url'   => get_permalink($p->ID),
+        'status'=> $p->post_status,
       ];
-    }, $rows ?: []);
+    }
 
-    wp_send_json_success($tutorials);
+    wp_send_json_success($data);
   }
 }
 

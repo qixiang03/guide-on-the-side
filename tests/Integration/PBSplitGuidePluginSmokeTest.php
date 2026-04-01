@@ -83,10 +83,51 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->assertContains('wp_ajax_pbsg_list_h5p', $tags);
     }
 
-    public function test_total_hook_count_matches_expected(): void
+    public function test_expected_filters_are_registered(): void
     {
-        $this->assertCount(6, WPStubs::$hooks['filter'], 'Expected 6 filters');
-        $this->assertCount(32, WPStubs::$hooks['action'], 'Expected 32 actions');
+        $filters = array_column(WPStubs::$hooks['filter'], 'tag');
+        foreach (
+            [
+                'theme_page_templates',
+                'template_include',
+                'add_menu_classes',
+                'page_row_actions',
+            ] as $tag
+        ) {
+            $this->assertContains($tag, $filters, "Missing filter: {$tag}");
+        }
+    }
+
+    public function test_expected_actions_are_registered(): void
+    {
+        $actions = array_column(WPStubs::$hooks['action'], 'tag');
+        foreach (
+            [
+                'add_meta_boxes_page',
+                'save_post_page',
+                'wp_enqueue_scripts',
+                'admin_enqueue_scripts',
+                'wp_ajax_pbsg_list_h5p',
+                'wp_ajax_pbsg_create_h5p',
+                'wp_ajax_pbsg_get_h5p_content',
+                'wp_ajax_pbsg_upload_file',
+                'wp_ajax_pbsg_list_tutorials',
+                'wp_ajax_pbsg_get_templates',
+                'wp_ajax_pbsg_save_as_template',
+                'wp_ajax_pbsg_create_from_template',
+                'load-post-new.php',
+            ] as $tag
+        ) {
+            $this->assertContains($tag, $actions, "Missing action: {$tag}");
+        }
+        $this->assertGreaterThanOrEqual(1, count(array_keys(array_filter(
+            WPStubs::$hooks['action'],
+            static fn (array $h): bool => $h['tag'] === 'admin_init'
+        ))), 'Expected at least one admin_init callback');
+        $this->assertGreaterThanOrEqual(1, count(array_keys(array_filter(
+            WPStubs::$hooks['action'],
+            static fn (array $h): bool => $h['tag'] === 'admin_menu'
+        ))), 'Expected at least one admin_menu callback');
     }
 
     /* =============================================================

@@ -80,6 +80,21 @@
         });
 
         /**
+         * Build localized confirm string; %1$s and %2$s are replaced in order.
+         *
+         * @param {string} fmt
+         * @param {string} name
+         * @param {string} login
+         * @return {string}
+         */
+        function formatUserConfirm(fmt, name, login) {
+            if (!fmt) {
+                return '';
+            }
+            return fmt.replace('%1$s', name).replace('%2$s', login);
+        }
+
+        /**
          * Basic email validation.
          *
          * @param {string} email

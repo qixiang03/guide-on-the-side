@@ -268,28 +268,28 @@ final class PBSGPluginAjaxHandlersTest extends TestCase
         $this->assertSame(403, WPStubs::callArgs('wp_send_json_error', 0)[1]);
     }
 
-    // /**
-    //  * @covers PB_Split_Guide_Plugin::ajax_list_tutorials
-    //  */
-    // public function test_ajax_list_tutorials_returns_split_guide_pages(): void
-    // {
-    //     WPStubs::$returns['current_user_can'] = true;
-    //     WPStubs::$returns['get_the_title'] = 'My Tutorial';
-    //     WPStubs::$returns['get_posts'] = [
-    //         (object) ['ID' => 12, 'post_status' => 'publish'],
-    //     ];
+    /**
+     * @covers PB_Split_Guide_Plugin::ajax_list_tutorials
+     */
+    public function test_ajax_list_tutorials_returns_split_guide_pages(): void
+    {
+        WPStubs::$returns['current_user_can'] = true;
+        WPStubs::$returns['get_the_title'] = 'My Tutorial';
+        WPStubs::$returns['get_posts'] = [
+            (object) ['ID' => 12, 'post_status' => 'publish'],
+        ];
 
-    //     try {
-    //         $this->plugin->ajax_list_tutorials();
-    //     } catch (WPDieException $e) {
-    //         // expected
-    //     }
+        try {
+            $this->plugin->ajax_list_tutorials();
+        } catch (WPDieException $e) {
+            // expected
+        }
 
-    //     $this->assertTrue(WPStubs::wasCalled('wp_send_json_success'));
-    //     $items = WPStubs::callArgs('wp_send_json_success', 0)[0];
-    //     $this->assertCount(1, $items);
-    //     $this->assertSame(12, $items[0]['id']);
-    //     $this->assertSame('My Tutorial', $items[0]['title']);
-    //     $this->assertSame('publish', $items[0]['status']);
-    // }
+        $this->assertTrue(WPStubs::wasCalled('wp_send_json_success'));
+        $items = WPStubs::callArgs('wp_send_json_success', 0)[0];
+        $this->assertCount(1, $items);
+        $this->assertSame(12, $items[0]['id']);
+        $this->assertSame('My Tutorial', $items[0]['title']);
+        $this->assertSame('publish', $items[0]['status']);
+    }
 }
