@@ -1580,7 +1580,7 @@ class PB_Split_Guide_Plugin {
           }
 
           return true;
-        }, }), ", );
+        }
 
         var tries = 0;
         var timer = setInterval(function() {
