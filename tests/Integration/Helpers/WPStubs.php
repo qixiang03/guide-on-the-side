@@ -68,6 +68,45 @@ if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');
 }
 
+if (!defined('UPLOAD_ERR_OK')) {
+    define('UPLOAD_ERR_OK', 0);
+}
+if (!defined('UPLOAD_ERR_NO_FILE')) {
+    define('UPLOAD_ERR_NO_FILE', 4);
+}
+
+/**
+ * Minimal WP_Error stand-in for unit tests (WordPress not loaded).
+ */
+if (!class_exists('WP_Error', false)) {
+    class WP_Error
+    {
+        public function __construct(
+            public string $code = '',
+            public string $message = '',
+            public mixed $data = null
+        ) {
+        }
+
+        public function get_error_message(): string
+        {
+            return $this->message;
+        }
+
+        public function get_error_code(): string
+        {
+            return $this->code;
+        }
+    }
+}
+
+if (!function_exists('is_wp_error')) {
+    function is_wp_error(mixed $thing): bool
+    {
+        return $thing instanceof WP_Error;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  WordPress hook system stubs                                       */
 /* ------------------------------------------------------------------ */
