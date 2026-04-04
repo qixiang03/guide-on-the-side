@@ -545,9 +545,9 @@ function branchSummary(s) {
             ${renderBranchQuestions(branch.questions, idx)}
           </div>
           <div class="pbsg-branch-actions">
-            <button type="button" class="button pbsg-btn-outline pbsg-add-branch-question" data-step-idx="${idx}" data-type="multichoice">Add MCQ</button>
+            <button type="button" class="button pbsg-btn-outline pbsg-add-branch-question" data-step-idx="${idx}" data-type="multichoice">Add Multiple Selection</button>
             <button type="button" class="button pbsg-btn-outline pbsg-add-branch-question" data-step-idx="${idx}" data-type="blanks">Add Fill in Blank</button>
-            <button type="button" class="button pbsg-btn-outline pbsg-add-branch-question" data-step-idx="${idx}" data-type="singlechoice">Add Single Choice</button>
+            <button type="button" class="button pbsg-btn-outline pbsg-add-branch-question" data-step-idx="${idx}" data-type="singlechoice">Add Single Selection</button>
           </div>
         </div>
 
@@ -633,7 +633,7 @@ function branchSummary(s) {
   // ═══════════════════════════════════════════════════════════
   //  Step Card Rendering
   // ═══════════════════════════════════════════════════════════
-  function quizName(t) { return { multichoice: 'Multiple Choice', blanks: 'Fill in Blanks', singlechoice: 'Single Choice' }[t] || ''; }
+  function quizName(t) { return { multichoice: 'Multiple Selection', blanks: 'Fill in Blanks', singlechoice: 'Single Selection' }[t] || ''; }
 
   function renderStepCards() {
     const steps = getSteps().map(norm);
@@ -721,6 +721,9 @@ function branchSummary(s) {
     }
 
     setSteps(steps);
+    steps.forEach(function (_s, idx) {
+      if (_s.quiz && _s.quiz.type === 'blanks') updateBlanksCaseRiskUI(idx);
+    });
   }
 
   // ─── Quiz Panel ────────────────────────────────────────
@@ -746,11 +749,11 @@ function branchSummary(s) {
     return `
       <div class="pbsg-quiz-type-selector" data-idx="${idx}">
         <button type="button" class="pbsg-quiz-type-btn${qt === 'multichoice' ? ' active' : ''}" data-type="multichoice" data-idx="${idx}">
-          <span class="pbsg-type-icon">&#x2611;</span>Multiple Choice</button>
+          <span class="pbsg-type-icon">&#x2611;</span>Multiple Selection</button>
         <button type="button" class="pbsg-quiz-type-btn${qt === 'blanks' ? ' active' : ''}" data-type="blanks" data-idx="${idx}">
           <span class="pbsg-type-icon">&#x270F;&#xFE0F;</span>Fill in Blanks</button>
         <button type="button" class="pbsg-quiz-type-btn${qt === 'singlechoice' ? ' active' : ''}" data-type="singlechoice" data-idx="${idx}">
-          <span class="pbsg-type-icon">&#x25C9;</span>Single Choice</button>
+          <span class="pbsg-type-icon">&#x25C9;</span>Single Selection</button>
       </div>
       <div class="pbsg-quiz-form" data-idx="${idx}">${renderQuizForm(qt, s.quiz || {}, idx)}</div>
       <div class="pbsg-existing-h5p-link">
@@ -795,12 +798,48 @@ function branchSummary(s) {
   }
 
   // ─── Fill in the Blanks ───────────────────────────────
+  /** Tokens inside *asterisks* (each / alternative, hints stripped) for case-risk checks */
+  function blanksAnswerTokensFromSentence(sentence) {
+    const tokens = [];
+    const re = /\*([^*]+)\*/g;
+    let m;
+    while ((m = re.exec(sentence || ''))) {
+      let inner = m[1];
+      const ci = inner.indexOf(':');
+      if (ci > -1) inner = inner.substring(0, ci);
+      inner.split('/').forEach(function (part) {
+        const t = part.trim();
+        if (t) tokens.push(t);
+      });
+    }
+    return tokens;
+  }
+
+  /** True if any expected answer mixes upper and lower case (risky with case-sensitive grading). */
+  function blanksCaseSensitiveRiskyAnswers(sentence) {
+    return blanksAnswerTokensFromSentence(sentence).some(function (t) {
+      return /[a-z]/.test(t) && /[A-Z]/.test(t);
+    });
+  }
+
+  function updateBlanksCaseRiskUI(idx) {
+    if (isNaN(idx)) return;
+    const $card = $(`#pbsg-step-${idx}`);
+    if (!$card.length) return;
+    const sentence = $card.find('.pbsg-blanks-sentence').val() || '';
+    const caseOn = $card.find('.pbsg-blanks-case').is(':checked');
+    const cnt = (sentence.match(/\*[^*]+\*/g) || []).length;
+    const risky = caseOn && cnt > 0 && blanksCaseSensitiveRiskyAnswers(sentence);
+    $card.find('.pbsg-blanks-case-risk-msg').toggle(risky);
+  }
+
   function renderBlanksForm(quiz, idx) {
     const sentence = quiz.sentence || '';
     const caseSens = quiz.case_sensitive !== undefined ? quiz.case_sensitive : false;
     const typos = quiz.accept_typos !== undefined ? quiz.accept_typos : false;
     const preview = blanksPreview(sentence);
     const cnt = (sentence.match(/\*[^*]+\*/g) || []).length;
+    const caseRiskVisible = caseSens && cnt > 0 && blanksCaseSensitiveRiskyAnswers(sentence);
 
     return `
       <div class="pbsg-field">
@@ -836,6 +875,9 @@ function branchSummary(s) {
               <div class="pbsg-toggle-desc">Words 3&ndash;9 chars: 1 typo allowed &middot; 10+ chars: 2 typos allowed</div>
             </div>
           </label>
+        </div>
+        <div class="pbsg-blanks-case-risk-msg" data-idx="${idx}" style="display:${caseRiskVisible ? 'block' : 'none'}; margin-top:10px; padding:8px; background:#fcf3f3; border:1px solid #e8b4b4; border-radius:4px; font-size:12px; color:#5c1a1a;">
+          <strong>Case sensitivity:</strong> At least one wrapped answer mixes uppercase and lowercase. With Case sensitive enabled, grading requires an exact character match &mdash; students may be marked wrong if capitalization differs.
         </div>
       </div>`;
   }
@@ -1067,11 +1109,14 @@ function branchSummary(s) {
         .html('&#x26A0; No blanks detected &mdash; wrap words with *asterisks*');
     }
     syncQuiz(idx);
+    updateBlanksCaseRiskUI(idx);
   });
   $(document).on('change', '.pbsg-blanks-case, .pbsg-blanks-typos', function () {
     const $opt = $(this).closest('.pbsg-toggle-option');
     $opt.toggleClass('pbsg-toggle-option--active', $(this).is(':checked'));
-    syncQuiz(parseInt($(this).data('idx'), 10));
+    const idx = parseInt($(this).data('idx'), 10);
+    syncQuiz(idx);
+    updateBlanksCaseRiskUI(idx);
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -2098,7 +2143,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   // ═══════════════════════════════════════════════════════════
   $(document).on('click', '#pbsg_pick_cover_image', function (e) {
     e.preventDefault();
-    const frame = wp.media({ title: 'Select Tutorial Cover Image', button: { text: 'Use this image' }, library: { type: 'image' }, multiple: false });
+    const frame = wp.media({ title: 'Select Tutorial Cover Image (16:9, ~1600×900 px, <1 MB recommended)', button: { text: 'Use this image' }, library: { type: 'image' }, multiple: false });
     frame.on('select', function () { const a = frame.state().get('selection').first().toJSON(); $('#pbsg_cover_image_id').val(a.id || 0); $('#pbsg_cover_image_url').val(a.url || ''); $('#pbsg_cover_preview').attr('src', a.url || '').removeClass('pbsg-hidden'); });
     frame.open();
   });
@@ -2111,14 +2156,17 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   $(document).on('click', '#publish, #save-post', function (e) {
     const steps = getSteps().map(norm);
     let valid = true;
+    const caseRiskStepNums = [];
 
     steps.forEach((s, idx) => {
       syncQuiz(idx);
       syncResource(idx);
+      const step = getSteps().map(norm)[idx];
+      if (!step || !step.quiz) return;
 
       // Validate Fill in Blanks has at least one *blank*
-      if (s.quiz && s.quiz.type === 'blanks') {
-        const sentence = s.quiz.sentence || '';
+      if (step.quiz.type === 'blanks') {
+        const sentence = step.quiz.sentence || '';
         const blanks = (sentence.match(/\*[^*]+\*/g) || []).length;
         if (sentence.trim().length > 0 && blanks === 0) {
           valid = false;
@@ -2128,6 +2176,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
           // Highlight the error
           $(`#pbsg-step-${idx} .pbsg-blanks-sentence`).css('border-color', '#8C2004');
           alert('Step ' + (idx + 1) + ': Fill in the Blanks requires at least one *blank* word wrapped in asterisks.');
+        } else if (step.quiz.case_sensitive && blanks > 0 && blanksCaseSensitiveRiskyAnswers(sentence)) {
+          caseRiskStepNums.push(idx + 1);
         }
       }
     });
@@ -2136,6 +2186,15 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       e.preventDefault();
       e.stopImmediatePropagation();
       return false;
+    }
+
+    if (caseRiskStepNums.length) {
+      const msg = 'Step(s) ' + caseRiskStepNums.join(', ') + ': Case sensitive Fill in the Blanks uses mixed-capitalization answers. Grading requires an exact character match, so students may be marked wrong if capitalization differs. Continue saving?';
+      if (!window.confirm(msg)) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
     }
 
     // Save is proceeding — clear the dirty flag so beforeunload doesn't fire

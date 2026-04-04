@@ -147,7 +147,7 @@
             { label: 'Total Views', value: formatNumber( totals.total_views ), color: 'blue' },
             { label: 'Total Completions', value: formatNumber( totals.total_completions ), color: 'blue' },
             { label: 'Avg Completion Rate', value: totals.avg_completion + '%', color: getBadgeColor( totals.avg_completion, bench.completion_rate_green, bench.completion_rate_amber ) },
-            { label: 'Avg Tutorial Score', value: totals.avg_score + '%', color: getBadgeColor( totals.avg_score, bench.score_green, bench.score_amber ), badge: 'all-time' },
+            { label: 'Avg Score', value: totals.avg_score + '%', color: getBadgeColor( totals.avg_score, bench.score_green, bench.score_amber ), badge: 'all-time' },
         ] );
 
         // Main content grid
@@ -447,7 +447,7 @@
         let html = '<table class="pbsg-data-table">';
         html += '<thead><tr>';
         html += '<th>Tutorial</th><th>Views</th><th>Completions</th>';
-        html += '<th>Completion Rate</th><th>Avg Tutorial Score <span class="pbsg-alltime-badge">all-time</span></th><th>Trend</th>';
+        html += '<th>Completion Rate</th><th>Avg Score <span class="pbsg-alltime-badge">all-time</span></th><th>Trend</th>';
         html += '</tr></thead><tbody>';
 
         tutorials.forEach( t => {
@@ -496,7 +496,7 @@
             const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
             const reasons = [];
             if ( rate < attComp ) reasons.push( 'Completion rate below ' + attComp + '%' );
-            if ( score < attScore ) reasons.push( 'Avg tutorial score below ' + attScore + '%' );
+            if ( score < attScore ) reasons.push( 'Avg Score below ' + attScore + '%' );
 
             const adminUrl = config.ajaxUrl.replace( 'admin-ajax.php', 'admin.php' );
 
