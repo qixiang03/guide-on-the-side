@@ -29,6 +29,11 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
 class PB_Split_Guide_Plugin {
   const TEMPLATE_SLUG = 'split-guide-template.php';
 
+  /** Some installs (e.g. Pressbooks) store {@see TEMPLATE_SLUG} with a templates/ prefix. */
+  public static function is_split_guide_template($value) {
+    return $value === self::TEMPLATE_SLUG || $value === 'templates/' . self::TEMPLATE_SLUG;
+  }
+
   // Meta keys
   const META_STEPS = '_pbsg_steps_json';
   const META_NOTE  = '_pbsg_header_note';
@@ -79,6 +84,9 @@ class PB_Split_Guide_Plugin {
     add_action('add_meta_boxes_page', [$this, 'add_meta_boxes']);
     add_action('save_post_page', [$this, 'save_meta'], 10, 2);
     add_action('admin_init', [$this, 'maybe_remove_editor']);
+    add_action('edit_form_after_title', [$this, 'render_split_guide_editor_notice']);
+    add_filter('use_block_editor_for_post_type', [$this, 'use_block_editor_for_page_tutorial'], 9999, 2);
+    add_filter('use_block_editor_for_post', [$this, 'use_block_editor_for_split_guide_post'], 9999, 2);
 
     add_action('wp_enqueue_scripts', [$this, 'enqueue_assets']);
     add_action('admin_enqueue_scripts', [$this, 'enqueue_admin_assets']);
@@ -417,7 +425,7 @@ class PB_Split_Guide_Plugin {
     $page_id = get_queried_object_id();
     $selected = get_post_meta($page_id, '_wp_page_template', true);
 
-    if ($selected === self::TEMPLATE_SLUG) {
+    if (self::is_split_guide_template($selected)) {
       $plugin_template = plugin_dir_path(__FILE__) . 'templates/' . self::TEMPLATE_SLUG;
       if (file_exists($plugin_template)) return $plugin_template;
     }
@@ -436,7 +444,7 @@ class PB_Split_Guide_Plugin {
 
     // Owner metabox and Tutorial Attributes removal — only for Split Guide tutorials
     $template = get_post_meta($post->ID, '_wp_page_template', true);
-    if ($template === self::TEMPLATE_SLUG) {
+    if (self::is_split_guide_template($template)) {
       add_meta_box(
         'pbsg_owner_box',
         __('Tutorial Owner', 'pb-split-guide'),
@@ -744,7 +752,7 @@ class PB_Split_Guide_Plugin {
             <div class="pbsg-intro-cover-col">
               <div class="pbsg-field">
                 <label class="pbsg-field-label">Cover Image <span class="pbsg-field-optional">(optional)</span></label>
-                <div class="pbsg-cover-image-box">
+                <div class="pbsg-cover-image-box" title="Recommended: wide landscape (16:9), about 1600×900 px; keep under ~1 MB to avoid heavy compression or distortion.">
                   <img
                     id="pbsg_cover_preview"
                     class="pbsg-cover-preview<?php echo $cover_image_url ? '' : ' pbsg-hidden'; ?>"
@@ -756,10 +764,13 @@ class PB_Split_Guide_Plugin {
                   <input type="hidden" class="pbsg-hidden" id="pbsg_cover_image_url"
                          value="<?php echo esc_attr($cover_image_url); ?>" style="display:none" />
                   <div class="pbsg-cover-actions">
-                    <button type="button" class="button" id="pbsg_pick_cover_image">Choose Image</button>
+                    <button type="button" class="button" id="pbsg_pick_cover_image" title="Recommended: 16:9, ~1600×900 px, under ~1 MB">Choose Image</button>
                     <button type="button" class="button" id="pbsg_clear_cover_image">Clear</button>
                   </div>
                 </div>
+                <p class="description" style="margin-top:8px; font-size:12px; color:#646970;">
+                  <strong>Tip:</strong> Use a wide landscape image (16:9), around <strong>1600×900 px</strong>, and keep file size under about <strong>1 MB</strong> so it displays clearly without heavy compression or stretching.
+                </p>
               </div>
 
               <div class="pbsg-field">
@@ -911,7 +922,7 @@ class PB_Split_Guide_Plugin {
               <?php
               $bench_fields = [
                 ['label' => 'Completion Rate',  'prefix' => 'completion_rate', 'type' => 'percent',  'desc' => 'Badge colours for tutorial completion rate'],
-                ['label' => 'Tutorial Score',   'prefix' => 'score',           'type' => 'percent',  'desc' => 'Badge colours for average quiz score'],
+                ['label' => 'Avg Score',        'prefix' => 'score',           'type' => 'percent',  'desc' => 'Badge colours for average quiz score'],
                 ['label' => 'Correct Rate',     'prefix' => 'correct_rate',    'type' => 'percent',  'desc' => 'Badge colours for per-question correct rate'],
                 ['label' => 'Give-up Count',    'prefix' => 'giveup',          'type' => 'inverse',  'desc' => 'Lower is better — high give-ups get flagged'],
                 ['label' => 'Max Retries',      'prefix' => 'retries',         'type' => 'inverse',  'desc' => 'Lower is better — high retries get flagged'],
@@ -990,6 +1001,7 @@ class PB_Split_Guide_Plugin {
                          min="0" max="100" style="width:60px; font-size:13px;" />
                   <span style="font-size:12px;">%</span>
                 </div>
+                <div style="font-size:11px; font-weight:600; color:#646970; margin:6px 0 6px 0; text-align:center; letter-spacing:0.05em;">OR</div>
                 <div style="display:flex; align-items:center; gap:6px;">
                   <span style="font-size:12px; width:100px;">Avg Score &lt;</span>
                   <input type="number" class="pbsg-bench-override" data-key="attention_score"
@@ -998,7 +1010,7 @@ class PB_Split_Guide_Plugin {
                          min="0" max="100" style="width:60px; font-size:13px;" />
                   <span style="font-size:12px;">%</span>
                 </div>
-                <div style="font-size:11px; color:#646970; margin-top:4px;">Tutorials below these thresholds are flagged</div>
+                <div style="font-size:11px; color:#646970; margin-top:4px;">A tutorial is flagged if <strong>either</strong> threshold is crossed (OR logic).</div>
               </div>
 
             </div>
@@ -1041,6 +1053,30 @@ class PB_Split_Guide_Plugin {
       <?php endif; ?>
     </div>
     <?php
+  }
+
+  /**
+   * When the block/classic editor is removed, the main column looks empty; point users to the metabox.
+   */
+  public function render_split_guide_editor_notice($post) {
+    if (!$post instanceof \WP_Post || $post->post_type !== 'page') {
+      return;
+    }
+    global $pagenow;
+    if (!in_array($pagenow, ['post.php', 'post-new.php'], true)) {
+      return;
+    }
+    $tpl = get_post_meta($post->ID, '_wp_page_template', true);
+    $show = ($pagenow === 'post-new.php') || self::is_split_guide_template($tpl);
+    if (!$show) {
+      return;
+    }
+    echo '<div class="notice notice-info inline" style="margin:12px 0;"><p>';
+    echo esc_html__(
+      'This tutorial does not use the standard page editor. Add the introduction, steps, and quizzes in the Split Guide Settings section below (scroll down on this screen).',
+      'pb-split-guide'
+    );
+    echo '</p></div>';
   }
 
   /**
@@ -1284,9 +1320,9 @@ class PB_Split_Guide_Plugin {
               <div style="font-size:11px; color:#646970; margin-top:4px;">Below amber = red badge</div>
             </div>
 
-            <!-- Tutorial Score -->
+            <!-- Avg Score -->
             <div class="pbsg-bench-group">
-              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">Tutorial Score Badges</label>
+              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">Avg Score Badges</label>
               <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                 <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#517E1B;"></span>
                 <span style="font-size:12px; width:80px;">Green &ge;</span>
@@ -1378,6 +1414,7 @@ class PB_Split_Guide_Plugin {
                        min="0" max="100" style="width:60px;" />
                 <span style="font-size:12px;">%</span>
               </div>
+              <div style="font-size:11px; font-weight:600; color:#646970; margin:8px 0 8px 0; text-align:center; letter-spacing:0.05em;">OR</div>
               <div style="display:flex; align-items:center; gap:8px;">
                 <span style="font-size:12px; width:120px;">Avg Score &lt;</span>
                 <input type="number" class="pbsg-bench-input" data-key="attention_score"
@@ -1385,7 +1422,7 @@ class PB_Split_Guide_Plugin {
                        min="0" max="100" style="width:60px;" />
                 <span style="font-size:12px;">%</span>
               </div>
-              <div style="font-size:11px; color:#646970; margin-top:4px;">Tutorials below these are flagged on the dashboard</div>
+              <div style="font-size:11px; color:#646970; margin-top:4px;">A tutorial is flagged if <strong>either</strong> threshold is crossed (OR logic).</div>
             </div>
 
           </div>
@@ -1661,7 +1698,7 @@ class PB_Split_Guide_Plugin {
 
     $page_id = get_queried_object_id();
     $selected = get_post_meta($page_id, '_wp_page_template', true);
-    if ($selected !== self::TEMPLATE_SLUG) return;
+    if (!self::is_split_guide_template($selected)) return;
 
     wp_enqueue_style(
       'pbsg_split_guide_css',
@@ -1699,9 +1736,47 @@ class PB_Split_Guide_Plugin {
     if ($post_id <= 0) return;
 
     $template = get_post_meta($post_id, '_wp_page_template', true);
-    if ($template === self::TEMPLATE_SLUG) {
+    if (self::is_split_guide_template($template)) {
       remove_post_type_support('page', 'editor');
     }
+  }
+
+  /**
+   * Disable the block editor for tutorial pages where the classic editor is removed.
+   * Without this, Gutenberg still mounts and the main column stays empty (editor support is off).
+   */
+  public function use_block_editor_for_page_tutorial($use_block_editor, $post_type) {
+    if ($post_type !== 'page') {
+      return $use_block_editor;
+    }
+    global $pagenow;
+    if (!in_array($pagenow, ['post.php', 'post-new.php'], true)) {
+      return $use_block_editor;
+    }
+    if ($pagenow === 'post-new.php') {
+      return false;
+    }
+    $post_id = isset($_GET['post']) ? (int) $_GET['post'] : 0;
+    $tpl     = $post_id > 0 ? get_post_meta($post_id, '_wp_page_template', true) : '';
+    if ($post_id > 0 && self::is_split_guide_template($tpl)) {
+      return false;
+    }
+    return $use_block_editor;
+  }
+
+  /**
+   * @param bool    $use_block_editor
+   * @param WP_Post $post
+   */
+  public function use_block_editor_for_split_guide_post($use_block_editor, $post) {
+    if (!$post instanceof \WP_Post || $post->post_type !== 'page') {
+      return $use_block_editor;
+    }
+    $tpl = get_post_meta($post->ID, '_wp_page_template', true);
+    if (self::is_split_guide_template($tpl)) {
+      return false;
+    }
+    return $use_block_editor;
   }
 
   public function enqueue_admin_assets($hook) {

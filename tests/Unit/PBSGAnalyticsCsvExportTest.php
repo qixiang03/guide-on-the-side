@@ -97,7 +97,7 @@ class PBSGAnalyticsCsvExportTest extends TestCase
             'Views',
             'Completions',
             'Completion Rate (%)',
-            'Avg Tutorial Score (%)',
+            'Avg Score (%)',
             'Avg Time (s)',
         ];
 
@@ -234,7 +234,7 @@ class PBSGAnalyticsCsvExportTest extends TestCase
             'Completions',
             'Completion Rate (%)',
             'Avg Time (s)',
-            'Avg Tutorial Score (%)',
+            'Avg Score (%)',
             'First Attempt Rate (%)',
             'Avg Attempts',
             'Give-up Rate (%)',

@@ -813,7 +813,7 @@ class PBSG_Analytics {
             $filename = 'tutorial-analytics-overview-' . $date_from . '-to-' . $date_to . '.csv';
             self::send_csv_headers( $filename );
 
-            fputcsv( $output, array( 'Tutorial', 'Views', 'Completions', 'Completion Rate (%)', 'Avg Tutorial Score (%)', 'Avg Time (s)' ) );
+            fputcsv( $output, array( 'Tutorial', 'Views', 'Completions', 'Completion Rate (%)', 'Avg Score (%)', 'Avg Time (s)' ) );
             $data = self::get_overview_data();
             foreach ( $data['tutorials'] as $t ) {
                 fputcsv( $output, array(
@@ -843,7 +843,7 @@ class PBSG_Analytics {
                 array( 'Completions', 'completions' ),
                 array( 'Completion Rate (%)', 'completion_rate' ),
                 array( 'Avg Time (s)', 'avg_time_seconds' ),
-                array( 'Avg Tutorial Score (%)', 'avg_score' ),
+                array( 'Avg Score (%)', 'avg_score' ),
                 array( 'First Attempt Rate (%)', 'first_attempt_rate' ),
                 array( 'Avg Attempts', 'avg_attempts' ),
                 array( 'Give-up Rate (%)', 'giveup_rate' ),

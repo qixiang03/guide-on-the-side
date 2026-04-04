@@ -225,7 +225,7 @@ jQuery(function ($) {
   // ═══════════════════════════════════════════════════════════
   //  Step Card Rendering
   // ═══════════════════════════════════════════════════════════
-  function quizName(t) { return { multichoice: 'Multiple Choice', blanks: 'Fill in Blanks', singlechoice: 'Single Choice' }[t] || ''; }
+  function quizName(t) { return { multichoice: 'Multiple Selection', blanks: 'Fill in Blanks', singlechoice: 'Single Selection' }[t] || ''; }
 
   function renderStepCards() {
     const steps = getSteps().map(norm);
@@ -333,11 +333,11 @@ jQuery(function ($) {
     return `
       <div class="pbsg-quiz-type-selector" data-idx="${idx}">
         <button type="button" class="pbsg-quiz-type-btn${qt === 'multichoice' ? ' active' : ''}" data-type="multichoice" data-idx="${idx}">
-          <span class="pbsg-type-icon">&#x2611;</span>Multiple Choice</button>
+          <span class="pbsg-type-icon">&#x2611;</span>Multiple Selection</button>
         <button type="button" class="pbsg-quiz-type-btn${qt === 'blanks' ? ' active' : ''}" data-type="blanks" data-idx="${idx}">
           <span class="pbsg-type-icon">&#x270F;&#xFE0F;</span>Fill in Blanks</button>
         <button type="button" class="pbsg-quiz-type-btn${qt === 'singlechoice' ? ' active' : ''}" data-type="singlechoice" data-idx="${idx}">
-          <span class="pbsg-type-icon">&#x25C9;</span>Single Choice</button>
+          <span class="pbsg-type-icon">&#x25C9;</span>Single Selection</button>
       </div>
       <div class="pbsg-quiz-form" data-idx="${idx}">${renderQuizForm(qt, s.quiz || {}, idx)}</div>
       <div class="pbsg-existing-h5p-link">
