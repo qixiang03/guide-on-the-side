@@ -331,9 +331,14 @@ $s['branch'] = $branch;
       </div>
 
       <div class="pbsg-nav">
-        <button type="button" class="pbsg-btn-outline" id="pbsgPrev">Prev</button>
-        <span id="pbsgProgress" class="pbsg-progress"></span>
-        <button type="button" class="pbsg-btn-outline" id="pbsgNext">Next</button>
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev">Prev</button>
+
+        <div class="pbsg-nav-center">
+          <span id="pbsgProgress" class="pbsg-progress"></span>
+          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">0/0 ✓</span>
+        </div>
+
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext">Next</button>
       </div>
 
     </div>

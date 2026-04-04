@@ -133,6 +133,7 @@ jQuery(function ($) {
   
     o.quiz = o.quiz || null;
     o.h5p_id = o.h5p_id || 0;
+    o.h5p_cleared = !!o.h5p_cleared;
     o.title = o.title || '';
     // Branch / sub-tutorial defaults
        o.branch = (o.branch && typeof o.branch === 'object') ? o.branch : null;
@@ -735,11 +736,27 @@ function branchSummary(s) {
           <span>Linked to <strong>H5P #${s.h5p_id}</strong></span>
         </div>
         <div class="pbsg-linked-h5p-actions">
-          <a href="#" class="pbsg-detach-h5p" data-idx="${idx}">Detach &amp; create new inline</a>
+          <a href="#" class="pbsg-create-inline-from-linked" data-idx="${idx}">Create new</a>
           <span class="pbsg-sep">|</span>
-          <a href="#" class="pbsg-use-existing-h5p" data-idx="${idx}">Change H5P</a>
+          <a href="#" class="pbsg-use-existing-h5p" data-idx="${idx}">Select exists</a>
           <span class="pbsg-sep">|</span>
           <a href="#" class="pbsg-edit-h5p" data-idx="${idx}" data-h5p-id="${s.h5p_id}">Edit H5P</a>
+          <span class="pbsg-sep">|</span>
+          <a href="#" class="pbsg-remove-h5p-link" data-idx="${idx}">Remove link</a>
+        </div>
+      </div>`;
+    }
+
+    if (s.h5p_cleared && !s.quiz && !s.h5p_id) {
+      return `<div class="pbsg-linked-h5p">
+        <div class="pbsg-linked-h5p-info">
+          <span class="pbsg-linked-icon">&#x1F517;</span>
+          <span><strong>No H5P quiz linked</strong></span>
+        </div>
+        <div class="pbsg-linked-h5p-actions">
+          <a href="#" class="pbsg-use-existing-h5p" data-idx="${idx}">Select exists</a>
+          <span class="pbsg-sep">|</span>
+          <a href="#" class="pbsg-create-inline-from-linked" data-idx="${idx}">Create new</a>
         </div>
       </div>`;
     }
@@ -2086,17 +2103,61 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       const id = parseInt($('#pbsg-h5p-select').val(), 10);
       if (!id || pickIdx === null) return;
       const steps = getSteps().map(norm);
-      if (steps[pickIdx]) { steps[pickIdx].h5p_id = id; steps[pickIdx].quiz = null; setSteps(steps); renderStepCards(); }
+      if (steps[pickIdx]) {
+        steps[pickIdx].h5p_id = id;
+        steps[pickIdx].quiz = null;
+        steps[pickIdx].h5p_cleared = false;
+        setSteps(steps);
+        renderStepCards();
+      }
       tb_remove();
     });
   }
 
-  $(document).on('click', '.pbsg-detach-h5p', function (e) {
+  $(document).on('click', '.pbsg-create-inline-from-linked', function (e) {
     e.preventDefault();
-    const idx = parseInt($(this).data('idx'), 10); if (isNaN(idx)) return;
+
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+
     const steps = getSteps().map(norm);
-    if (steps[idx]) { steps[idx].h5p_id = 0; steps[idx].quiz = { type: 'multichoice', question: '', answers: [{ text: '', correct: true }, { text: '', correct: false }] }; setSteps(steps); renderStepCards(); }
+
+    if (steps[idx]) {
+      steps[idx].h5p_id = 0;
+      steps[idx].h5p_cleared = false;
+      steps[idx].quiz = {
+        type: 'multichoice',
+        question: '',
+        answers: [
+          { text: '', correct: true },
+          { text: '', correct: false }
+        ]
+      };
+
+      setSteps(steps);
+      renderStepCards();
+    }
   });
+
+  $(document).on('click', '.pbsg-remove-h5p-link', function (e) {
+    e.preventDefault();
+
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+
+    const steps = getSteps().map(norm);
+
+    if (steps[idx]) {
+      steps[idx].h5p_id = 0;
+      steps[idx].quiz = null;
+      steps[idx].h5p_cleared = true;
+      delete steps[idx]._editing_h5p;
+
+      setSteps(steps);
+      renderStepCards();
+    }
+  });
+  
 
   // Issue 5: Edit H5P — fetch existing content and populate inline form
   $(document).on('click', '.pbsg-edit-h5p', function (e) {
@@ -2325,8 +2386,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     }
     const html = `
       <div id="pbsg-save-tpl-modal" style="padding:18px;">
-        <h2 style="margin-top:0;">Save as Template</h2>
-        <p style="color:#50575e; margin-bottom:14px;">The current steps will be saved as a reusable template for new tutorials.</p>
+        <h2 style="margin-top:0;">Save All as Template</h2>
+        <p style="color:#50575e; margin-bottom:14px;">This will save all current settings, quiz steps, tutorial resources, and configuration as a reusable template for new tutorials.</p>
         <p style="margin:0 0 6px;"><strong>Template name <span style="color:#d63638;">*</span></strong></p>
         <input type="text" id="pbsg-tpl-name" style="width:100%;" placeholder="e.g. Library Catalogue Search" />
         <p style="margin:12px 0 6px;"><strong>Description</strong></p>
@@ -2344,7 +2405,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       $('body').append('<div id="pbsg-save-tpl-inline" style="display:none;"></div>');
     }
     $('#pbsg-save-tpl-inline').html(html);
-    tb_show('Save as Template', '#TB_inline?inlineId=pbsg-save-tpl-inline&width=560&height=380');
+    tb_show('Save All as Template', '#TB_inline?inlineId=pbsg-save-tpl-inline&width=560&height=380');
 
     $('#pbsg-tpl-cancel-btn').on('click', () => tb_remove());
     $('#pbsg-tpl-save-btn').on('click', function () {

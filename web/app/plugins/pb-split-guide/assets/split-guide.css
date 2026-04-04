@@ -1605,3 +1605,38 @@ body.tutorial-active #colophon {
 .pbsg-branch-quiz-host {
   scroll-margin-top: 0 !important;
 }
+
+.pbsg-nav {
+  display: grid;
+  grid-template-columns: minmax(110px, 140px) 1fr minmax(110px, 140px);
+  align-items: center;
+  gap: 12px;
+}
+
+.pbsg-nav-btn {
+  min-width: 110px;
+  padding: 8px 18px;
+  font-size: 15px;
+}
+
+.pbsg-nav-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pbsg-progress {
+  white-space: nowrap;
+}
+
+.pbsg-running-score {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #2e7d32;
+  min-width: 72px;
+}

@@ -405,11 +405,18 @@ function attachH5PWatcher(stepIndex){
     if (correct) {
       passedSteps.add(stepIndex);
       lockNext(false);
+      updateRunningScore();
       updateCertificateGate();
       return;
     }
 
     passedSteps.delete(stepIndex);
+
+    // Default rule:
+    // Wrong answer should NOT block Next anymore,
+    // unless this step has a triggered mandatory branch.
+    lockNext(false);
+    updateRunningScore();
 
     // Show branch popup ONLY after a real Check click,
     // not during every MutationObserver redraw
@@ -420,16 +427,13 @@ function attachH5PWatcher(stepIndex){
         showLearnMoreButton();
 
         if (isMandatoryBranch(step)) {
-          // Mandatory: student must enter the branch
+          // Mandatory branch blocks Next
           lockNext(true);
         } else {
-          // Optional: student may skip the branch and continue
+          // Optional branch still allows Next
           lockNext(false);
         }
       }
-    } else {
-      // No branch triggered yet -> wrong answer still blocks Next
-      lockNext(true);
     }
 
     updateCertificateGate();
@@ -477,6 +481,7 @@ function attachH5PWatcher(stepIndex){
 
 const titleEl = document.getElementById('pbsgStepTitle');
 const progressEl = document.getElementById('pbsgProgress');
+const runningScoreEl = document.getElementById('pbsgRunningScore');
 const progressFillEl = document.getElementById('pbsgProgressFill');
 const progressLabelEl = document.getElementById('pbsgProgressLabel');
 
@@ -505,8 +510,15 @@ function requiredQuizStepsCount(){
   return steps.filter(s => !!s.h5p_id).length;
 }
 
+function attemptedQuizStepsCount(){
+  let n = 0;
+  steps.forEach((s, idx) => {
+    if (s.h5p_id && (attemptCounts[idx] || 0) > 0) n++;
+  });
+  return n;
+}
+
 function passedQuizStepsCount(){
-  // only count steps that actually have quizzes
   let n = 0;
   steps.forEach((s, idx) => {
     if (s.h5p_id && passedSteps.has(idx)) n++;
@@ -525,6 +537,15 @@ function getFinalGradePercent(){
   if (total === 0) return 100;
 
   return ((passed / total) * 100).toFixed(2);
+}
+
+function updateRunningScore() {
+  if (!runningScoreEl) return;
+
+  const correct = passedQuizStepsCount();
+  const attempted = attemptedQuizStepsCount();
+
+  runningScoreEl.textContent = `${correct}/${attempted} ✓`;
 }
 
 function resetTutorialToStart(){
@@ -566,25 +587,16 @@ function hasIntroScreen(){
 function updateCertificateGate(){
   if (!certBtn) return;
 
-  // Only show/allow certificate on last step
+  // Only allow certificate on the summary / last step area
   if (i !== steps.length - 1) {
     lockCert(true, '');
     return;
   }
 
-  const total = requiredQuizStepsCount();
-  const passed = passedQuizStepsCount();
-
-  if (total === 0) {
-    lockCert(false, ''); // no quizzes => allow
-    return;
-  }
-
-  if (allQuizzesPassed()) {
-    lockCert(false, 'All steps passed. You can download your certificate.');
-  } else {
-    lockCert(true, `Complete all quiz steps correctly first (${passed}/${total} passed).`);
-  }
+  // New rule:
+  // Certificate is always allowed on the last step,
+  // even if not all quizzes are passed.
+  lockCert(false, '');
 
   finalizeCompletionIfReady();
 }
@@ -656,7 +668,6 @@ async function markCompletedOnce() {
 
 async function finalizeCompletionIfReady() {
   if (i !== steps.length - 1) return false;
-  if (!allQuizzesPassed()) return false;
 
   const ok = window.PBSG_CERT?.isLoggedIn
     ? await markCompletedOnce()
@@ -933,9 +944,10 @@ function render(){
   renderTutorial(step);
 
   //titleEl.textContent = step.title || `Step ${i+1}`;
+  
   if (titleEl) titleEl.textContent = '';
-  // Inline (left pane) progress
-  progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
+  if (progressEl) progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
+  updateRunningScore();
 
   
 
@@ -949,10 +961,8 @@ function render(){
   if (step.h5p_id) {
     if (isCurrentStepBlockedByMandatoryBranch()) {
       lockNext(true);
-    } else if (isCurrentStepSkippableByOptionalBranch()) {
-      lockNext(false);
     } else {
-      lockNext(!passedSteps.has(i));
+      lockNext(false);
     }
   } else {
     lockNext(false);
@@ -1345,6 +1355,7 @@ function renderBranchStep() {
   const pageText = `Page: ${mainNumber}${letter} of ${branchTotal}`;
 
   if (progressEl) progressEl.textContent = pageText;
+  updateRunningScore();
   if (progressLabelEl) progressLabelEl.textContent = pageText;
 
   const pct = branchTotal ? (branchCurrent / branchTotal) * 100 : 0;
@@ -1407,13 +1418,7 @@ function buildCertificateUrl(studentName) {
 
 if (summaryCertBtn) {
   summaryCertBtn.onclick = async () => {
-    const ok = await finalizeCompletionIfReady();
-
-    if (!ok) {
-      alert('Tutorial completion has not been recorded yet. Please make sure all quiz steps are passed.');
-      return;
-    }
-
+    await finalizeCompletionIfReady();
     openCertModal();
   };
 }

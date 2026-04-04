@@ -1428,3 +1428,8 @@
 .pbsg-branch-inline-option input[type="radio"] {
   margin: 0;
 }
+
+/* Space between Add Step and Save Template button */
+.pbsg-save-template {
+  margin-top: 20px;   /* adjust this value if needed */
+}
