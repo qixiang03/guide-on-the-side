@@ -10,14 +10,9 @@ const fallbackLink = document.getElementById('pbsgFallbackLink');
 
 const prevBtn = document.getElementById('pbsgPrev');
 const nextBtn = document.getElementById('pbsgNext');
-
-const branchModal = document.getElementById('pbsgBranchModal');
-const branchText = document.getElementById('pbsgBranchText');
-const branchOpenBtn = document.getElementById('pbsgBranchOpen');
-const branchReturnBtn = document.getElementById('pbsgBranchReturn');
-const branchCompleteBtn = document.getElementById('pbsgBranchComplete');
-const branchSkipBtn = document.getElementById('pbsgBranchSkip');
-const branchCloseBtn = document.getElementById('pbsgBranchClose');
+const learnMoreWrap = document.getElementById('pbsgLearnMoreWrap');
+const learnMoreBtn = document.getElementById('pbsgLearnMore');
+const branchQuizHost = document.getElementById('pbsgBranchQuizHost');
 
 const introScreen = document.getElementById('pbsgIntroScreen');
 const mainContent = document.getElementById('pbsgMainContent');
@@ -64,7 +59,7 @@ function bindMenu(){
   });
 }
 
-// Only allow going BACK (or current). Future steps are disabled.
+
 function updateMenuState(){
   if (!menuDd) return;
 
@@ -75,7 +70,7 @@ function updateMenuState(){
     const isFuture = idx > i;
 
     el.classList.toggle('is-current', isCurrent);
-    el.classList.toggle('is-disabled', isFuture);
+    el.classList.toggle('is-disabled', inBranch || isFuture);
   });
 }
 
@@ -99,11 +94,7 @@ const passedSteps = new Set(); // remember which steps are already correct
 
 const triggeredBranchSteps = new Set();
 const completedBranchSteps = new Set();
-const startedBranchSteps = new Set();
 
-let activeBranchStep = null;
-let branchReturnTarget = null;
-let activeBranchWindow = null;
 
 let h5pObs = null;
 let h5pClickHandler = null;
@@ -131,29 +122,15 @@ function lockNext(locked){
   nextBtn.classList.toggle('pbsg-locked', !!locked);
 }
 
-function openBranchModal() {
-  if (!branchModal) return;
-  branchModal.style.display = '';
-  branchModal.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('pbsg-branch-modal-open');
-}
-
-function closeBranchModal() {
-  if (!branchModal) return;
-  branchModal.style.display = 'none';
-  branchModal.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('pbsg-branch-modal-open');
-}
-
 function hasBranch(step) {
   return !!(
     step &&
     step.branch &&
-    step.branch.mode !== 'none' &&
-    step.branch.tutorial &&
+    (step.branch.mode === 'optional' || step.branch.mode === 'mandatory') &&
     (
-      ((step.branch.tutorial.type === 'url' || step.branch.tutorial.type === 'tutorial') && step.branch.tutorial.url) ||
-      (step.branch.tutorial.type === 'file' && step.branch.tutorial.file_url)
+      (Array.isArray(step.branch.questions) && step.branch.questions.length > 0) ||
+      (step.branch.tutorial_type === 'url' && step.branch.tutorial_url) ||
+      (step.branch.tutorial_type === 'file' && step.branch.tutorial_file_url)
     )
   );
 }
@@ -162,128 +139,12 @@ function shouldTriggerBranch(stepIndex) {
   const step = steps[stepIndex];
   if (!hasBranch(step)) return false;
 
-  const required = step.branch.trigger_attempts || 1;
   const attempts = attemptCounts[stepIndex] || 0;
-
-  return attempts >= required;
+  return attempts >= 1;
 }
 
 function isMandatoryBranch(step) {
   return hasBranch(step) && step.branch.mode === 'mandatory';
-}
-
-function resetBranchUI() {
-  activeBranchStep = null;
-  branchReturnTarget = null;
-
-  closeBranchModal();
-
-  if (branchText) branchText.innerHTML = '';
-
-  if (branchReturnBtn) branchReturnBtn.style.display = 'none';
-  if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
-  if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-  if (branchOpenBtn) {
-    branchOpenBtn.style.display = 'inline-block';
-    branchOpenBtn.textContent = 'Start';
-  }
-  if (branchCloseBtn) branchCloseBtn.style.display = 'none';
-}
-
-function showBranchPrompt(stepIndex) {
-  const step = steps[stepIndex];
-  if (!hasBranch(step) || !branchText) return;
-
-  activeBranchStep = stepIndex;
-  branchReturnTarget = stepIndex;
-
-  const required = Math.max(1, parseInt(step.branch.trigger_attempts, 10) || 1);
-  const attempts = Math.max(required, parseInt(attemptCounts[stepIndex], 10) || required);
-  const title = step.branch.title || 'Branch Review';
-
-  let intro = step.branch.intro || '';
-  if (!intro) {
-    if (step.branch.mode === 'mandatory') {
-      intro = `You answered this question incorrectly ${attempts} ${attempts === 1 ? 'time' : 'times'}. You must complete this sub-tutorial before continuing.`;
-    } else {
-      intro = `You answered this question incorrectly ${attempts} ${attempts === 1 ? 'time' : 'times'}. Practicing this sub-tutorial may help you learn better.`;
-    }
-  }
-
-  const modeText = step.branch.mode === 'mandatory'
-    ? 'You can continue only after you finish this sub-tutorial and answer the main quiz correctly.'
-    : 'You may start the sub-tutorial now or skip it and return to the main tutorial.';
-
-  const modalTitle = document.getElementById('pbsgBranchModalTitle');
-  if (modalTitle) modalTitle.textContent = title;
-
-  branchText.innerHTML = `
-    ${intro}<br>
-    <span class="pbsg-branch-mode">${modeText}</span>
-  `;
-
-  if (branchOpenBtn) {
-    branchOpenBtn.textContent = 'Start';
-    branchOpenBtn.style.display = 'inline-block';
-  }
-
-  if (branchReturnBtn) branchReturnBtn.style.display = 'none';
-
-if (step.branch.mode === 'mandatory') {
-  if (branchCompleteBtn) {
-    branchCompleteBtn.textContent = 'Finished';
-    branchCompleteBtn.style.display = completedBranchSteps.has(stepIndex) ? 'inline-block' : 'none';
-  }
-  if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-  if (branchCloseBtn) branchCloseBtn.style.display = 'none';
-} else {
-    if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
-    if (branchSkipBtn) {
-      branchSkipBtn.textContent = 'Skip';
-      branchSkipBtn.style.display = 'inline-block';
-    }
-    if (branchCloseBtn) branchCloseBtn.style.display = 'inline-block';
-  }
-
-  openBranchModal();
-}
-
-function renderBranchTutorial(stepIndex) {
-  const step = steps[stepIndex];
-  if (!hasBranch(step)) return;
-
-  let url = '';
-  if (step.branch.tutorial.type === 'url' || step.branch.tutorial.type === 'tutorial') {
-    url = step.branch.tutorial.url || '';
-  } else if (step.branch.tutorial.type === 'file') {
-    url = step.branch.tutorial.file_url || '';
-  }
-
-  if (!url) return;
-
-  startedBranchSteps.add(stepIndex);
-
-  // pass parent step info to the sub tutorial window
-  try {
-    const u = new URL(url, window.location.origin);
-    u.searchParams.set('pbsg_branch_parent_step', String(stepIndex));
-    url = u.toString();
-  } catch (e) {}
-
-  activeBranchWindow = window.open(url, '_blank');
-
-  if (step.branch.mode === 'mandatory') {
-    if (branchOpenBtn) branchOpenBtn.style.display = 'inline-block';
-    if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
-    if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-  } else {
-    closeBranchModal();
-  }
-}
-
-function returnToMainTutorial() {
-  if (branchReturnTarget === null || !steps[branchReturnTarget]) return;
-  renderTutorial(steps[branchReturnTarget]);
 }
 
 function isCurrentStepBlockedByMandatoryBranch() {
@@ -303,17 +164,6 @@ window.addEventListener('message', (event) => {
   if (!Number.isFinite(stepIndex)) return;
 
   completedBranchSteps.add(stepIndex);
-
-  if (activeBranchStep === stepIndex) {
-    if (branchCompleteBtn) {
-      branchCompleteBtn.textContent = 'Finished';
-      branchCompleteBtn.style.display = 'inline-block';
-    }
-    if (branchOpenBtn) {
-      branchOpenBtn.style.display = 'inline-block';
-      branchOpenBtn.textContent = 'Start';
-    }
-  }
 });
 
 
@@ -423,12 +273,6 @@ function attachH5PWatcher(stepIndex){
 
     if (correct) {
       passedSteps.add(stepIndex);
-
-      // Only close the branch UI if this step is actually passed
-      if (activeBranchStep === stepIndex || triggeredBranchSteps.has(stepIndex)) {
-        resetBranchUI();
-      }
-
       lockNext(false);
       updateCertificateGate();
       return;
@@ -439,13 +283,20 @@ function attachH5PWatcher(stepIndex){
     // Show branch popup ONLY after a real Check click,
     // not during every MutationObserver redraw
     if (allowBranchPrompt && shouldTriggerBranch(stepIndex)) {
-      if (!triggeredBranchSteps.has(stepIndex)) {
-        triggeredBranchSteps.add(stepIndex);
-        showBranchPrompt(stepIndex);
+      triggeredBranchSteps.add(stepIndex);
+
+      if (!inBranch && stepIndex === i) {
+        showLearnMoreButton();
+
+        if (isMandatoryBranch(step)) {
+          lockNext(true);
+        }
       }
     }
 
-    lockNext(true);
+    if (!(allowBranchPrompt && shouldTriggerBranch(stepIndex) && isMandatoryBranch(step) && stepIndex === i)) {
+      lockNext(true);
+    }
 
     updateCertificateGate();
   };
@@ -553,7 +404,12 @@ function resetTutorialToStart(){
 
   triggeredBranchSteps.clear();
   completedBranchSteps.clear();
-  resetBranchUI();
+  inBranch = false;
+  branchParentIndex = null;
+  branchStepIndex = 0;
+  currentTutorialSignature = null;
+  showH5PFrame();
+  hideLearnMoreButton();
 
   steps.forEach((step, idx) => {
     attemptCounts[idx] = 0;
@@ -603,6 +459,24 @@ function updateCertificateGate(){
 let certMarked = false;
 
 let i = 0;
+let inBranch = false;
+let branchParentIndex = null;
+let branchStepIndex = 0;
+let currentTutorialSignature = null;
+
+
+function getCurrentBranch() {
+  if (branchParentIndex === null) return null;
+  const parent = steps[branchParentIndex];
+  if (!parent || !parent.branch) return null;
+  return parent.branch;
+}
+
+function getCurrentBranchQuestion() {
+  const branch = getCurrentBranch();
+  if (!branch || !Array.isArray(branch.questions)) return null;
+  return branch.questions[branchStepIndex] || null;
+}
 
 let attemptCounts = {};
 steps.forEach((_, idx) => {
@@ -808,13 +682,21 @@ function toEmbeddableUrl(rawUrl){
   return rawUrl;
 }
 
-function renderTutorial(step){
+function renderTutorial(step, options = {}){
   const t = step.tutorial || {};
   const tutorialStage = document.getElementById('pbsgTutorialStage');
 
   if (!tutorialStage) return;
 
-  // Reset stage to iframe by default
+  const force = !!options.force;
+  const nextSignature = getTutorialSignature(step);
+
+  if (!force && currentTutorialSignature === nextSignature) {
+    return;
+  }
+
+  currentTutorialSignature = nextSignature;
+
   tutorialStage.innerHTML = `
     <iframe aria-label="Tutorial Frame" id="pbsgTutorialFrame" class="pbsg-iframe"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -884,10 +766,31 @@ function renderTutorial(step){
 function render(){
 
   cleanupH5PWatcher();
-  resetBranchUI();
+
+  if (inBranch) {
+    renderBranchStep();
+    return;
+  }
+
+  showH5PFrame();
+  hideLearnMoreButton();
 
   const step = steps[i];
   if (!step) return;
+
+  if (
+    step.h5p_id &&
+    !passedSteps.has(i) &&
+    hasBranch(step) &&
+    triggeredBranchSteps.has(i) &&
+    !completedBranchSteps.has(i)
+  ) {
+    showLearnMoreButton();
+
+    if (isMandatoryBranch(step)) {
+      lockNext(true);
+    }
+  }
 
   if (step.h5p_id) h5pFrame.src = h5pUrl(step.h5p_id);
   else h5pFrame.src='';
@@ -936,10 +839,55 @@ function render(){
   updateMenuState();
 }
 
-prevBtn.onclick = ()=>{ if(i>0){i--;render();} };
+prevBtn.onclick = () => {
+  if (inBranch) {
+    if (branchStepIndex > 0) {
+      branchStepIndex--;
+      renderBranchStep();
+    }
+    return;
+  }
+
+  if (i > 0) {
+    i--;
+    render();
+  }
+};
 
 nextBtn.onclick = async () => {
   cleanupH5PWatcher();
+
+  if (inBranch) {
+    const branch = getCurrentBranch();
+    if (!branch) return;
+
+    if (branchStepIndex < branch.questions.length - 1) {
+      branchStepIndex++;
+      renderBranchStep();
+      return;
+    }
+
+    inBranch = false;
+    completedBranchSteps.add(branchParentIndex);
+
+    const nextMainIndex = branchParentIndex + 1;
+
+    if (nextMainIndex < steps.length) {
+      i = nextMainIndex;
+      const oldParent = branchParentIndex;
+      branchParentIndex = null;
+      branchStepIndex = 0;
+      showBranchExitNotice(oldParent);
+      render();
+    } else {
+      branchParentIndex = null;
+      branchStepIndex = 0;
+      await finalizeCompletionIfReady();
+      showSummaryScreen();
+    }
+
+    return;
+  }
 
   if (i < steps.length - 1) {
     i++;
@@ -950,57 +898,21 @@ nextBtn.onclick = async () => {
   }
 };
 
-if (branchOpenBtn) {
-  branchOpenBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-    renderBranchTutorial(activeBranchStep);
-  };
+function showBranchExitNotice(parentIdx) {
+  const stepTitle = steps[parentIdx]?.title || `Question ${parentIdx + 1}`;
+  alert(`You have completed the branch. You can go back to ${stepTitle} later if you want to retry it for a correct score.`);
 }
 
-if (branchReturnBtn) {
-  branchReturnBtn.onclick = () => {
-    returnToMainTutorial();
-  };
-}
+if (learnMoreBtn) {
+  learnMoreBtn.onclick = () => {
+    const step = steps[i];
+    if (!step || !hasBranch(step)) return;
 
-if (branchSkipBtn) {
-  branchSkipBtn.onclick = () => {
-    if (activeBranchStep === null) return;
+    inBranch = true;
+    branchParentIndex = i;
+    branchStepIndex = 0;
 
-    const step = steps[activeBranchStep];
-    if (step.branch.mode === 'mandatory') return;
-
-    resetBranchUI();
-
-    if (step.h5p_id) {
-      lockNext(true);
-    } else {
-      lockNext(false);
-    }
-  };
-}
-
-if (branchCompleteBtn) {
-  branchCompleteBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-
-    const completedStep = activeBranchStep;
-    const step = steps[completedStep];
-
-    // do not allow manual fake completion
-    if (!completedBranchSteps.has(completedStep)) {
-      return;
-    }
-
-    resetBranchUI();
-
-    if (completedStep === i) {
-      if (passedSteps.has(i)) {
-        lockNext(false);
-      } else {
-        lockNext(true);
-      }
-    }
+    renderBranchStep();
   };
 }
 
@@ -1021,6 +933,255 @@ if (certBtn) {
 
     window.location.href = u.toString();
   };
+}
+
+function showLearnMoreButton() {
+  if (learnMoreWrap) learnMoreWrap.style.display = '';
+}
+
+function hideLearnMoreButton() {
+  if (learnMoreWrap) learnMoreWrap.style.display = 'none';
+}
+
+
+function showH5PFrame() {
+  if (h5pFrame) h5pFrame.style.display = '';
+  if (branchQuizHost) {
+    branchQuizHost.style.display = 'none';
+    branchQuizHost.innerHTML = '';
+  }
+}
+
+function showBranchQuizHost() {
+  if (h5pFrame) {
+    h5pFrame.style.display = 'none';
+    h5pFrame.src = '';
+  }
+  if (branchQuizHost) branchQuizHost.style.display = '';
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, function (m) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[m];
+  });
+}
+
+function renderInlineBranchQuestion(q) {
+  if (!branchQuizHost) return;
+
+  showBranchQuizHost();
+
+  const type = q.type || '';
+  let html = '';
+
+  if (type === 'multichoice') {
+    const answers = Array.isArray(q.answers) ? q.answers : [];
+    html = `
+      <div class="pbsg-branch-inline-question">
+        <h3>${escapeHtml(q.question || '')}</h3>
+        <div class="pbsg-branch-inline-answers">
+          ${answers.map((a, idx) => `
+            <label class="pbsg-branch-inline-answer">
+              <input type="checkbox" name="pbsgBranchAnswer" value="${idx}">
+              <span>${escapeHtml(a.text || '')}</span>
+            </label>
+          `).join('')}
+        </div>
+        <div class="pbsg-branch-inline-actions">
+          <button type="button" id="pbsgBranchCheck">Check</button>
+        </div>
+        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
+      </div>
+    `;
+  } else if (type === 'singlechoice') {
+    const wrongs = Array.isArray(q.wrong_answers) ? q.wrong_answers : [];
+    const choices = [q.correct_answer || '', ...wrongs].filter(Boolean);
+
+    html = `
+      <div class="pbsg-branch-inline-question">
+        <h3>${escapeHtml(q.question || '')}</h3>
+        <div class="pbsg-branch-inline-answers">
+          ${choices.map((choice, idx) => `
+            <label class="pbsg-branch-inline-answer">
+              <input type="radio" name="pbsgBranchAnswer" value="${idx}">
+              <span>${escapeHtml(choice)}</span>
+            </label>
+          `).join('')}
+        </div>
+        <div class="pbsg-branch-inline-actions">
+          <button type="button" id="pbsgBranchCheck">Check</button>
+        </div>
+        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
+      </div>
+    `;
+
+    branchQuizHost.innerHTML = html;
+    bindInlineBranchCheck(q, choices);
+    return;
+  } else if (type === 'blanks') {
+    html = `
+      <div class="pbsg-branch-inline-question">
+        <h3>Fill in the blank</h3>
+        <div class="pbsg-branch-inline-blanks">
+          <textarea id="pbsgBranchBlanksInput" rows="4">${escapeHtml(q.sentence || '')}</textarea>
+        </div>
+        <div class="pbsg-branch-inline-actions">
+          <button type="button" id="pbsgBranchCheck">Check</button>
+        </div>
+        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
+      </div>
+    `;
+  }
+
+  branchQuizHost.innerHTML = html;
+  bindInlineBranchCheck(q);
+}
+
+function bindInlineBranchCheck(q, singleChoices = []) {
+  const checkBtn = document.getElementById('pbsgBranchCheck');
+  const feedback = document.getElementById('pbsgBranchFeedback');
+
+  if (!checkBtn || !feedback) return;
+
+  checkBtn.onclick = () => {
+    let correct = false;
+
+    if (q.type === 'multichoice') {
+      const selected = Array.from(document.querySelectorAll('input[name="pbsgBranchAnswer"]:checked'))
+        .map(el => parseInt(el.value, 10))
+        .sort();
+
+      const correctIdx = (q.answers || [])
+        .map((a, idx) => a.correct ? idx : -1)
+        .filter(idx => idx >= 0)
+        .sort();
+
+      correct = JSON.stringify(selected) === JSON.stringify(correctIdx);
+    } else if (q.type === 'singlechoice') {
+      const selected = document.querySelector('input[name="pbsgBranchAnswer"]:checked');
+      if (selected) {
+        const idx = parseInt(selected.value, 10);
+        correct = singleChoices[idx] === (q.correct_answer || '');
+      }
+    } else if (q.type === 'blanks') {
+      const input = document.getElementById('pbsgBranchBlanksInput');
+      const value = (input?.value || '').trim();
+      correct = value.length > 0;
+    }
+
+    if (correct) {
+      feedback.textContent = 'Correct.';
+      feedback.className = 'pbsg-branch-feedback is-correct';
+      lockNext(false);
+    } else {
+      feedback.textContent = 'Try again.';
+      feedback.className = 'pbsg-branch-feedback is-wrong';
+      lockNext(true);
+    }
+  };
+}
+
+function buildBranchTutorialStep(branch) {
+  return {
+    tutorial: {
+      type: branch.tutorial_type || '',
+      url: branch.tutorial_url || '',
+      file_url: branch.tutorial_file_url || '',
+      mime: branch.tutorial_mime || ''
+    }
+  };
+}
+
+function getTutorialSignature(step) {
+  const t = step?.tutorial || {};
+  return JSON.stringify({
+    type: t.type || '',
+    url: t.url || '',
+    file_url: t.file_url || '',
+    mime: t.mime || ''
+  });
+}
+
+function buildMainTutorialStepForBranch(parentStep) {
+  return {
+    tutorial: {
+      type: parentStep?.tutorial?.type || '',
+      url: parentStep?.tutorial?.url || '',
+      file_url: parentStep?.tutorial?.file_url || '',
+      mime: parentStep?.tutorial?.mime || ''
+    }
+  };
+}
+
+function buildBranchQuestionTutorialStep(q) {
+  return {
+    tutorial: {
+      type: q?.tutorial_type || '',
+      url: q?.tutorial_url || '',
+      file_url: q?.tutorial_file_url || '',
+      mime: q?.tutorial_mime || ''
+    }
+  };
+}
+
+function getEffectiveBranchTutorialStep(parentStep, branch, q) {
+  const mode = branch?.resource_mode || 'main';
+
+  if (mode === 'main') {
+    return buildMainTutorialStepForBranch(parentStep);
+  }
+
+  if (mode === 'per_question') {
+    return buildBranchQuestionTutorialStep(q);
+  }
+
+  return buildBranchTutorialStep(branch);
+}
+
+function renderBranchStep() {
+  cleanupH5PWatcher();
+  hideLearnMoreButton();
+
+  const parentStep = steps[branchParentIndex];
+  const branch = getCurrentBranch();
+  const q = getCurrentBranchQuestion();
+
+  if (!branch || !q || !parentStep) return;
+
+  renderInlineBranchQuestion(q);
+
+  const effectiveTutorialStep = getEffectiveBranchTutorialStep(parentStep, branch, q);
+  renderTutorial(effectiveTutorialStep);
+
+  const letter = String.fromCharCode(65 + branchStepIndex);
+  const pageText = `Page: ${branchParentIndex + 1}${letter} of ${steps.length}`;
+
+  if (progressEl) progressEl.textContent = pageText;
+  if (progressLabelEl) progressLabelEl.textContent = pageText;
+
+  const pct = steps.length ? ((branchParentIndex + 1) / steps.length) * 100 : 0;
+  if (progressFillEl) progressFillEl.style.width = pct.toFixed(2) + '%';
+
+  prevBtn.disabled = branchStepIndex === 0;
+  lockNext(true);
+
+  updateMenuStateForBranch();
+}
+
+function updateMenuStateForBranch() {
+  if (!menuDd) return;
+
+  const items = menuDd.querySelectorAll('.pbsg-menu-item');
+  items.forEach(el => {
+    el.classList.remove('is-current');
+    el.classList.add('is-disabled');
+  });
 }
 
 
@@ -1119,23 +1280,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-
-if (branchCloseBtn) {
-  branchCloseBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-
-    const step = steps[activeBranchStep];
-    if (step.branch.mode === 'mandatory') return;
-
-    resetBranchUI();
-
-    if (step.h5p_id) {
-      lockNext(true);
-    } else {
-      lockNext(false);
-    }
-  };
-}
 
 retakeBtn.onclick = () => {
   window.location.href = '/';

@@ -117,29 +117,69 @@ foreach ($steps as $s) {
 
   $s['tutorial'] = $tutorial;
 
-  $branch_tutorial_type = isset($s['branch_tutorial_type']) ? $s['branch_tutorial_type'] : '';
-  $branch_tutorial_url  = isset($s['branch_tutorial_url']) ? $s['branch_tutorial_url'] : '';
-  $branch_tutorial_attachment_id = isset($s['branch_tutorial_attachment_id']) ? absint($s['branch_tutorial_attachment_id']) : 0;
+  $branch = null;
 
-  $branch = [
-    'mode' => !empty($s['branch_mode']) ? $s['branch_mode'] : 'none',
-    'trigger_attempts' => !empty($s['branch_trigger_attempts']) ? (int)$s['branch_trigger_attempts'] : 1,
-    'title' => !empty($s['branch_title']) ? $s['branch_title'] : '',
-    'intro' => !empty($s['branch_intro']) ? $s['branch_intro'] : '',
-    'tutorial' => [
-      'type' => $branch_tutorial_type,
-      'url' => $branch_tutorial_url,
-      'file_url' => '',
-      'mime' => ''
-    ]
-  ];
+if (!empty($s['branch']) && is_array($s['branch'])) {
+  $raw_branch = $s['branch'];
 
-  if ($branch_tutorial_type === 'file' && $branch_tutorial_attachment_id > 0) {
-    $branch['tutorial']['file_url'] = wp_get_attachment_url($branch_tutorial_attachment_id);
-    $branch['tutorial']['mime'] = get_post_mime_type($branch_tutorial_attachment_id);
+
+  $branch_questions = [];
+
+  if (!empty($raw_branch['questions']) && is_array($raw_branch['questions'])) {
+    foreach ($raw_branch['questions'] as $q) {
+      if (!is_array($q)) continue;
+
+      $q_tutorial_type = !empty($q['tutorial_type']) ? $q['tutorial_type'] : '';
+      $q_tutorial_url = !empty($q['tutorial_url']) ? $q['tutorial_url'] : '';
+      $q_tutorial_attachment_id = !empty($q['tutorial_attachment_id']) ? absint($q['tutorial_attachment_id']) : 0;
+      $q_tutorial_file_name = !empty($q['tutorial_file_name']) ? $q['tutorial_file_name'] : '';
+      $q_tutorial_file_url = !empty($q['tutorial_file_url']) ? $q['tutorial_file_url'] : '';
+      $q_tutorial_mime = '';
+
+      if ($q_tutorial_type === 'file' && $q_tutorial_attachment_id > 0) {
+        $q_tutorial_file_url = wp_get_attachment_url($q_tutorial_attachment_id);
+        $q_tutorial_mime = get_post_mime_type($q_tutorial_attachment_id);
+      }
+
+      $q['tutorial_type'] = $q_tutorial_type;
+      $q['tutorial_url'] = $q_tutorial_url;
+      $q['tutorial_attachment_id'] = $q_tutorial_attachment_id;
+      $q['tutorial_file_name'] = $q_tutorial_file_name;
+      $q['tutorial_file_url'] = $q_tutorial_file_url;
+      $q['tutorial_mime'] = $q_tutorial_mime;
+
+      $branch_questions[] = $q;
+    }
   }
 
-  $s['branch'] = $branch;
+  $branch = [
+    'mode' => !empty($raw_branch['mode']) ? $raw_branch['mode'] : 'optional',
+    'resource_mode' => !empty($raw_branch['resource_mode']) ? $raw_branch['resource_mode'] : 'main',
+    'trigger_attempts' => 1,
+    'questions' => $branch_questions,
+    'tutorial_type' => !empty($raw_branch['tutorial_type']) ? $raw_branch['tutorial_type'] : '',
+    'tutorial_url' => !empty($raw_branch['tutorial_url']) ? $raw_branch['tutorial_url'] : '',
+    'tutorial_attachment_id' => !empty($raw_branch['tutorial_attachment_id']) ? absint($raw_branch['tutorial_attachment_id']) : 0,
+    'tutorial_file_name' => !empty($raw_branch['tutorial_file_name']) ? $raw_branch['tutorial_file_name'] : '',
+    'tutorial_file_url' => !empty($raw_branch['tutorial_file_url']) ? $raw_branch['tutorial_file_url'] : '',
+    'tutorial_mime' => '',
+  ];
+
+  if ($branch['tutorial_type'] === 'file' && $branch['tutorial_attachment_id'] > 0) {
+    $branch['tutorial_file_url'] = wp_get_attachment_url($branch['tutorial_attachment_id']);
+    $branch['tutorial_mime'] = get_post_mime_type($branch['tutorial_attachment_id']);
+  }
+
+  if (
+    empty($branch['questions']) &&
+    empty($branch['tutorial_url']) &&
+    empty($branch['tutorial_file_url'])
+  ) {
+    $branch = null;
+  }
+}
+
+$s['branch'] = $branch;
 
   $steps_enriched[] = $s;
 }
@@ -281,6 +321,13 @@ foreach ($steps as $s) {
 
       <div class="pbsg-iframe-wrap">
         <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe" tabindex="0"></iframe>
+        <div id="pbsgBranchQuizHost" class="pbsg-branch-quiz-host" style="display:none;"></div>
+      </div>
+
+      <div id="pbsgLearnMoreWrap" class="pbsg-learn-more-wrap" style="display:none;">
+        <button type="button" id="pbsgLearnMore" class="pbsg-learn-more-btn">
+          Learn more about this
+        </button>
       </div>
 
       <div class="pbsg-nav">
@@ -315,21 +362,6 @@ foreach ($steps as $s) {
       </div>
       <div class="pbsg-banner-actions">
         <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>
-      </div>
-    </div>
-
-    <div id="pbsgBranchModal" class="pbsg-branch-modal" style="display:none;" aria-hidden="true">
-      <div class="pbsg-branch-modal-backdrop"></div>
-      <div class="pbsg-branch-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgBranchModalTitle">
-        <button type="button" class="pbsg-branch-modal-close" id="pbsgBranchClose" aria-label="Close" style="display:none;">&times;</button>
-        <h3 id="pbsgBranchModalTitle" class="pbsg-branch-modal-title">Branch Review</h3>
-        <div id="pbsgBranchText" class="pbsg-branch-text"></div>
-        <div class="pbsg-branch-actions">
-          <button type="button" class="button button-primary" id="pbsgBranchOpen">Start</button>
-          <button type="button" class="button" id="pbsgBranchSkip" style="display:none;">Skip</button>
-          <button type="button" class="button button-primary" id="pbsgBranchComplete" style="display:none;">Finished</button>
-          <button type="button" class="button" id="pbsgBranchReturn" style="display:none;">Back to Main Tutorial</button>
-        </div>
       </div>
     </div>
 
