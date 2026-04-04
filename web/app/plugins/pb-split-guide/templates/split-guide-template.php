@@ -331,9 +331,9 @@ $s['branch'] = $branch;
       </div>
 
       <div class="pbsg-nav">
-        <button type="button" class="button" id="pbsgPrev">Prev</button>
-        <span id="pbsgProgress"></span>
-        <button type="button" class="button button-primary" id="pbsgNext">Next</button>
+        <button type="button" class="pbsg-btn-outline" id="pbsgPrev">Prev</button>
+        <span id="pbsgProgress" class="pbsg-progress"></span>
+        <button type="button" class="pbsg-btn-outline" id="pbsgNext">Next</button>
       </div>
 
     </div>
@@ -358,7 +358,7 @@ $s['branch'] = $branch;
     <div class="pbsg-banner">
       <div class="pbsg-banner-text">
         <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
-        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank" style="text-decoration: underline;">Open in new window ↗</a>
+        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window ↗</a>
       </div>
       <div class="pbsg-banner-actions">
         <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>
@@ -444,10 +444,11 @@ window.PBSG_CERT = {
 
     <?php if ($is_logged_in): ?>
       <div class="pbsg-summary-actions">
-        <button type="button" class="button button-primary" id="pbsgSummaryCertDownload">
+        <button type="button" class="pbsg-btn-outline" id="pbsgSummaryCertDownload">
           Generate Certificate
         </button>
-        <button type="button" class="button" id="pbsgRetakeTutorial">
+
+        <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial">
           Close Tutorial
         </button>
       </div>
@@ -478,8 +479,8 @@ window.PBSG_CERT = {
     <div id="pbsgCertModalError" class="pbsg-cert-error" style="display:none;"></div>
 
     <div class="pbsg-cert-modal-actions">
-      <button type="button" class="button" id="pbsgCertModalCancel">Cancel</button>
-      <button type="button" class="button button-primary" id="pbsgCertModalGenerate">Generate</button>
+      <button type="button" class="pbsg-btn-outline" id="pbsgCertModalCancel">Cancel</button>
+      <button type="button" class="pbsg-btn-outline" id="pbsgCertModalGenerate">Generate</button>
     </div>
   </div>
 </div>

@@ -154,6 +154,15 @@ function isCurrentStepBlockedByMandatoryBranch() {
   return !completedBranchSteps.has(i);
 }
 
+function isCurrentStepSkippableByOptionalBranch() {
+  const step = steps[i];
+  if (!step || !hasBranch(step)) return false;
+  if (step.branch.mode !== 'optional') return false;
+  if (!triggeredBranchSteps.has(i)) return false;
+  if (completedBranchSteps.has(i)) return false;
+  return true;
+}
+
 window.addEventListener('message', (event) => {
   if (event.origin !== window.location.origin) return;
 
@@ -267,6 +276,128 @@ function attachH5PWatcher(stepIndex){
 
     if (!doc || !doc.body) return false;
 
+
+    // Inject consistent styling into H5P iframe
+    try {
+      if (!doc.getElementById('pbsg-h5p-style')) {
+        const style = doc.createElement('style');
+        style.id = 'pbsg-h5p-style';
+
+        style.textContent = `
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            font-size: 14px !important;
+            color: #1d2327 !important;
+            background: #fff !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+          }
+
+          .h5p-container,
+          .h5p-content,
+          .h5p-question {
+            font-family: inherit !important;
+            box-sizing: border-box !important;
+          }
+
+          .h5p-question:first-child,
+          .h5p-content > .h5p-question:first-child,
+          .h5p-multichoice,
+          .h5p-single-choice {
+            margin-top: 10px !important;
+            margin-left: 5px !important;
+          }
+
+          .h5p-content,
+          .h5p-question {
+            margin-top: 0px !important;
+            margin-left: 0px !important;
+          }
+
+          .h5p-question-text,
+          .h5p-question-introduction {
+            font-size: 15px !important;
+            font-weight: 500 !important;
+            color: #6b7280 !important; 
+          }
+
+          .h5p-content,
+          .h5p-question,
+          .h5p-question-text,
+          .h5p-question-introduction {
+            color: #6b7280 !important;
+            margin-top: 0 !important;
+            padding-top: 0 !important;
+          }
+
+          .h5p-alternative-container {
+            position: relative !important;
+            font-size: 14px !important;
+            border-radius: 4px !important;
+            padding: 8px 12px 8px 42px !important;
+            margin-bottom: 6px !important;
+            box-sizing: border-box !important;
+          }
+
+          .h5p-alternative-container .h5p-alternative-inner,
+          .h5p-alternative-container label,
+          .h5p-answer,
+          .h5p-answer-text {
+            position: relative !important;
+            z-index: 2 !important;
+          }
+
+          .h5p-alternative-container input[type="radio"],
+          .h5p-alternative-container input[type="checkbox"] {
+            position: absolute !important;
+            left: 12px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            margin: 0 !important;
+            z-index: 3 !important;
+          }
+
+          .h5p-joubelui-button,
+          .h5p-question-check-answer,
+          .h5p-question-try-again,
+          .h5p-question-show-solution {
+            min-height: 34px !important;
+            padding: 6px 12px !important;
+            font-size: 13px !important;
+            border-radius: 4px !important;
+            background: #f6f7f7 !important;
+            color: #1d2327 !important;
+            border: 1px solid #ccd0d4 !important;
+            box-shadow: none !important;
+          }
+
+          .h5p-joubelui-button:hover {
+            background: #f0f0f1 !important;
+            border-color: #999 !important;
+          }
+
+          .h5p-feedback {
+            font-size: 13px !important;
+          }
+
+          /* Move Check button to the right */
+          .h5p-question .h5p-question-buttons,
+          .h5p-actions,
+          .h5p-joubelui-button-container {
+            display: flex !important;
+            justify-content: flex-end !important;
+          }
+        `;
+
+        doc.head.appendChild(style);
+      }
+    } catch (e) {
+      console.warn('H5P style injection failed:', e);
+    }
+
+    h5pFrame.style.transition = 'opacity 0.12s ease';
+    h5pFrame.style.opacity = '1';
+
     const updatePassState = ({ allowBranchPrompt = false } = {}) => {
     const correct = isH5PCorrect(doc);
     const step = steps[stepIndex];
@@ -289,12 +420,15 @@ function attachH5PWatcher(stepIndex){
         showLearnMoreButton();
 
         if (isMandatoryBranch(step)) {
+          // Mandatory: student must enter the branch
           lockNext(true);
+        } else {
+          // Optional: student may skip the branch and continue
+          lockNext(false);
         }
       }
-    }
-
-    if (!(allowBranchPrompt && shouldTriggerBranch(stepIndex) && isMandatoryBranch(step) && stepIndex === i)) {
+    } else {
+      // No branch triggered yet -> wrong answer still blocks Next
       lockNext(true);
     }
 
@@ -535,12 +669,10 @@ async function finalizeCompletionIfReady() {
   return ok;
 }
 
-
-
 function h5pUrl(id){
   const u = new URL(ajaxUrl, location.origin);
-  u.searchParams.set('action','h5p_embed');
-  u.searchParams.set('id',id);
+  u.searchParams.set('action', 'h5p_embed');
+  u.searchParams.set('id', id);
   return u.toString();
 }
 
@@ -792,8 +924,11 @@ function render(){
     }
   }
 
-  if (step.h5p_id) h5pFrame.src = h5pUrl(step.h5p_id);
-  else h5pFrame.src='';
+  if (step.h5p_id) {
+    h5pFrame.src = h5pUrl(step.h5p_id);
+  } else {
+    h5pFrame.src = '';
+  }
 
   renderTutorial(step);
 
@@ -814,6 +949,8 @@ function render(){
   if (step.h5p_id) {
     if (isCurrentStepBlockedByMandatoryBranch()) {
       lockNext(true);
+    } else if (isCurrentStepSkippableByOptionalBranch()) {
+      lockNext(false);
     } else {
       lockNext(!passedSteps.has(i));
     }
@@ -943,12 +1080,28 @@ function hideLearnMoreButton() {
   if (learnMoreWrap) learnMoreWrap.style.display = 'none';
 }
 
-
 function showH5PFrame() {
-  if (h5pFrame) h5pFrame.style.display = '';
+  if (h5pFrame) {
+    h5pFrame.style.display = '';
+    h5pFrame.style.opacity = '0';
+  }
+
   if (branchQuizHost) {
     branchQuizHost.style.display = 'none';
     branchQuizHost.innerHTML = '';
+  }
+}
+
+function resetLeftQuizScroll() {
+  const quizWrap = document.querySelector('.pbsg-left .pbsg-iframe-wrap');
+
+  if (quizWrap) {
+    quizWrap.scrollTop = 0;
+    quizWrap.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }
+
+  if (branchQuizHost) {
+    branchQuizHost.scrollTop = 0;
   }
 }
 
@@ -957,7 +1110,21 @@ function showBranchQuizHost() {
     h5pFrame.style.display = 'none';
     h5pFrame.src = '';
   }
-  if (branchQuizHost) branchQuizHost.style.display = '';
+
+  if (branchQuizHost) {
+    branchQuizHost.style.display = '';
+    branchQuizHost.scrollTop = 0;
+  }
+
+  resetLeftQuizScroll();
+
+  requestAnimationFrame(() => {
+    resetLeftQuizScroll();
+  });
+
+  setTimeout(() => {
+    resetLeftQuizScroll();
+  }, 0);
 }
 
 function escapeHtml(str) {
@@ -1156,17 +1323,33 @@ function renderBranchStep() {
 
   renderInlineBranchQuestion(q);
 
+  resetLeftQuizScroll();
+
+  requestAnimationFrame(() => {
+    resetLeftQuizScroll();
+  });
+
+  setTimeout(() => {
+    resetLeftQuizScroll();
+  }, 0);
+
   const effectiveTutorialStep = getEffectiveBranchTutorialStep(parentStep, branch, q);
   renderTutorial(effectiveTutorialStep);
 
-  const letter = String.fromCharCode(65 + branchStepIndex);
-  const pageText = `Page: ${branchParentIndex + 1}${letter} of ${steps.length}`;
+  
+  const branchTotal = Array.isArray(branch.questions) ? branch.questions.length : 0;
+  const letter = String.fromCharCode(65 + branchStepIndex); // A, B, C...
+  const mainNumber = branchParentIndex + 1;
+  const branchCurrent = branchStepIndex + 1;
+
+  const pageText = `Page: ${mainNumber}${letter} of ${branchTotal}`;
 
   if (progressEl) progressEl.textContent = pageText;
   if (progressLabelEl) progressLabelEl.textContent = pageText;
 
-  const pct = steps.length ? ((branchParentIndex + 1) / steps.length) * 100 : 0;
+  const pct = branchTotal ? (branchCurrent / branchTotal) * 100 : 0;
   if (progressFillEl) progressFillEl.style.width = pct.toFixed(2) + '%';
+
 
   prevBtn.disabled = branchStepIndex === 0;
   lockNext(true);
