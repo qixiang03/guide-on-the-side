@@ -48,12 +48,12 @@ function getNeedsAttentionFlags( tutorials ) {
         const rate  = parseFloat( t.completion_rate ) || 0;
         const score = parseFloat( t.avg_score ) || 0;
         const b     = t.benchmarks || {};
-        const attComp  = ( b.attention_completion !== undefined ) ? b.attention_completion : 60;
-        const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
+        const compAmber  = ( b.completion_rate_amber !== undefined ) ? b.completion_rate_amber : 50;
+        const scoreAmber = ( b.score_amber !== undefined ) ? b.score_amber : 50;
 
         const reasons = [];
-        if ( rate < attComp ) reasons.push( 'Completion rate below ' + attComp + '%' );
-        if ( score < attScore ) reasons.push( 'Avg tutorial score below ' + attScore + '%' );
+        if ( rate < compAmber ) reasons.push( 'Completion rate in red zone (below ' + compAmber + '%)' );
+        if ( score < scoreAmber ) reasons.push( 'Avg tutorial score in red zone (below ' + scoreAmber + '%)' );
 
         if ( reasons.length > 0 ) {
             flagged.push( { tutorial: t, reasons: reasons } );

@@ -73,8 +73,6 @@ class PB_Split_Guide_Plugin {
     'giveup_high'            => 10,
     'retries_low'            => 3,
     'retries_high'           => 8,
-    'attention_completion'   => 60,
-    'attention_score'        => 50,
   ];
 
   public function __construct() {
@@ -992,28 +990,6 @@ class PB_Split_Guide_Plugin {
               </div>
               <?php endif; endforeach; ?>
 
-              <!-- Needs Attention Triggers -->
-              <div class="pbsg-bench-group" style="padding:12px; background:#F8F8F8; border:1px solid #F1F1F1; border-radius:4px;">
-                <label style="font-weight:600; font-size:13px; display:block; margin-bottom:6px;">&#x26A0; Needs Attention</label>
-                <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
-                  <span style="font-size:12px; width:100px;">Completion &lt;</span>
-                  <input type="number" class="pbsg-bench-override" data-key="attention_completion"
-                         value="<?php echo esc_attr(isset($per_bench['attention_completion']) ? $per_bench['attention_completion'] : ''); ?>"
-                         placeholder="<?php echo esc_attr($site_benchmarks['attention_completion']); ?>"
-                         min="0" max="100" style="width:60px; font-size:13px;" />
-                  <span style="font-size:12px;">%</span>
-                </div>
-                <div style="font-size:11px; font-weight:600; color:#646970; margin:6px 0 6px 0; text-align:center; letter-spacing:0.05em;">OR</div>
-                <div style="display:flex; align-items:center; gap:6px;">
-                  <span style="font-size:12px; width:100px;">Avg Score &lt;</span>
-                  <input type="number" class="pbsg-bench-override" data-key="attention_score"
-                         value="<?php echo esc_attr(isset($per_bench['attention_score']) ? $per_bench['attention_score'] : ''); ?>"
-                         placeholder="<?php echo esc_attr($site_benchmarks['attention_score']); ?>"
-                         min="0" max="100" style="width:60px; font-size:13px;" />
-                  <span style="font-size:12px;">%</span>
-                </div>
-                <div style="font-size:11px; color:#646970; margin-top:4px;">A tutorial is flagged if <strong>either</strong> threshold is crossed (OR logic).</div>
-              </div>
 
             </div>
 
@@ -1407,27 +1383,6 @@ class PB_Split_Guide_Plugin {
                        min="0" style="width:60px;" />
               </div>
               <div style="font-size:11px; color:#646970; margin-top:4px;">Lower is better (inverse metric)</div>
-            </div>
-
-            <!-- Needs Attention Triggers -->
-            <div class="pbsg-bench-group">
-              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">&#x26A0; Needs Attention Triggers</label>
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                <span style="font-size:12px; width:120px;">Completion &lt;</span>
-                <input type="number" class="pbsg-bench-input" data-key="attention_completion"
-                       value="<?php echo esc_attr($bench['attention_completion']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
-              </div>
-              <div style="font-size:11px; font-weight:600; color:#646970; margin:8px 0 8px 0; text-align:center; letter-spacing:0.05em;">OR</div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:12px; width:120px;">Avg Score &lt;</span>
-                <input type="number" class="pbsg-bench-input" data-key="attention_score"
-                       value="<?php echo esc_attr($bench['attention_score']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
-              </div>
-              <div style="font-size:11px; color:#646970; margin-top:4px;">A tutorial is flagged if <strong>either</strong> threshold is crossed (OR logic).</div>
             </div>
 
           </div>

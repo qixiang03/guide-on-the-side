@@ -258,7 +258,7 @@
         if ( questions.length ) {
             html += '<div class="pbsg-card">';
             html += '<div class="pbsg-card-header">';
-            html += 'Quiz Questions <span class="pbsg-alltime-badge">all-time</span>';
+            html += '<div class="pbsg-section-header">Quiz Questions <span class="pbsg-alltime-badge">all-time</span></div>';
             html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">↓ Export CSV</a>';
             html += '</div>';
             html += renderQuestionsTable( questions, stats.tutorial_page_id, bench );
@@ -447,7 +447,7 @@
         let html = '<table class="pbsg-data-table">';
         html += '<thead><tr>';
         html += '<th>Tutorial</th><th>Views</th><th>Completions</th>';
-        html += '<th>Completion Rate</th><th>Avg Score <span class="pbsg-alltime-badge">all-time</span></th><th>Trend</th>';
+        html += '<th>Completion Rate</th><th><div class="pbsg-section-header">Avg Score <span class="pbsg-alltime-badge">all-time</span></div></th><th>Trend</th>';
         html += '</tr></thead><tbody>';
 
         tutorials.forEach( t => {
@@ -478,9 +478,9 @@
             const rate  = parseFloat( t.completion_rate ) || 0;
             const score = parseFloat( t.avg_score ) || 0;
             const b     = t.benchmarks || {};
-            const attComp  = ( b.attention_completion !== undefined ) ? b.attention_completion : 60;
-            const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
-            return rate < attComp || score < attScore;
+            const compAmber  = ( b.completion_rate_amber !== undefined ) ? b.completion_rate_amber : 50;
+            const scoreAmber = ( b.score_amber !== undefined ) ? b.score_amber : 50;
+            return rate < compAmber || score < scoreAmber;
         } );
 
         if ( ! flagged.length ) {
@@ -492,11 +492,11 @@
             const rate  = parseFloat( t.completion_rate ) || 0;
             const score = parseFloat( t.avg_score ) || 0;
             const b     = t.benchmarks || {};
-            const attComp  = ( b.attention_completion !== undefined ) ? b.attention_completion : 60;
-            const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
+            const compAmber  = ( b.completion_rate_amber !== undefined ) ? b.completion_rate_amber : 50;
+            const scoreAmber = ( b.score_amber !== undefined ) ? b.score_amber : 50;
             const reasons = [];
-            if ( rate < attComp ) reasons.push( 'Completion rate below ' + attComp + '%' );
-            if ( score < attScore ) reasons.push( 'Avg Score below ' + attScore + '%' );
+            if ( rate < compAmber ) reasons.push( 'Completion rate in red zone (below ' + compAmber + '%)' );
+            if ( score < scoreAmber ) reasons.push( 'Avg Score in red zone (below ' + scoreAmber + '%)' );
 
             const adminUrl = config.ajaxUrl.replace( 'admin-ajax.php', 'admin.php' );
 
@@ -925,7 +925,7 @@
             html += '</div>'; // end funnel section
 
             // === QUESTION PERFORMANCE SECTION ===
-            html += renderCompareSection( 'Question Performance <span class="pbsg-alltime-badge">all-time</span>', [
+            html += renderCompareSection( '<div class="pbsg-section-header">Question Performance <span class="pbsg-alltime-badge">all-time</span></div>', [
                 { label: 'Avg Score',           key: 'avg_score',          unit: '%', higher: true },
                 { label: 'First Attempt Rate',  key: 'first_attempt_rate', unit: '%', higher: true },
                 { label: 'Avg Attempts/Q',      key: 'avg_attempts',       unit: '',  higher: false },
@@ -1107,7 +1107,7 @@
         let html = '';
         items.forEach( item => {
             html += '<div class="pbsg-stat-box ' + item.color + '">';
-            html += '<div class="pbsg-stat-label">' + item.label;
+            html += '<div class="pbsg-stat-label pbsg-section-header">' + item.label;
             if ( item.badge ) {
                 html += ' <span class="pbsg-alltime-badge">' + escapeHtml( item.badge ) + '</span>';
             }

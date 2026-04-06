@@ -161,13 +161,13 @@ describe('getNeedsAttentionFlags', () => {
     expect(result).toHaveLength(0);
   });
 
-  it('flags tutorial below default completion threshold (60%)', () => {
+  it('flags tutorial below default completion threshold (50%)', () => {
     const tutorials = [
-      { completion_rate: 55, avg_score: 70, benchmarks: {} },
+      { completion_rate: 45, avg_score: 70, benchmarks: {} },
     ];
     const result = getNeedsAttentionFlags(tutorials);
     expect(result).toHaveLength(1);
-    expect(result[0].reasons).toContain('Completion rate below 60%');
+    expect(result[0].reasons).toContain('Completion rate in red zone (below 50%)');
   });
 
   it('flags tutorial below default score threshold (50%)', () => {
@@ -176,12 +176,12 @@ describe('getNeedsAttentionFlags', () => {
     ];
     const result = getNeedsAttentionFlags(tutorials);
     expect(result).toHaveLength(1);
-    expect(result[0].reasons).toContain('Avg tutorial score below 50%');
+    expect(result[0].reasons).toContain('Avg tutorial score in red zone (below 50%)');
   });
 
   it('flags both reasons when both thresholds fail', () => {
     const tutorials = [
-      { completion_rate: 50, avg_score: 40, benchmarks: {} },
+      { completion_rate: 49, avg_score: 40, benchmarks: {} },
     ];
     const result = getNeedsAttentionFlags(tutorials);
     expect(result).toHaveLength(1);
@@ -189,12 +189,12 @@ describe('getNeedsAttentionFlags', () => {
   });
 
   describe('with per-tutorial custom benchmarks', () => {
-    it('uses per-tutorial attention_completion threshold', () => {
+    it('uses per-tutorial completion_rate_amber threshold', () => {
       const tutorials = [
         {
           completion_rate: 55,
           avg_score: 70,
-          benchmarks: { attention_completion: 50 }, // lenient threshold
+          benchmarks: { completion_rate_amber: 50 }, // lenient threshold
         },
       ];
       // 55% >= 50% threshold → should NOT be flagged
@@ -202,12 +202,12 @@ describe('getNeedsAttentionFlags', () => {
       expect(result).toHaveLength(0);
     });
 
-    it('uses per-tutorial attention_score threshold', () => {
+    it('uses per-tutorial score_amber threshold', () => {
       const tutorials = [
         {
           completion_rate: 80,
           avg_score: 35,
-          benchmarks: { attention_score: 30 }, // lenient for hard tutorial
+          benchmarks: { score_amber: 30 }, // lenient for hard tutorial
         },
       ];
       // 35% >= 30% threshold → should NOT be flagged
@@ -221,13 +221,13 @@ describe('getNeedsAttentionFlags', () => {
           tutorial_name: 'Easy Tutorial',
           completion_rate: 55,
           avg_score: 60,
-          benchmarks: { attention_completion: 70 }, // strict for easy tutorial
+          benchmarks: { completion_rate_amber: 70 }, // strict for easy tutorial
         },
         {
           tutorial_name: 'Hard Tutorial',
           completion_rate: 55,
           avg_score: 60,
-          benchmarks: { attention_completion: 40 }, // lenient for hard tutorial
+          benchmarks: { completion_rate_amber: 40 }, // lenient for hard tutorial
         },
       ];
       const result = getNeedsAttentionFlags(tutorials);
@@ -241,12 +241,12 @@ describe('getNeedsAttentionFlags', () => {
         {
           completion_rate: 40,
           avg_score: 20,
-          benchmarks: { attention_completion: 75, attention_score: 60 },
+          benchmarks: { completion_rate_amber: 75, score_amber: 60 },
         },
       ];
       const result = getNeedsAttentionFlags(tutorials);
-      expect(result[0].reasons[0]).toBe('Completion rate below 75%');
-      expect(result[0].reasons[1]).toBe('Avg tutorial score below 60%');
+      expect(result[0].reasons[0]).toBe('Completion rate in red zone (below 75%)');
+      expect(result[0].reasons[1]).toBe('Avg tutorial score in red zone (below 60%)');
     });
   });
 
@@ -259,7 +259,7 @@ describe('getNeedsAttentionFlags', () => {
       const tutorials = [
         { completion_rate: 55, avg_score: 45 },
       ];
-      // Falls back to defaults (60, 50)
+      // Falls back to defaults (50, 50)
       const result = getNeedsAttentionFlags(tutorials);
       expect(result).toHaveLength(1);
     });
@@ -278,7 +278,7 @@ describe('getNeedsAttentionFlags', () => {
         {
           completion_rate: 0,
           avg_score: 0,
-          benchmarks: { attention_completion: 0, attention_score: 0 },
+          benchmarks: { completion_rate_amber: 0, score_amber: 0 },
         },
       ];
       // 0 is NOT < 0, so should not be flagged

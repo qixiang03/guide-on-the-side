@@ -2322,6 +2322,164 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   $('#pbsg_user_resizable').on('change', markDirty);
 
   // ═══════════════════════════════════════════════════════════
+  //  Dual-Pointer Benchmark Slider Component
+  // ═══════════════════════════════════════════════════════════
+
+  /**
+   * Initialize a dual-pointer slider on a .pbsg-slider-wrap element.
+   *
+   * @param {HTMLElement} wrapEl  - The .pbsg-slider-wrap container
+   * @param {Function}    onChange - Called with { low: Number, high: Number } on change
+   */
+  function pbsgDualSlider( wrapEl, onChange ) {
+    var $wrap   = $( wrapEl );
+    var $track  = $wrap.find( '.pbsg-slider-track' );
+    var $thumbs = $wrap.find( '.pbsg-slider-thumb' );
+    var $labels = $wrap.find( '.pbsg-slider-label input' );
+    var $segs   = $wrap.find( '.pbsg-slider-seg' );
+
+    var min     = parseInt( $wrap.attr( 'data-min' ), 10 ) || 0;
+    var max     = parseInt( $wrap.attr( 'data-max' ), 10 ) || 100;
+    var inverse = $wrap.attr( 'data-inverse' ) === '1';
+
+    var $segFirst  = $segs.eq( 0 );
+    var $segMiddle = $segs.eq( 1 );
+    var $segLast   = $segs.eq( 2 );
+
+    var $thumbLow  = $thumbs.eq( 0 );
+    var $thumbHigh = $thumbs.eq( 1 );
+    var $inputLow  = $labels.eq( 0 );
+    var $inputHigh = $labels.eq( 1 );
+
+    function valToPercent( v ) {
+      return ( ( v - min ) / ( max - min ) ) * 100;
+    }
+
+    function percentToVal( p ) {
+      return Math.round( min + ( p / 100 ) * ( max - min ) );
+    }
+
+    function clamp( v, lo, hi ) {
+      return Math.max( lo, Math.min( hi, v ) );
+    }
+
+    function getLow()  { return parseInt( $inputLow.val(), 10 )  || min; }
+    function getHigh() { return parseInt( $inputHigh.val(), 10 ) || min; }
+
+    function render() {
+      var low  = getLow();
+      var high = getHigh();
+      var pLow  = valToPercent( low );
+      var pHigh = valToPercent( high );
+
+      $segFirst.css( 'width', pLow + '%' );
+      $segMiddle.css( 'width', ( pHigh - pLow ) + '%' );
+      $segLast.css( 'width', ( 100 - pHigh ) + '%' );
+
+      $thumbLow.css( 'left', pLow + '%' ).attr( 'aria-valuenow', low );
+      $thumbHigh.css( 'left', pHigh + '%' ).attr( 'aria-valuenow', high );
+
+      $wrap.find( '.pbsg-slider-label' ).eq( 0 ).css( 'left', pLow + '%' );
+      $wrap.find( '.pbsg-slider-label' ).eq( 1 ).css( 'left', pHigh + '%' );
+    }
+
+    function fireChange() {
+      if ( typeof onChange === 'function' ) {
+        onChange( { low: getLow(), high: getHigh() } );
+      }
+    }
+
+    // Drag handler
+    function startDrag( e, isHighThumb ) {
+      e.preventDefault();
+      var trackRect = $track[0].getBoundingClientRect();
+
+      function onMove( ev ) {
+        var clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+        var pct = ( ( clientX - trackRect.left ) / trackRect.width ) * 100;
+        pct = clamp( pct, 0, 100 );
+        var val = percentToVal( pct );
+
+        if ( isHighThumb ) {
+          val = clamp( val, getLow() + 1, max );
+          $inputHigh.val( val );
+        } else {
+          val = clamp( val, min, getHigh() - 1 );
+          $inputLow.val( val );
+        }
+        render();
+      }
+
+      function onUp() {
+        $( document ).off( 'mousemove touchmove', onMove );
+        $( document ).off( 'mouseup touchend', onUp );
+        fireChange();
+      }
+
+      $( document ).on( 'mousemove touchmove', onMove );
+      $( document ).on( 'mouseup touchend', onUp );
+    }
+
+    $thumbLow.on( 'mousedown touchstart', function( e ) { startDrag( e, false ); } );
+    $thumbHigh.on( 'mousedown touchstart', function( e ) { startDrag( e, true ); } );
+
+    // Keyboard navigation (Arrow keys to adjust value by 1)
+    function handleKeydown( e, isHighThumb ) {
+      var step = 1;
+      var current = isHighThumb ? getHigh() : getLow();
+      var newVal = current;
+
+      if ( e.key === 'ArrowRight' || e.key === 'ArrowUp' ) {
+        newVal = current + step;
+      } else if ( e.key === 'ArrowLeft' || e.key === 'ArrowDown' ) {
+        newVal = current - step;
+      } else {
+        return;
+      }
+      e.preventDefault();
+
+      if ( isHighThumb ) {
+        newVal = clamp( newVal, getLow() + 1, max );
+        $inputHigh.val( newVal );
+      } else {
+        newVal = clamp( newVal, min, getHigh() - 1 );
+        $inputLow.val( newVal );
+      }
+      render();
+      fireChange();
+      ( isHighThumb ? $thumbHigh : $thumbLow ).attr( 'aria-valuenow', newVal );
+    }
+
+    $thumbLow.on( 'keydown', function( e ) { handleKeydown( e, false ); } );
+    $thumbHigh.on( 'keydown', function( e ) { handleKeydown( e, true ); } );
+
+    // Input edit handler
+    $inputLow.on( 'change blur', function() {
+      var v = clamp( parseInt( this.value, 10 ) || min, min, getHigh() - 1 );
+      $inputLow.val( v );
+      render();
+      fireChange();
+    } );
+
+    $inputHigh.on( 'change blur', function() {
+      var v = clamp( parseInt( this.value, 10 ) || min, getLow() + 1, max );
+      $inputHigh.val( v );
+      render();
+      fireChange();
+    } );
+
+    // Public API for external reset
+    wrapEl.pbsgSliderSetValues = function( low, high ) {
+      $inputLow.val( clamp( low, min, max - 1 ) );
+      $inputHigh.val( clamp( high, min + 1, max ) );
+      render();
+    };
+
+    // Initial render
+    render();
+  }
+
+  // ═══════════════════════════════════════════════════════════
   //  Benchmark Settings Section (Stretch Goal 5)
   // ═══════════════════════════════════════════════════════════
 

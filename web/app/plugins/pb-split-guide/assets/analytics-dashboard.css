@@ -721,6 +721,13 @@
    ALL-TIME BADGE & DATE SCOPE LABEL
    ========================================================================= */
 
+.pbsg-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
 .pbsg-alltime-badge {
     display: inline-block;
     padding: 1px 7px;
@@ -731,9 +738,9 @@
     text-transform: uppercase;
     letter-spacing: 0.3px;
     background: #fef3e0;
-
     vertical-align: middle;
-    margin-left: 6px;
+    margin-left: 0;
+    flex-shrink: 0;
 }
 
 .pbsg-date-scope {
