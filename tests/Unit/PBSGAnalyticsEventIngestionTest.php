@@ -271,6 +271,91 @@ class PBSGAnalyticsEventIngestionTest extends TestCase
     }
 
     /* ---------------------------------------------------------------
+       Enhanced device detection (touch_points-aware)
+       --------------------------------------------------------------- */
+
+    /**
+     * @covers PBSG_Analytics::detect_device
+     * @dataProvider deviceDetectionProvider
+     */
+    public function test_device_detection(string $ua, int $touchPoints, string $expected): void
+    {
+        $_SERVER['HTTP_USER_AGENT'] = $ua;
+
+        $ref = new \ReflectionMethod(PBSG_Analytics::class, 'detect_device');
+        $ref->setAccessible(true);
+        $result = $ref->invoke(null, $touchPoints);
+
+        $this->assertSame($expected, $result, "UA: {$ua} | touch: {$touchPoints}");
+    }
+
+    public static function deviceDetectionProvider(): array
+    {
+        return [
+            'Chrome desktop Windows' => [
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0',
+                0,
+                'desktop',
+            ],
+            'Safari macOS desktop' => [
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15',
+                0,
+                'desktop',
+            ],
+            'iPadOS Safari (masquerading as macOS)' => [
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15',
+                5,
+                'tablet',
+            ],
+            'iPadOS Chrome' => [
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120.0.0.0',
+                5,
+                'tablet',
+            ],
+            'iPhone Safari' => [
+                'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148',
+                5,
+                'mobile',
+            ],
+            'Android phone Chrome' => [
+                'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile',
+                5,
+                'mobile',
+            ],
+            'Android tablet Chrome (no mobile in UA)' => [
+                'Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 Chrome/120.0.0.0',
+                5,
+                'tablet',
+            ],
+            'iPad explicit UA (legacy)' => [
+                'Mozilla/5.0 (iPad; CPU OS 12_5_7 like Mac OS X) AppleWebKit/605.1.15',
+                5,
+                'tablet',
+            ],
+            'MacBook with trackpad (touch=1)' => [
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Safari/605.1.15',
+                1,
+                'desktop',
+            ],
+            'Kindle Fire (Silk)' => [
+                'Mozilla/5.0 (Linux; Android 11; KFTRWI) AppleWebKit/537.36 Silk/100.0.0',
+                5,
+                'tablet',
+            ],
+            'iPod touch' => [
+                'Mozilla/5.0 (iPod touch; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15',
+                5,
+                'mobile',
+            ],
+            'No UA string' => [
+                '',
+                0,
+                'desktop',
+            ],
+        ];
+    }
+
+    /* ---------------------------------------------------------------
        AJAX hook registration
        --------------------------------------------------------------- */
 
