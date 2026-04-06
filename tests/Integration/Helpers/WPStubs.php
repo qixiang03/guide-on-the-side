@@ -576,11 +576,18 @@ if (!function_exists('get_post_mime_type')) {
 /* ------------------------------------------------------------------ */
 
 if (!function_exists('get_header')) {
-    function get_header(string $name = null, array $args = []): void {}
+    function get_header(?string $name = null, array $args = []): void {}
 }
 
 if (!function_exists('get_footer')) {
-    function get_footer(string $name = null, array $args = []): void {}
+    function get_footer(?string $name = null, array $args = []): void {}
+}
+
+if (!function_exists('status_header')) {
+    function status_header(int $code, string $description = ''): void
+    {
+        WPStubs::record('status_header', [$code, $description]);
+    }
 }
 
 /* ------------------------------------------------------------------ */
