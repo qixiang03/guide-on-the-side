@@ -1433,3 +1433,139 @@
 .pbsg-save-template {
   margin-top: 20px;   /* adjust this value if needed */
 }
+
+/* ================================================================
+   DUAL-POINTER BENCHMARK SLIDER
+   ================================================================ */
+
+.pbsg-slider-wrap {
+  position: relative;
+  height: 30px;
+  margin: 0 8px;
+  user-select: none;
+}
+
+.pbsg-slider-track {
+  position: absolute;
+  top: 5px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  display: flex;
+  overflow: hidden;
+}
+
+.pbsg-slider-seg {
+  height: 100%;
+  transition: width 0.1s ease;
+}
+
+.pbsg-slider-seg--red    { background: #D93025; }
+.pbsg-slider-seg--amber  { background: #D4A017; }
+.pbsg-slider-seg--green  { background: #517E1B; }
+
+.pbsg-slider-thumb {
+  position: absolute;
+  top: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid #50575e;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  cursor: ew-resize;
+  transform: translateX(-7px);
+  z-index: 2;
+  touch-action: none;
+}
+
+.pbsg-slider-thumb:hover {
+  border-color: #333;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+.pbsg-slider-thumb:focus {
+  outline: 2px solid #517E1B;
+  outline-offset: 2px;
+}
+
+/* Expand tap target to 44x44px while keeping visual size at 14px */
+.pbsg-slider-thumb::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.pbsg-slider-label {
+  position: absolute;
+  top: 16px;
+  transform: translateX(-16px);
+  z-index: 1;
+}
+
+.pbsg-slider-label input {
+  width: 32px;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  padding: 0 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.pbsg-slider-label input::-webkit-inner-spin-button,
+.pbsg-slider-label input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.pbsg-slider-scale {
+  display: flex;
+  justify-content: space-between;
+  margin: 2px 8px 0;
+  font-size: 9px;
+  color: #a7aaad;
+}
+
+.pbsg-slider-legend {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #646970;
+  line-height: 1.5;
+}
+
+.pbsg-slider-legend .pbsg-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 3px;
+}
+
+.pbsg-slider-legend .pbsg-dot--green { background: #517E1B; }
+.pbsg-slider-legend .pbsg-dot--amber { background: #D4A017; }
+.pbsg-slider-legend .pbsg-dot--red   { background: #D93025; }
+
+/* Disabled state (when "Use site default" is checked) */
+.pbsg-slider-wrap.pbsg-slider--disabled .pbsg-slider-thumb {
+  cursor: default;
+  border-color: #a7aaad;
+  background: #e0e0e0;
+}
+
+.pbsg-slider-wrap.pbsg-slider--disabled .pbsg-slider-track {
+  opacity: 0.4;
+}
+
+.pbsg-slider-wrap.pbsg-slider--disabled .pbsg-slider-label input {
+  background: #f0f0f0;
+  color: #a7aaad;
+  pointer-events: none;
+}
