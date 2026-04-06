@@ -2308,13 +2308,22 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   $ratioSlider.on('input', updateRatioPreview);
 
   $useDefault.on('change', function () {
-    if ($(this).is(':checked')) {
-      $controls.css({ opacity: 0.4, 'pointer-events': 'none' });
+    var useDefault = $(this).is(':checked');
+
+    if (useDefault) {
+      // Reset slider to site default ratio
+      var defaultRatio = window.PBSG_ADMIN.ratioDefault || 40;
+      $ratioSlider.val(defaultRatio);
+      updateRatioPreview();
       $ratioHidden.val('');
     } else {
-      $controls.css({ opacity: 1, 'pointer-events': '' });
       $ratioHidden.val(parseInt($ratioSlider.val(), 10));
     }
+
+    $controls.css({
+      opacity: useDefault ? 0.4 : 1,
+      'pointer-events': useDefault ? 'none' : ''
+    });
     markDirty();
   });
 
@@ -2497,13 +2506,31 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   var $benchHidden   = $('#pbsg_benchmarks_json');
 
   $useSiteBench.on('change', function () {
-    if ($(this).is(':checked')) {
-      $benchControls.css({ opacity: 0.4, 'pointer-events': 'none' });
+    var useDefault = $(this).is(':checked');
+
+    if (useDefault) {
+      // Reset all sliders to site default values
+      var defaults = window.PBSG_ADMIN.benchmarkDefaults || {};
+      $('#pbsg_benchmark_controls .pbsg-slider-wrap').each(function () {
+        var keyLow  = $(this).attr('data-key-low');
+        var keyHigh = $(this).attr('data-key-high');
+        var low  = defaults[keyLow]  || 0;
+        var high = defaults[keyHigh] || 0;
+        if (this.pbsgSliderSetValues) {
+          this.pbsgSliderSetValues(low, high);
+        }
+      });
       $benchHidden.val('');  // empty = use site defaults
     } else {
-      $benchControls.css({ opacity: 1, 'pointer-events': '' });
       syncBenchOverrides();
     }
+
+    // Toggle disabled state
+    $('#pbsg_benchmark_controls .pbsg-slider-wrap').toggleClass('pbsg-slider--disabled', useDefault);
+    $benchControls.css({
+      opacity: useDefault ? 0.4 : 1,
+      'pointer-events': useDefault ? 'none' : ''
+    });
     markDirty();
   });
 
@@ -2511,18 +2538,25 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   function syncBenchOverrides() {
     var obj = {};
     var hasValue = false;
-    $('.pbsg-bench-override').each(function () {
-      var key = $(this).attr('data-key');
-      var val = $(this).val();
-      if (val !== '' && val !== undefined) {
-        obj[key] = parseInt(val, 10);
+    $('#pbsg_benchmark_controls .pbsg-slider-wrap').each(function () {
+      var $inputs = $(this).find('.pbsg-slider-label input');
+      var keyLow  = $(this).attr('data-key-low');
+      var keyHigh = $(this).attr('data-key-high');
+      var valLow  = $inputs.eq(0).val();
+      var valHigh = $inputs.eq(1).val();
+      if (valLow !== '' && valLow !== undefined) {
+        obj[keyLow] = parseInt(valLow, 10);
+        hasValue = true;
+      }
+      if (valHigh !== '' && valHigh !== undefined) {
+        obj[keyHigh] = parseInt(valHigh, 10);
         hasValue = true;
       }
     });
     $benchHidden.val(hasValue ? JSON.stringify(obj) : '');
   }
 
-  $(document).on('input change', '.pbsg-bench-override', function () {
+  $(document).on('input change', '.pbsg-bench-override, #pbsg_benchmark_controls .pbsg-slider-label input', function () {
     if (!$useSiteBench.is(':checked')) {
       syncBenchOverrides();
     }
