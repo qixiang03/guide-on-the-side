@@ -618,6 +618,16 @@ if (!function_exists('get_page_template_slug')) {
     }
 }
 
+if (!function_exists('get_post_status')) {
+    function get_post_status($post = null): string|false
+    {
+        WPStubs::record('get_post_status', [$post]);
+        $map = WPStubs::returnFor('post_statuses', []);
+        $post_id = is_object($post) ? $post->ID : (int) $post;
+        return $map[$post_id] ?? WPStubs::returnFor('get_post_status', 'publish');
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Option stubs                                                      */
 /* ------------------------------------------------------------------ */
