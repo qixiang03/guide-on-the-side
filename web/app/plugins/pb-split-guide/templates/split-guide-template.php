@@ -338,7 +338,7 @@ $s['branch'] = $branch;
 
         <div class="pbsg-nav-center">
           <span id="pbsgProgress" class="pbsg-progress"></span>
-          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">0/0 ✓</span>
+          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">Correct/Attempted 0/0 ✓</span>
         </div>
 
         <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext">Next</button>
@@ -369,7 +369,7 @@ $s['branch'] = $branch;
         <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window ↗</a>
       </div>
       <div class="pbsg-banner-actions">
-        <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>
+        <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>  
       </div>
     </div>
 

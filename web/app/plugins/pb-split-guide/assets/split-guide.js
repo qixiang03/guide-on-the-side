@@ -844,7 +844,7 @@ function updateRunningScore() {
   const correct = passedQuizStepsCount();
   const attempted = attemptedQuizStepsCount();
 
-  runningScoreEl.textContent = `${correct}/${attempted} ✓`;
+  runningScoreEl.textContent = `Correct/Attempted ${correct}/${attempted} ✓`;
 }
 
 function resetTutorialToStart(){

@@ -676,6 +676,7 @@ body.pbsg-standalone .pbsg-wrap{
 }
 
 
+
 /* ==========================================
    Visual Spacing Improvement (Cleaner UI)
    ========================================== */
@@ -1638,5 +1639,5 @@ body.tutorial-active #colophon {
   white-space: nowrap;
   font-weight: 600;
   color: #2e7d32;
-  min-width: 72px;
+  min-width: 200px;
 }
