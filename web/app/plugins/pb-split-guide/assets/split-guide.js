@@ -1770,7 +1770,7 @@ document.addEventListener('keydown', (e) => {
 
 
 retakeBtn.onclick = () => {
-  window.location.href = '/';
+  window.location.href = '/wp-admin/admin.php?page=pbsg-my-tutorials';
 };
 
 // ===== Focus System =====
