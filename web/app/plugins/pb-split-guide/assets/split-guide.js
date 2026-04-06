@@ -403,6 +403,7 @@ function attachH5PWatcher(stepIndex){
     const step = steps[stepIndex];
 
     if (correct) {
+      // If the student has a correct result visible, keep this step marked as passed
       passedSteps.add(stepIndex);
       lockNext(false);
       updateRunningScore();
@@ -410,7 +411,13 @@ function attachH5PWatcher(stepIndex){
       return;
     }
 
-    passedSteps.delete(stepIndex);
+    // IMPORTANT:
+    // Do not remove a previously-passed step during passive checks
+    // such as iframe reload, Prev/Next navigation, or MutationObserver redraws.
+    // Only remove it after a real Check action.
+    if (allowBranchPrompt) {
+      passedSteps.delete(stepIndex);
+    }
 
     // Default rule:
     // Wrong answer should NOT block Next anymore,

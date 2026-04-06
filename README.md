@@ -83,7 +83,14 @@ Built for **UPEI Library** as a free, accessible, PIPEDA-compliant alternative t
    cd ../../../..
    ```
 
-6. **Access the application**
+6. **Install tcpdf for pdf certificate generation**
+
+   ```bash
+   cd web/app/plugins/pb-split-guide
+   lando composer require tecnickcom/tcpdf
+   ```
+
+7. **Access the application**
    - WordPress: `http://localhost:8080`
    - WordPress Admin: `http://localhost:8080/wp/wp-admin/`
    - phpMyAdmin: `http://localhost:8081`
