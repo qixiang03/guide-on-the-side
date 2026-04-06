@@ -212,6 +212,11 @@ class PBSG_Analytics {
             wp_send_json_error( 'Invalid tutorial', 400 );
         }
 
+        // Reject events for non-published tutorials (prevents draft/preview pollution)
+        if ( get_post_status( $tutorial_id ) !== 'publish' ) {
+            wp_send_json_error( 'tutorial_unavailable', 410 );
+        }
+
         // Parse device type from user-agent (no fingerprinting)
         $device = self::detect_device();
 

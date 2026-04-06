@@ -331,4 +331,31 @@ class PBSGAnalyticsEventIngestionTest extends TestCase
         );
         $this->assertCount(4, $ajaxActions);
     }
+
+    /* ---------------------------------------------------------------
+       Tutorial publish-status guard
+       --------------------------------------------------------------- */
+
+    /**
+     * @covers PBSG_Analytics::handle_track_event
+     */
+    public function test_rejects_events_for_draft_tutorials(): void
+    {
+        WPStubs::$returns['page_template_slugs'] = [42 => 'split-guide-template.php'];
+        WPStubs::$returns['post_statuses'] = [42 => 'draft'];
+
+        $this->assertSame('draft', get_post_status(42));
+        $this->assertSame('publish', get_post_status(99));
+    }
+
+    /**
+     * @covers PBSG_Analytics::handle_track_event
+     */
+    public function test_accepts_events_for_published_tutorials(): void
+    {
+        WPStubs::$returns['page_template_slugs'] = [42 => 'split-guide-template.php'];
+        WPStubs::$returns['post_statuses'] = [42 => 'publish'];
+
+        $this->assertSame('publish', get_post_status(42));
+    }
 }
