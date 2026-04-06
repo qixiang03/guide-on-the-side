@@ -1268,8 +1268,9 @@ class PB_Split_Guide_Plugin {
         ">
           <h2 style="margin-top:0; font-size:18px;">&#x1F4CA; Default Performance Benchmarks</h2>
           <p class="description" style="margin-bottom: 16px;">
-            These thresholds determine badge colours and &ldquo;Needs Attention&rdquo; flags on the analytics dashboard.
-            Librarians can override these per tutorial for harder or easier guides.
+            These thresholds determine badge colours on the analytics dashboard.
+            Tutorials with any metric in the <strong style="color:#D93025;">red</strong> zone are automatically flagged as &ldquo;Needs Attention&rdquo; on the Overview tab.
+            Librarians can override these per tutorial in the tutorial editor.
           </p>
 
           <!-- Hidden field carries the JSON blob -->
@@ -1279,110 +1280,213 @@ class PB_Split_Guide_Plugin {
 
           <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
 
-            <!-- Completion Rate -->
+            <!-- 1. Completion Rate -->
             <div class="pbsg-bench-group">
-              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">Completion Rate Badges</label>
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#517E1B;"></span>
-                <span style="font-size:12px; width:80px;">Green &ge;</span>
-                <input type="number" class="pbsg-bench-input" data-key="completion_rate_green"
-                       value="<?php echo esc_attr($bench['completion_rate_green']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Completion Rate Badges</label>
+              <div style="font-size:11px;color:#646970;margin-bottom:14px;line-height:1.4;">
+                % of students who finish all steps of a tutorial. Shown on Overview and Tutorial Detail tabs.
               </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#D4A017;"></span>
-                <span style="font-size:12px; width:80px;">Amber &ge;</span>
-                <input type="number" class="pbsg-bench-input" data-key="completion_rate_amber"
-                       value="<?php echo esc_attr($bench['completion_rate_amber']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
+              <div class="pbsg-slider-wrap" data-min="0" data-max="100" data-inverse="0"
+                   data-key-low="completion_rate_amber" data-key-high="completion_rate_green">
+                <div class="pbsg-slider-track">
+                  <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--green"></div>
+                </div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Amber threshold for Completion Rate"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="<?php echo esc_attr($bench['completion_rate_amber']); ?>"></div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Green threshold for Completion Rate"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="<?php echo esc_attr($bench['completion_rate_green']); ?>"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['completion_rate_amber']); ?>"
+                     min="0" max="100"
+                     aria-label="Amber threshold value for Completion Rate"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['completion_rate_green']); ?>"
+                     min="0" max="100"
+                     aria-label="Green threshold value for Completion Rate"></div>
               </div>
-              <div style="font-size:11px; color:#646970; margin-top:4px;">Below amber = red badge</div>
+              <div class="pbsg-slider-scale"><span>0%</span><span>100%</span></div>
+              <div class="pbsg-slider-legend">
+                <span class="pbsg-dot pbsg-dot--green"></span><strong>Green</strong> &mdash; On track, no action needed<br>
+                <span class="pbsg-dot pbsg-dot--amber"></span><strong>Amber</strong> &mdash; Worth reviewing; some students may be dropping off<br>
+                <span class="pbsg-dot pbsg-dot--red"></span><strong>Red</strong> &mdash; Needs attention; tutorial may be too long or confusing
+              </div>
             </div>
 
-            <!-- Avg Score -->
+            <!-- 2. Avg Score -->
             <div class="pbsg-bench-group">
-              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">Avg Score Badges</label>
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#517E1B;"></span>
-                <span style="font-size:12px; width:80px;">Green &ge;</span>
-                <input type="number" class="pbsg-bench-input" data-key="score_green"
-                       value="<?php echo esc_attr($bench['score_green']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Avg Score Badges</label>
+              <div style="font-size:11px;color:#646970;margin-bottom:14px;line-height:1.4;">
+                Average % of quiz questions answered correctly across all students. Shown on Overview tab (all-time).
               </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#D4A017;"></span>
-                <span style="font-size:12px; width:80px;">Amber &ge;</span>
-                <input type="number" class="pbsg-bench-input" data-key="score_amber"
-                       value="<?php echo esc_attr($bench['score_amber']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
+              <div class="pbsg-slider-wrap" data-min="0" data-max="100" data-inverse="0"
+                   data-key-low="score_amber" data-key-high="score_green">
+                <div class="pbsg-slider-track">
+                  <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--green"></div>
+                </div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Amber threshold for Avg Score"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="<?php echo esc_attr($bench['score_amber']); ?>"></div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Green threshold for Avg Score"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="<?php echo esc_attr($bench['score_green']); ?>"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['score_amber']); ?>"
+                     min="0" max="100"
+                     aria-label="Amber threshold value for Avg Score"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['score_green']); ?>"
+                     min="0" max="100"
+                     aria-label="Green threshold value for Avg Score"></div>
               </div>
-              <div style="font-size:11px; color:#646970; margin-top:4px;">Below amber = red badge</div>
+              <div class="pbsg-slider-scale"><span>0%</span><span>100%</span></div>
+              <div class="pbsg-slider-legend">
+                <span class="pbsg-dot pbsg-dot--green"></span><strong>Green</strong> &mdash; Students understand the material well<br>
+                <span class="pbsg-dot pbsg-dot--amber"></span><strong>Amber</strong> &mdash; Some questions may need clearer wording<br>
+                <span class="pbsg-dot pbsg-dot--red"></span><strong>Red</strong> &mdash; Students are struggling; review quiz content
+              </div>
             </div>
 
-            <!-- Correct Rate -->
+            <!-- 3. Correct Rate -->
             <div class="pbsg-bench-group">
-              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">Correct Rate Badges</label>
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#517E1B;"></span>
-                <span style="font-size:12px; width:80px;">Green &ge;</span>
-                <input type="number" class="pbsg-bench-input" data-key="correct_rate_green"
-                       value="<?php echo esc_attr($bench['correct_rate_green']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Correct Rate Badges</label>
+              <div style="font-size:11px;color:#646970;margin-bottom:14px;line-height:1.4;">
+                % of attempts answered correctly for each individual question. Shown in Quiz Questions table on Tutorial Detail.
               </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#D4A017;"></span>
-                <span style="font-size:12px; width:80px;">Amber &ge;</span>
-                <input type="number" class="pbsg-bench-input" data-key="correct_rate_amber"
-                       value="<?php echo esc_attr($bench['correct_rate_amber']); ?>"
-                       min="0" max="100" style="width:60px;" />
-                <span style="font-size:12px;">%</span>
+              <div class="pbsg-slider-wrap" data-min="0" data-max="100" data-inverse="0"
+                   data-key-low="correct_rate_amber" data-key-high="correct_rate_green">
+                <div class="pbsg-slider-track">
+                  <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--green"></div>
+                </div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Amber threshold for Correct Rate"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="<?php echo esc_attr($bench['correct_rate_amber']); ?>"></div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Green threshold for Correct Rate"
+                     aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="<?php echo esc_attr($bench['correct_rate_green']); ?>"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['correct_rate_amber']); ?>"
+                     min="0" max="100"
+                     aria-label="Amber threshold value for Correct Rate"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['correct_rate_green']); ?>"
+                     min="0" max="100"
+                     aria-label="Green threshold value for Correct Rate"></div>
               </div>
-              <div style="font-size:11px; color:#646970; margin-top:4px;">Below amber = red badge</div>
+              <div class="pbsg-slider-scale"><span>0%</span><span>100%</span></div>
+              <div class="pbsg-slider-legend">
+                <span class="pbsg-dot pbsg-dot--green"></span><strong>Green</strong> &mdash; Question is well understood by students<br>
+                <span class="pbsg-dot pbsg-dot--amber"></span><strong>Amber</strong> &mdash; Question could be clearer or hints may help<br>
+                <span class="pbsg-dot pbsg-dot--red"></span><strong>Red</strong> &mdash; Question is too hard or poorly worded; rework needed
+              </div>
             </div>
 
-            <!-- Give-ups (inverse) -->
+            <!-- 4. Give-up Count (inverse) -->
             <div class="pbsg-bench-group">
-              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">Give-up Count Badges</label>
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#517E1B;"></span>
-                <span style="font-size:12px; width:80px;">Green &le;</span>
-                <input type="number" class="pbsg-bench-input" data-key="giveup_low"
-                       value="<?php echo esc_attr($bench['giveup_low']); ?>"
-                       min="0" style="width:60px;" />
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Give-up Count Badges</label>
+              <div style="font-size:11px;color:#646970;margin-bottom:14px;line-height:1.4;">
+                Number of times students gave up on a question without answering. Shown in Question Drill-Down. Lower is better.
               </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#8C2004;"></span>
-                <span style="font-size:12px; width:80px;">Red &gt;</span>
-                <input type="number" class="pbsg-bench-input" data-key="giveup_high"
-                       value="<?php echo esc_attr($bench['giveup_high']); ?>"
-                       min="0" style="width:60px;" />
+              <div class="pbsg-slider-wrap" data-min="0" data-max="15" data-inverse="1"
+                   data-key-low="giveup_low" data-key-high="giveup_high">
+                <div class="pbsg-slider-track">
+                  <div class="pbsg-slider-seg pbsg-slider-seg--green"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
+                </div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Green threshold for Give-up Count"
+                     aria-valuemin="0" aria-valuemax="15"
+                     aria-valuenow="<?php echo esc_attr($bench['giveup_low']); ?>"></div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Red threshold for Give-up Count"
+                     aria-valuemin="0" aria-valuemax="15"
+                     aria-valuenow="<?php echo esc_attr($bench['giveup_high']); ?>"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['giveup_low']); ?>"
+                     min="0" max="15"
+                     aria-label="Green threshold value for Give-up Count"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['giveup_high']); ?>"
+                     min="0" max="15"
+                     aria-label="Red threshold value for Give-up Count"></div>
               </div>
-              <div style="font-size:11px; color:#646970; margin-top:4px;">Lower is better (inverse metric)</div>
+              <div class="pbsg-slider-scale"><span>0</span><span>15+</span></div>
+              <div class="pbsg-slider-legend">
+                <span class="pbsg-dot pbsg-dot--green"></span><strong>Green</strong> &mdash; Few give-ups; students are engaging with the question<br>
+                <span class="pbsg-dot pbsg-dot--amber"></span><strong>Amber</strong> &mdash; Some students giving up; review difficulty level<br>
+                <span class="pbsg-dot pbsg-dot--red"></span><strong>Red</strong> &mdash; Many students giving up; question likely needs rework
+              </div>
             </div>
 
-            <!-- Max Retries (inverse) -->
+            <!-- 5. Retries (inverse) -->
             <div class="pbsg-bench-group">
-              <label style="font-weight:600; font-size:13px; display:block; margin-bottom:8px;">Max Retries Badges</label>
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#517E1B;"></span>
-                <span style="font-size:12px; width:80px;">Green &le;</span>
-                <input type="number" class="pbsg-bench-input" data-key="retries_low"
-                       value="<?php echo esc_attr($bench['retries_low']); ?>"
-                       min="0" style="width:60px;" />
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:6px;">Retries Badges</label>
+              <div style="font-size:11px;color:#646970;margin-bottom:14px;line-height:1.4;">
+                Highest number of retry attempts on a single question in one session. Shown in Question Drill-Down. Lower is better.
               </div>
-              <div style="display:flex; align-items:center; gap:8px;">
-                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:#8C2004;"></span>
-                <span style="font-size:12px; width:80px;">Red &gt;</span>
-                <input type="number" class="pbsg-bench-input" data-key="retries_high"
-                       value="<?php echo esc_attr($bench['retries_high']); ?>"
-                       min="0" style="width:60px;" />
+              <div class="pbsg-slider-wrap" data-min="0" data-max="13" data-inverse="1"
+                   data-key-low="retries_low" data-key-high="retries_high">
+                <div class="pbsg-slider-track">
+                  <div class="pbsg-slider-seg pbsg-slider-seg--green"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
+                  <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
+                </div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Green threshold for Retries"
+                     aria-valuemin="0" aria-valuemax="13"
+                     aria-valuenow="<?php echo esc_attr($bench['retries_low']); ?>"></div>
+                <div class="pbsg-slider-thumb" tabindex="0" role="slider"
+                     aria-label="Red threshold for Retries"
+                     aria-valuemin="0" aria-valuemax="13"
+                     aria-valuenow="<?php echo esc_attr($bench['retries_high']); ?>"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['retries_low']); ?>"
+                     min="0" max="13"
+                     aria-label="Green threshold value for Retries"></div>
+                <div class="pbsg-slider-label"><input type="number"
+                     value="<?php echo esc_attr($bench['retries_high']); ?>"
+                     min="0" max="13"
+                     aria-label="Red threshold value for Retries"></div>
               </div>
-              <div style="font-size:11px; color:#646970; margin-top:4px;">Lower is better (inverse metric)</div>
+              <div class="pbsg-slider-scale"><span>0</span><span>13+</span></div>
+              <div class="pbsg-slider-legend">
+                <span class="pbsg-dot pbsg-dot--green"></span><strong>Green</strong> &mdash; Students get it within a few tries<br>
+                <span class="pbsg-dot pbsg-dot--amber"></span><strong>Amber</strong> &mdash; Students need several attempts; question may be tricky<br>
+                <span class="pbsg-dot pbsg-dot--red"></span><strong>Red</strong> &mdash; Excessive retries; question may be unfair or confusing
+              </div>
+            </div>
+
+            <!-- 6. How Benchmarks Work (summary/legend) -->
+            <div class="pbsg-bench-group" style="background:#f6f7f7;border:1px solid #e0e0e0;border-radius:6px;padding:14px;">
+              <label style="font-weight:600;font-size:13px;display:block;margin-bottom:8px;">How Benchmarks Work</label>
+              <div style="font-size:11px;color:#646970;line-height:1.6;margin-bottom:12px;">
+                Each metric on the analytics dashboard displays a coloured badge based on the thresholds you set with the sliders above.
+              </div>
+              <div style="font-size:11px;color:#1d2327;line-height:1.8;margin-bottom:12px;">
+                <span class="pbsg-dot pbsg-dot--green"></span><strong>Green</strong> &mdash; Performing well. No action needed.<br>
+                <span class="pbsg-dot pbsg-dot--amber"></span><strong>Amber</strong> &mdash; Worth a look. Not urgent, but may improve with adjustments.<br>
+                <span class="pbsg-dot pbsg-dot--red"></span><strong>Red</strong> &mdash; Needs attention. Tutorial is flagged on the Overview tab for review.
+              </div>
+              <div style="border-top:1px solid #dcdcde;padding-top:10px;font-size:11px;color:#646970;line-height:1.5;">
+                <strong>Needs Attention flag:</strong> Any tutorial with a metric in the red zone is automatically flagged on the Overview tab. No separate threshold to configure.
+              </div>
+              <div style="border-top:1px solid #dcdcde;padding-top:10px;margin-top:10px;font-size:11px;color:#646970;line-height:1.5;">
+                <strong>Per-tutorial override:</strong> These are site-wide defaults. You can set different thresholds for individual tutorials in the tutorial editor.
+              </div>
             </div>
 
           </div>
