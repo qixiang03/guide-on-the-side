@@ -1710,15 +1710,18 @@ class PB_Split_Guide_Plugin {
       '0.5.0'
     );
 
-    $steps_json = get_post_meta( $page_id, '_pbsg_steps_json', true );
-    $steps_data = json_decode( $steps_json, true );
-    $total_steps = is_array( $steps_data ) ? count( $steps_data ) : 1;
+    // Only localize tracker data on published tutorials — prevents draft/preview pollution
+    if ( get_post_status( $page_id ) === 'publish' ) {
+        $steps_json = get_post_meta( $page_id, '_pbsg_steps_json', true );
+        $steps_data = json_decode( $steps_json, true );
+        $total_steps = is_array( $steps_data ) ? count( $steps_data ) : 1;
 
-    wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
-        'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
-        'tutorialPageId' => $page_id,
-        'totalSteps'     => $total_steps,
-    ) ); 
+        wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
+            'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+            'tutorialPageId' => $page_id,
+            'totalSteps'     => $total_steps,
+        ) );
+    } 
   }
 
   /**

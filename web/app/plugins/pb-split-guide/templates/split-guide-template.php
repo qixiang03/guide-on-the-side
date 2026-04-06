@@ -32,13 +32,16 @@ wp_enqueue_script(
   true
 );
 
-wp_enqueue_script(
-    'pbsg-tracker',
-    plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
-    array(),
-    filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js' ),
-    true
-);
+// Only load analytics tracker on published tutorials — prevents draft/preview pollution
+if ( get_post_status() === 'publish' ) {
+    wp_enqueue_script(
+        'pbsg-tracker',
+        plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
+        array(),
+        filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js' ),
+        true
+    );
+}
 
 get_header();
 
