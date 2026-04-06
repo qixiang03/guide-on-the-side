@@ -608,6 +608,8 @@ let i = 0;
 let inBranch = false;
 let branchParentIndex = null;
 let branchStepIndex = 0;
+// Expose branch state for the analytics tracker (read-only accessor)
+window.pbsgInBranch = function() { return inBranch; };
 let currentTutorialSignature = null;
 
 

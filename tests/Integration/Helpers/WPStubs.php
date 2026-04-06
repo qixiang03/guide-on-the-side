@@ -576,11 +576,18 @@ if (!function_exists('get_post_mime_type')) {
 /* ------------------------------------------------------------------ */
 
 if (!function_exists('get_header')) {
-    function get_header(string $name = null, array $args = []): void {}
+    function get_header(?string $name = null, array $args = []): void {}
 }
 
 if (!function_exists('get_footer')) {
-    function get_footer(string $name = null, array $args = []): void {}
+    function get_footer(?string $name = null, array $args = []): void {}
+}
+
+if (!function_exists('status_header')) {
+    function status_header(int $code, string $description = ''): void
+    {
+        WPStubs::record('status_header', [$code, $description]);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -615,6 +622,16 @@ if (!function_exists('get_page_template_slug')) {
         $map = WPStubs::returnFor('page_template_slugs', []);
         $post_id = is_object($post) ? $post->ID : (int) $post;
         return $map[$post_id] ?? '';
+    }
+}
+
+if (!function_exists('get_post_status')) {
+    function get_post_status($post = null): string|false
+    {
+        WPStubs::record('get_post_status', [$post]);
+        $map = WPStubs::returnFor('post_statuses', []);
+        $post_id = is_object($post) ? $post->ID : (int) $post;
+        return $map[$post_id] ?? WPStubs::returnFor('get_post_status', 'publish');
     }
 }
 

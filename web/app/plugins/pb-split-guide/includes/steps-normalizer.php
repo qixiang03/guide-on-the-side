@@ -195,6 +195,14 @@ final class PBSG_Steps_Normalizer
 
                 $has_shared_branch_resource = ($branch_tutorial_type !== '');
 
+                $has_per_question_resource = false;
+                foreach ($questions as $q) {
+                    if (!empty($q['tutorial_type'])) {
+                        $has_per_question_resource = true;
+                        break;
+                    }
+                }
+
                 if (
                     !empty($questions) &&
                     (

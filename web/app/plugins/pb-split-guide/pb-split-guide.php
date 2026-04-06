@@ -149,6 +149,8 @@ class PB_Split_Guide_Plugin {
 
     // Ensure template table exists (handles already-active installs)
     add_action('admin_init', ['PBSG_Template_Manager', 'maybe_create_tables'], 1);
+
+    add_action('template_redirect', [$this, 'handle_error_page']);
   }
   
 
@@ -1710,15 +1712,18 @@ class PB_Split_Guide_Plugin {
       '0.5.0'
     );
 
-    $steps_json = get_post_meta( $page_id, '_pbsg_steps_json', true );
-    $steps_data = json_decode( $steps_json, true );
-    $total_steps = is_array( $steps_data ) ? count( $steps_data ) : 1;
+    // Only localize tracker data on published tutorials — prevents draft/preview pollution
+    if ( get_post_status( $page_id ) === 'publish' ) {
+        $steps_json = get_post_meta( $page_id, '_pbsg_steps_json', true );
+        $steps_data = json_decode( $steps_json, true );
+        $total_steps = is_array( $steps_data ) ? count( $steps_data ) : 1;
 
-    wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
-        'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
-        'tutorialPageId' => $page_id,
-        'totalSteps'     => $total_steps,
-    ) ); 
+        wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
+            'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
+            'tutorialPageId' => $page_id,
+            'totalSteps'     => $total_steps,
+        ) );
+    } 
   }
 
   /**
@@ -2338,6 +2343,127 @@ class PB_Split_Guide_Plugin {
     }
 
     wp_send_json_success($data);
+  }
+
+  /**
+   * Render the PBSG-410 error page when a tutorial becomes unavailable mid-session.
+   * Triggered by /?pbsg-error=410 redirect from split-guide-tracker.js.
+   */
+  public function handle_error_page() {
+    if ( ! isset( $_GET['pbsg-error'] ) || $_GET['pbsg-error'] !== '410' ) {
+        return;
+    }
+
+    status_header( 410 );
+    get_header();
+    ?>
+    <style>
+        .pbsg-error-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 60vh;
+            padding: 2rem 1rem;
+            font-family: 'Roboto', Arial, sans-serif;
+        }
+        .pbsg-error-card {
+            background: #F8F8F8;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            max-width: 480px;
+            width: 100%;
+            padding: 2.5rem 2rem;
+            text-align: center;
+        }
+        .pbsg-error-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pbsg-error-icon svg {
+            width: 48px;
+            height: 48px;
+        }
+        .pbsg-error-card h1 {
+            font-family: 'Lusitana', Georgia, serif;
+            color: #333333;
+            font-size: 1.5rem;
+            margin: 0 0 1rem;
+        }
+        .pbsg-error-card p {
+            color: #333333;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin: 0 0 1.5rem;
+        }
+        .pbsg-error-close {
+            display: inline-block;
+            background: #517E1B;
+            color: #fff;
+            border: none;
+            padding: 0.75rem 2rem;
+            border-radius: 4px;
+            font-family: 'Roboto Condensed', Arial, sans-serif;
+            font-size: 0.95rem;
+            cursor: pointer;
+            min-width: 44px;
+            min-height: 44px;
+        }
+        .pbsg-error-close:hover {
+            background: #436819;
+        }
+        .pbsg-error-close:focus {
+            outline: 2px solid #517E1B;
+            outline-offset: 2px;
+        }
+        .pbsg-error-fallback {
+            display: none;
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: 1rem;
+        }
+        .pbsg-error-code {
+            color: #999;
+            font-family: 'Roboto Condensed', Arial, sans-serif;
+            font-size: 0.8rem;
+            margin-top: 1.5rem;
+        }
+    </style>
+    <div class="pbsg-error-wrap">
+        <div class="pbsg-error-card" role="alert">
+            <div class="pbsg-error-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#8C2004" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            </div>
+            <h1><?php echo esc_html__( 'Tutorial Unavailable', 'pb-split-guide' ); ?></h1>
+            <p><?php echo esc_html__( 'The tutorial you were working on is no longer available. It may have been unpublished or removed.', 'pb-split-guide' ); ?></p>
+            <p><?php echo esc_html__( 'If you believe this is an error, please contact your librarian.', 'pb-split-guide' ); ?></p>
+            <button type="button" class="pbsg-error-close" id="pbsg-close-btn" aria-label="<?php echo esc_attr__( 'Close this page', 'pb-split-guide' ); ?>">
+                <?php echo esc_html__( 'Close Page', 'pb-split-guide' ); ?>
+            </button>
+            <p class="pbsg-error-fallback" id="pbsg-close-fallback">
+                <?php echo esc_html__( 'If this page didn\'t close, you can safely close this tab.', 'pb-split-guide' ); ?>
+            </p>
+            <p class="pbsg-error-code"><?php echo esc_html__( 'Error: PBSG-410', 'pb-split-guide' ); ?></p>
+        </div>
+    </div>
+    <script>
+    document.getElementById('pbsg-close-btn').addEventListener('click', function() {
+        window.close();
+        setTimeout(function() {
+            document.getElementById('pbsg-close-fallback').style.display = 'block';
+        }, 500);
+    });
+    </script>
+    <?php
+    get_footer();
+    exit;
   }
 }
 

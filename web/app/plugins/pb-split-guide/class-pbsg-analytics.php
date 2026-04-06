@@ -212,8 +212,14 @@ class PBSG_Analytics {
             wp_send_json_error( 'Invalid tutorial', 400 );
         }
 
-        // Parse device type from user-agent (no fingerprinting)
-        $device = self::detect_device();
+        // Reject events for non-published tutorials (prevents draft/preview pollution)
+        if ( get_post_status( $tutorial_id ) !== 'publish' ) {
+            wp_send_json_error( 'tutorial_unavailable', 410 );
+        }
+
+        // Parse device type from user-agent + client touch hint (no fingerprinting)
+        $touch  = isset( $data['touch_points'] ) ? absint( $data['touch_points'] ) : 0;
+        $device = self::detect_device( $touch );
 
         // Route to handler
         switch ( $event_type ) {
@@ -1166,17 +1172,42 @@ class PBSG_Analytics {
     }
 
     /**
-     * Simple device detection from user-agent (no fingerprinting).
+     * Enhanced device detection from user-agent + client touch hint.
+     * No fingerprinting — only UA pattern matching + navigator.maxTouchPoints.
+     *
+     * @param int $touch_points Client-reported navigator.maxTouchPoints (0 if unavailable)
      */
-    private static function detect_device() {
+    private static function detect_device( $touch_points = 0 ) {
         $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( $_SERVER['HTTP_USER_AGENT'] ) : '';
 
-        if ( preg_match( '/tablet|ipad|playbook|silk/i', $ua ) ) {
+        // 1. Explicit tablet markers (legacy iPads, Kindle, PlayBook)
+        if ( preg_match( '/ipad|playbook|silk/i', $ua ) ) {
             return self::DEVICE_TABLET;
         }
-        if ( preg_match( '/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/i', $ua ) ) {
+
+        // 2. Explicit phone markers
+        if ( preg_match( '/iphone|ipod/i', $ua ) ) {
             return self::DEVICE_MOBILE;
         }
+
+        // 3. Android: "android" + "mobile" = phone; "android" without "mobile" = tablet
+        if ( strpos( $ua, 'android' ) !== false ) {
+            if ( strpos( $ua, 'mobile' ) !== false ) {
+                return self::DEVICE_MOBILE;
+            }
+            return self::DEVICE_TABLET;
+        }
+
+        // 4. Non-Android "mobile" marker (Opera Mini, BlackBerry, IEMobile, etc.)
+        if ( preg_match( '/mobile|blackberry|opera mini|iemobile/i', $ua ) ) {
+            return self::DEVICE_MOBILE;
+        }
+
+        // 5. iPadOS detection: macOS-like UA but high touch points (>= 3)
+        if ( $touch_points >= 3 && strpos( $ua, 'macintosh' ) !== false ) {
+            return self::DEVICE_TABLET;
+        }
+
         return self::DEVICE_DESKTOP;
     }
 
