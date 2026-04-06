@@ -2532,6 +2532,21 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   // Track dirty state on benchmark inputs
   $(document).on('input change', '#pbsg_use_site_benchmarks, .pbsg-bench-override', markDirty);
 
+  // Initialize dual-pointer sliders on Guide Settings page
+  $( '.pbsg-admin-settings-card .pbsg-slider-wrap' ).each( function() {
+    pbsgDualSlider( this, function() {
+      // Sync all slider values to the hidden JSON field
+      var obj = {};
+      $( '.pbsg-admin-settings-card .pbsg-slider-wrap' ).each( function() {
+        var $inputs = $( this ).find( '.pbsg-slider-label input' );
+        var keyLow  = $( this ).attr( 'data-key-low' );
+        var keyHigh = $( this ).attr( 'data-key-high' );
+        obj[ keyLow ]  = parseInt( $inputs.eq( 0 ).val(), 10 );
+        obj[ keyHigh ] = parseInt( $inputs.eq( 1 ).val(), 10 );
+      } );
+      $( '#pbsg_benchmark_defaults_json' ).val( JSON.stringify( obj ) );
+    } );
+  } );
 
   // ═══════════════════════════════════════════════════════════
   //  Save as Template (Sprint 7 SG3)
