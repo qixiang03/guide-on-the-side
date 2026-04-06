@@ -2548,6 +2548,16 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     } );
   } );
 
+  // Initialize dual-pointer sliders on per-tutorial metabox
+  $( '#pbsg_benchmark_controls .pbsg-slider-wrap' ).each( function() {
+    pbsgDualSlider( this, function() {
+      if ( !$useSiteBench.is( ':checked' ) ) {
+        syncBenchOverrides();
+      }
+      markDirty();
+    } );
+  } );
+
   // ═══════════════════════════════════════════════════════════
   //  Save as Template (Sprint 7 SG3)
   // ═══════════════════════════════════════════════════════════

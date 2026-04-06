@@ -258,7 +258,7 @@
         if ( questions.length ) {
             html += '<div class="pbsg-card">';
             html += '<div class="pbsg-card-header">';
-            html += '<div class="pbsg-section-header">Quiz Questions <span class="pbsg-alltime-badge">all-time</span></div>';
+            html += 'Quiz Questions <span class="pbsg-alltime-badge">all-time</span>';
             html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">↓ Export CSV</a>';
             html += '</div>';
             html += renderQuestionsTable( questions, stats.tutorial_page_id, bench );
