@@ -694,29 +694,36 @@ function attachH5PWatcher(stepIndex){
     }
 
     // Only remove passed state after a real Check action
+    // Only remove passed state after a real Check action
     if (allowBranchPrompt) {
       passedSteps.delete(stepIndex);
     }
 
-    // After Check, wrong answers are allowed to proceed by default
-    lockNext(false);
-    updateRunningScore();
-
-    // Branch logic only after a real Check action
+    // A wrong checked answer may trigger branch state
     if (allowBranchPrompt && shouldTriggerBranch(stepIndex)) {
       triggeredBranchSteps.add(stepIndex);
-
-      if (!inBranch && stepIndex === i) {
-        showLearnMoreButton();
-
-        if (isMandatoryBranch(step)) {
-          lockNext(true);
-        } else {
-          lockNext(false);
-        }
-      }
     }
 
+    // Show the Learn More button whenever this step already has a triggered branch
+    if (
+      triggeredBranchSteps.has(stepIndex) &&
+      !completedBranchSteps.has(stepIndex) &&
+      !inBranch &&
+      stepIndex === i
+    ) {
+      showLearnMoreButton();
+    }
+
+    // For mandatory branch: keep Next locked until branch is completed
+    const mustStayLocked =
+      isMandatoryBranch(step) &&
+      triggeredBranchSteps.has(stepIndex) &&
+      !completedBranchSteps.has(stepIndex);
+
+    // Optional branch or no branch: can continue after Check
+    lockNext(mustStayLocked);
+
+    updateRunningScore();
     updateCertificateGate();
   };
 
