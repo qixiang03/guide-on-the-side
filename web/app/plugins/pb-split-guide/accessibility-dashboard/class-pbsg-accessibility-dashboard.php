@@ -130,7 +130,7 @@ class Pressbooks_Accessibility_Enhancer {
         if (file_exists($colorblind_css)) {
             wp_admin_css_color(
                 'colorblind-friendly',
-                __('Colorblind Friendly (Blue/Orange)', 'accessibility-enhancer'),
+                __('Colorblind Friendly', 'accessibility-enhancer'),
                 $plugin_url . 'styles/admin-colors-colorblind.css',
                 array('#003f87', '#0066cc', '#ff6600', '#f0f0f0'),
                 array(
