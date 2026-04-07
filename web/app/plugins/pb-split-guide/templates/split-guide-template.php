@@ -417,7 +417,9 @@ $s['branch'] = $branch;
 
 
 
-
+<?php
+$close_tutorial_url = get_post_meta($page_id, PB_Split_Guide_Plugin::META_CLOSE_URL, true);
+?>
 
 <script>
 window.PBSG_CERT = {
@@ -425,6 +427,7 @@ window.PBSG_CERT = {
   tutorialId: <?php echo (int)$page_id; ?>,
   nonce: <?php echo wp_json_encode($cert_nonce); ?>,
   isLoggedIn: <?php echo $is_logged_in ? 'true' : 'false'; ?>,
+  closeTutorialUrl: <?php echo wp_json_encode($close_tutorial_url); ?>,
 };
 </script>
 

@@ -1733,27 +1733,20 @@ if (certModalGenerate) {
       return;
     }
 
-    // Make sure completion is recorded before generating
     await finalizeCompletionIfReady();
 
     const previewUrl = buildCertificateUrl(name);
 
-    // Prevent repeated clicks right away
+    // Disable both buttons so certificate cannot be generated again
     certModalGenerate.disabled = true;
-    if (summaryCertBtn) summaryCertBtn.disabled = true;
+    if (summaryCertBtn) {
+      summaryCertBtn.disabled = true;
+      summaryCertBtn.classList.add('pbsg-locked');
+    }
 
-    // Open certificate preview in a new tab
     window.open(previewUrl, '_blank');
 
     closeCertModal();
-
-    // Clear current tutorial progress in memory
-    resetTutorialToStart();
-
-    // Refresh the current page so everything is reset visually too
-    setTimeout(() => {
-      window.location.reload();
-    }, 300);
   };
 }
 
@@ -1784,8 +1777,20 @@ document.addEventListener('keydown', (e) => {
 });
 
 
+function handleCloseTutorialAction() {
+  const closeUrl = (window.PBSG_CERT?.closeTutorialUrl || '').trim();
+
+  if (closeUrl) {
+    window.location.href = closeUrl;
+    return;
+  }
+
+  // Try to close the current tab
+  window.close();
+}
+
 retakeBtn.onclick = () => {
-  window.location.href = '/wp-admin/admin.php?page=pbsg-my-tutorials';
+  handleCloseTutorialAction();
 };
 
 // ===== Focus System =====

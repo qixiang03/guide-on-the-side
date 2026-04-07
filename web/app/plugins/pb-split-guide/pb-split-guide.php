@@ -40,6 +40,7 @@ class PB_Split_Guide_Plugin {
   const META_STEPS = '_pbsg_steps_json';
   const META_NOTE  = '_pbsg_header_note';
   const META_COVER_ID = '_pbsg_cover_image_id';
+  const META_CLOSE_URL = '_pbsg_close_tutorial_url';
 
   // Structured intro meta keys (Phase 7)
   const META_INTRO_DESC    = '_pbsg_intro_description';
@@ -632,6 +633,7 @@ class PB_Split_Guide_Plugin {
     $note = get_post_meta($post->ID, self::META_NOTE, true);
     $cover_image_id  = (int) get_post_meta($post->ID, self::META_COVER_ID, true);
     $cover_image_url = $cover_image_id ? wp_get_attachment_image_url($cover_image_id, 'large') : '';
+    $close_tutorial_url = get_post_meta($post->ID, self::META_CLOSE_URL, true);
 
     // Structured intro fields
     $intro_desc    = get_post_meta($post->ID, self::META_INTRO_DESC, true);
@@ -1046,7 +1048,35 @@ class PB_Split_Guide_Plugin {
         </button>
       </div>
 
-      <div class="pbsg-template-save-row" style="margin-top:70px; text-align:right;">
+      <div class="pbsg-section pbsg-close-url-section">
+
+  <div class="pbsg-section-header">
+    <h3>Close Tutorial Behavior</h3>
+  </div>
+
+    <div class="pbsg-section-body">
+
+      <div class="pbsg-field">
+        <label class="pbsg-label">Close Tutorial URL</label>
+
+        <input
+          type="text"
+          name="pbsg_close_tutorial_url"
+          value="<?php echo esc_attr($close_tutorial_url); ?>"
+          class="pbsg-input"
+          placeholder="Leave empty to close the current tab"
+        />
+
+        <p class="pbsg-description">
+          If empty, the tutorial will close the current tab.  
+          If a URL is provided, users will be redirected instead.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+      <div class="pbsg-template-save-row" style="margin-top:24px; text-align:right;">
         <button type="button" class="button" id="pbsg-save-as-template">Save All as Template</button>
       </div>
 
@@ -1624,6 +1654,16 @@ class PB_Split_Guide_Plugin {
 
     $note = isset($_POST['pbsg_header_note']) ? sanitize_text_field($_POST['pbsg_header_note']) : '';
     update_post_meta($post_id, self::META_NOTE, $note);
+
+    $close_tutorial_url = isset($_POST['pbsg_close_tutorial_url'])
+      ? trim(wp_unslash($_POST['pbsg_close_tutorial_url']))
+      : '';
+
+    if ($close_tutorial_url !== '') {
+      update_post_meta($post_id, self::META_CLOSE_URL, $close_tutorial_url);
+    } else {
+      delete_post_meta($post_id, self::META_CLOSE_URL);
+    }
 
     $cover_image_id = isset($_POST['pbsg_cover_image_id']) ? absint($_POST['pbsg_cover_image_id']) : 0;
 
