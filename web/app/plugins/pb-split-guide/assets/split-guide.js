@@ -675,9 +675,17 @@ function attachH5PWatcher(stepIndex){
     const updatePassState = ({ allowBranchPrompt = false } = {}) => {
     const correct = isH5PCorrect(doc);
     const step = steps[stepIndex];
+    const hasChecked = (attemptCounts[stepIndex] || 0) > 0;
+
+    // Global rule: until Check is clicked, Next must stay disabled
+    if (!hasChecked) {
+      lockNext(true);
+      updateRunningScore();
+      updateCertificateGate();
+      return;
+    }
 
     if (correct) {
-      // If the student has a correct result visible, keep this step marked as passed
       passedSteps.add(stepIndex);
       lockNext(false);
       updateRunningScore();
@@ -685,22 +693,16 @@ function attachH5PWatcher(stepIndex){
       return;
     }
 
-    // IMPORTANT:
-    // Do not remove a previously-passed step during passive checks
-    // such as iframe reload, Prev/Next navigation, or MutationObserver redraws.
-    // Only remove it after a real Check action.
+    // Only remove passed state after a real Check action
     if (allowBranchPrompt) {
       passedSteps.delete(stepIndex);
     }
 
-    // Default rule:
-    // Wrong answer should NOT block Next anymore,
-    // unless this step has a triggered mandatory branch.
+    // After Check, wrong answers are allowed to proceed by default
     lockNext(false);
     updateRunningScore();
 
-    // Show branch popup ONLY after a real Check click,
-    // not during every MutationObserver redraw
+    // Branch logic only after a real Check action
     if (allowBranchPrompt && shouldTriggerBranch(stepIndex)) {
       triggeredBranchSteps.add(stepIndex);
 
@@ -708,10 +710,8 @@ function attachH5PWatcher(stepIndex){
         showLearnMoreButton();
 
         if (isMandatoryBranch(step)) {
-          // Mandatory branch blocks Next
           lockNext(true);
         } else {
-          // Optional branch still allows Next
           lockNext(false);
         }
       }
@@ -1258,7 +1258,11 @@ function render(){
   prevBtn.disabled = i === 0;
 
   if (step.h5p_id) {
-    if (isCurrentStepBlockedByMandatoryBranch()) {
+    const hasChecked = (attemptCounts[i] || 0) > 0;
+
+    if (!hasChecked) {
+      lockNext(true);
+    } else if (isCurrentStepBlockedByMandatoryBranch()) {
       lockNext(true);
     } else {
       lockNext(false);
@@ -1321,10 +1325,8 @@ nextBtn.onclick = async () => {
 
     if (nextMainIndex < steps.length) {
       i = nextMainIndex;
-      const oldParent = branchParentIndex;
       branchParentIndex = null;
       branchStepIndex = 0;
-      showBranchExitNotice(oldParent);
       render();
     } else {
       branchParentIndex = null;
@@ -1346,11 +1348,6 @@ nextBtn.onclick = async () => {
     showSummaryScreen();
   }
 };
-
-function showBranchExitNotice(parentIdx) {
-  const stepTitle = steps[parentIdx]?.title || `Question ${parentIdx + 1}`;
-  alert(`You have completed the branch. You can go back to ${stepTitle} later if you want to retry it for a correct score.`);
-}
 
 if (learnMoreBtn) {
   learnMoreBtn.onclick = () => {
@@ -1724,7 +1721,7 @@ if (summaryCertBtn) {
 }
 
 if (certModalGenerate) {
-  certModalGenerate.onclick = () => {
+  certModalGenerate.onclick = async () => {
     const name = (certModalName?.value || '').trim();
 
     if (!name) {
@@ -1736,9 +1733,27 @@ if (certModalGenerate) {
       return;
     }
 
+    // Make sure completion is recorded before generating
+    await finalizeCompletionIfReady();
+
     const previewUrl = buildCertificateUrl(name);
+
+    // Prevent repeated clicks right away
+    certModalGenerate.disabled = true;
+    if (summaryCertBtn) summaryCertBtn.disabled = true;
+
+    // Open certificate preview in a new tab
     window.open(previewUrl, '_blank');
+
     closeCertModal();
+
+    // Clear current tutorial progress in memory
+    resetTutorialToStart();
+
+    // Refresh the current page so everything is reset visually too
+    setTimeout(() => {
+      window.location.reload();
+    }, 300);
   };
 }
 
