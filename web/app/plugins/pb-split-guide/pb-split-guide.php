@@ -143,7 +143,10 @@ class PB_Split_Guide_Plugin {
     add_action('admin_menu', [$this, 'register_guide_settings_page']);
 
     // Template picker & export/import (Sprint 7 SG3 & SG4)
-    add_action('load-post-new.php',             [$this, 'maybe_redirect_to_template_picker']);
+    // Priority 5 on admin_init fires BEFORE Pressbooks' redirect_away_from_bad_urls (priority 10),
+    // which would otherwise intercept post-new.php?post_type=page and redirect to book_dashboard
+    // because 'page' is not in Pressbooks' list_post_types() whitelist.
+    add_action('admin_init',                    [$this, 'maybe_redirect_to_template_picker'], 5);
     add_action('admin_menu',                    [$this, 'register_template_picker_page']);
     add_action('wp_ajax_pbsg_get_templates',    [$this, 'ajax_get_templates']);
     add_action('wp_ajax_pbsg_save_as_template', [$this, 'ajax_save_as_template']);
@@ -2141,6 +2144,8 @@ class PB_Split_Guide_Plugin {
    * Redirect post-new.php?post_type=page → template picker page.
    */
   public function maybe_redirect_to_template_picker() {
+    global $pagenow;
+    if ($pagenow !== 'post-new.php') return;
     $post_type = isset($_GET['post_type']) ? sanitize_key($_GET['post_type']) : 'post';
     if ($post_type !== 'page') return;
     if (!current_user_can('edit_pages')) return;
