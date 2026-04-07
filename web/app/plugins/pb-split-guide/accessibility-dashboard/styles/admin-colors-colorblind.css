@@ -90,9 +90,9 @@ textarea:focus {
 }
 
 .wp-core-ui .button {
-    background: #ff6600;
-    border-color: #ff6600;
-    color: #000;
+    background: #ff6600 !important;
+    border-color: #ff6600 !important;
+    color: #000 !important;
     font-weight: 600;
 }
 
@@ -100,14 +100,14 @@ textarea:focus {
 .wp-core-ui .button.hover,
 .wp-core-ui .button:focus,
 .wp-core-ui .button:hover {
-    background: #cc3300;
-    border-color: #cc3300;
-    color: #000;
+    background: #cc3300 !important;
+    border-color: #cc3300 !important;
+    color: #000 !important;
 }
 
 .wp-core-ui .button.focus,
 .wp-core-ui .button:focus {
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #cc3300;
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #cc3300 !important;
 }
 
 .wp-core-ui .button:active {

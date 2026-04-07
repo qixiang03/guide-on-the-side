@@ -89,23 +89,23 @@ textarea:focus {
 }
 
 .wp-core-ui .button {
-    background: #517E1B;
-    border-color: #517E1B;
-    color: #fff;
+    background: #517E1B !important;
+    border-color: #517E1B !important;
+    color: #fff !important;
 }
 
 .wp-core-ui .button.focus,
 .wp-core-ui .button.hover,
 .wp-core-ui .button:focus,
 .wp-core-ui .button:hover {
-    background: #416516;
-    border-color: #416516;
-    color: #fff;
+    background: #416516 !important;
+    border-color: #416516 !important;
+    color: #fff !important;
 }
 
 .wp-core-ui .button.focus,
 .wp-core-ui .button:focus {
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #416516;
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #416516 !important;
 }
 
 .wp-core-ui .button:active {
