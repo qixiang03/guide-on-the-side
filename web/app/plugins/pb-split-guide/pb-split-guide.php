@@ -2087,6 +2087,27 @@ class PB_Split_Guide_Plugin {
     }
   } // end post editor assets
 
+  // Slider CSS + JS on Guide Settings page (benchmark sliders)
+  if (isset($_GET['page']) && $_GET['page'] === 'pbsg-guide-settings') {
+    wp_enqueue_style(
+      'pbsg-admin',
+      plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
+      [],
+      '2.1.2'
+    );
+    wp_enqueue_script(
+      'pbsg_admin_js',
+      plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
+      ['jquery'],
+      '0.7.2',
+      true
+    );
+    wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
+      'benchmarkDefaults' => self::resolve_benchmarks(0),
+      'ratioDefault'      => intval(get_option(self::OPTION_DEFAULT_RATIO, self::RATIO_DEFAULT)),
+    ]);
+  }
+
   // Cross-edit JS — needed on Guide Settings, My Tutorials, post editor, and Pages list
   $cross_edit_screens = ['pbsg-my-tutorials', 'pbsg-guide-settings'];
   $current_page = isset($_GET['page']) ? sanitize_text_field($_GET['page']) : '';
