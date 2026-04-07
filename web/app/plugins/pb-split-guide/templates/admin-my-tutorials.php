@@ -19,7 +19,9 @@ $base_url         = admin_url('admin.php?page=pbsg-my-tutorials');
 ?>
 
 <div class="wrap pbsg-admin-tutorials-page">
-  <h1 style="margin-bottom:6px;">My Tutorials</h1>
+  <h1 class="wp-heading-inline" style="margin-bottom:6px;">My Tutorials</h1>
+  <a href="<?php echo esc_url(admin_url('admin.php?page=pbsg-new-tutorial')); ?>" class="page-title-action">Add Tutorial</a>
+  <hr class="wp-header-end">
 
   <div class="nav-tab-wrapper" style="margin-bottom:20px;">
     <?php if ($is_admin) : ?>
@@ -49,6 +51,9 @@ $base_url         = admin_url('admin.php?page=pbsg-my-tutorials');
           esc_html_e('No tutorials found.', 'pb-split-guide');
         }
         ?>
+        <a href="<?php echo esc_url(admin_url('admin.php?page=pbsg-new-tutorial')); ?>">
+          <?php esc_html_e('Add your first tutorial.', 'pb-split-guide'); ?>
+        </a>
       </p>
     </div>
   <?php else : ?>
