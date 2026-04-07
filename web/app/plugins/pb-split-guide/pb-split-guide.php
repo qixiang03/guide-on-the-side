@@ -1612,6 +1612,260 @@ class PB_Split_Guide_Plugin {
     ]);
   }
 
+  /**
+   * AJAX: Transfer tutorial ownership.
+   *
+   * Validates nonce, ownership, toggle state, target user role.
+   * Admins can always transfer; librarians only when toggle is ON and they own the tutorial.
+   */
+  public function ajax_transfer_ownership() {
+    check_ajax_referer('pbsg_transfer_ownership', '_wpnonce');
+
+    $post_ids     = isset($_POST['post_ids']) ? array_map('absint', (array) $_POST['post_ids']) : [];
+    $new_owner_id = isset($_POST['new_owner_id']) ? absint($_POST['new_owner_id']) : 0;
+
+    if (empty($post_ids) || !$new_owner_id) {
+      wp_send_json_error(['message' => __('Invalid request parameters.', 'pb-split-guide')]);
+    }
+
+    $is_admin = PBSG_Roles::is_admin();
+    $current_user_id = get_current_user_id();
+
+    // Check transfer toggle (admins exempt)
+    if (!$is_admin && !self::is_transfer_enabled()) {
+      wp_send_json_error(['message' => __('Ownership transfer is disabled.', 'pb-split-guide')]);
+    }
+
+    // Validate target user has librarian or admin role on this site
+    $target_user = get_userdata($new_owner_id);
+    if (!$target_user) {
+      wp_send_json_error(['message' => __('Target user not found.', 'pb-split-guide')]);
+    }
+    $valid_roles = [PBSG_Roles::LIBRARIAN_ROLE, 'administrator'];
+    $has_valid_role = !empty(array_intersect($valid_roles, $target_user->roles));
+    if (!$has_valid_role) {
+      wp_send_json_error(['message' => __('Target user must be a librarian or administrator.', 'pb-split-guide')]);
+    }
+
+    // Validate each post
+    $transferred = [];
+    foreach ($post_ids as $post_id) {
+      $post = get_post($post_id);
+      if (!$post || $post->post_type !== 'page') {
+        wp_send_json_error(['message' => sprintf(__('Post %d is not a valid page.', 'pb-split-guide'), $post_id)]);
+      }
+
+      // Must be a Split Guide tutorial
+      if (!PBSG_Roles::is_tutorial($post_id)) {
+        wp_send_json_error(['message' => sprintf(__('Post %d is not a tutorial.', 'pb-split-guide'), $post_id)]);
+      }
+
+      // Non-admins must own the tutorial
+      if (!$is_admin && (int) $post->post_author !== $current_user_id) {
+        wp_send_json_error(['message' => sprintf(__('You do not own the tutorial "%s".', 'pb-split-guide'), get_the_title($post_id))]);
+      }
+
+      // No self-transfer
+      if ((int) $post->post_author === $new_owner_id) {
+        wp_send_json_error(['message' => sprintf(__('"%s" is already owned by that user.', 'pb-split-guide'), get_the_title($post_id))]);
+      }
+
+      $transferred[] = $post_id;
+    }
+
+    // Execute transfer
+    global $wpdb;
+    foreach ($transferred as $post_id) {
+      $wpdb->update(
+        $wpdb->posts,
+        ['post_author' => $new_owner_id],
+        ['ID' => $post_id],
+        ['%d'],
+        ['%d']
+      );
+      clean_post_cache($post_id);
+    }
+
+    wp_send_json_success([
+      'message'     => sprintf(
+        _n(
+          '%d tutorial transferred successfully.',
+          '%d tutorials transferred successfully.',
+          count($transferred),
+          'pb-split-guide'
+        ),
+        count($transferred)
+      ),
+      'transferred' => $transferred,
+    ]);
+  }
+
+  /**
+   * AJAX: Get eligible transfer targets (librarians + admins).
+   */
+  public function ajax_get_transfer_targets() {
+    check_ajax_referer('pbsg_transfer_ownership', '_wpnonce');
+
+    $exclude_id = get_current_user_id();
+    $targets = PBSG_Librarian_Manager::get_reassignment_targets($exclude_id);
+
+    wp_send_json_success(['targets' => $targets]);
+  }
+
+  // ── Bulk Action: Transfer Ownership on Pages list ─────────────────────────
+
+  /**
+   * Add "Transfer Ownership" to the Pages (Tutorials) list table bulk actions.
+   */
+  public function register_transfer_bulk_action( $bulk_actions ) {
+    if ( PBSG_Roles::is_admin() || self::is_transfer_enabled() ) {
+      $bulk_actions['pbsg_transfer_ownership'] = __( 'Transfer Ownership', 'pb-split-guide' );
+    }
+    return $bulk_actions;
+  }
+
+  /**
+   * Handle the "Transfer Ownership" bulk action from Pages list.
+   * Redirects to My Tutorials page with a modal trigger param.
+   */
+  public function handle_transfer_bulk_action( $redirect_to, $doaction, $post_ids ) {
+    if ( $doaction !== 'pbsg_transfer_ownership' ) {
+      return $redirect_to;
+    }
+
+    // Filter to only tutorials the current user can transfer
+    $is_admin = PBSG_Roles::is_admin();
+    $current_user_id = get_current_user_id();
+    $valid_ids = [];
+
+    foreach ( $post_ids as $post_id ) {
+      $post_id = absint( $post_id );
+      if ( ! PBSG_Roles::is_tutorial( $post_id ) ) {
+        continue; // Skip non-tutorial pages
+      }
+      $post = get_post( $post_id );
+      if ( ! $post ) continue;
+
+      // Non-admins can only transfer their own
+      if ( ! $is_admin && (int) $post->post_author !== $current_user_id ) {
+        continue;
+      }
+      $valid_ids[] = $post_id;
+    }
+
+    if ( empty( $valid_ids ) ) {
+      return add_query_arg( 'pbsg_transfer_error', 'no_valid', $redirect_to );
+    }
+
+    // Store in transient for the modal to pick up
+    set_transient( 'pbsg_bulk_transfer_' . $current_user_id, $valid_ids, 300 );
+
+    return add_query_arg( [
+      'page'               => 'pbsg-my-tutorials',
+      'pbsg_bulk_transfer' => '1',
+    ], admin_url( 'admin.php' ) );
+  }
+
+  /**
+   * Show notice if transfer bulk action had no valid tutorials.
+   */
+  public function transfer_bulk_action_notice() {
+    if ( ! isset( $_GET['pbsg_transfer_error'] ) ) return;
+
+    $error = sanitize_text_field( $_GET['pbsg_transfer_error'] );
+    if ( $error === 'no_valid' ) {
+      echo '<div class="notice notice-warning is-dismissible"><p>';
+      esc_html_e( 'No eligible tutorials found for transfer. You can only transfer tutorials you own.', 'pb-split-guide' );
+      echo '</p></div>';
+    }
+  }
+
+  // ── Template Picker ────────────────────────────────────────────────────────
+
+  /**
+   * Redirect post-new.php?post_type=page → template picker page.
+   */
+  public function maybe_redirect_to_template_picker() {
+    global $pagenow;
+    if ($pagenow !== 'post-new.php') return;
+    $post_type = isset($_GET['post_type']) ? sanitize_key($_GET['post_type']) : 'post';
+    if ($post_type !== 'page') return;
+    if (!current_user_can('edit_pages')) return;
+
+    wp_safe_redirect(admin_url('admin.php?page=pbsg-new-tutorial'));
+    exit;
+  }
+
+  public function register_template_picker_page() {
+    add_submenu_page(
+      null,               // hidden — no parent
+      'New Tutorial',
+      'New Tutorial',
+      'edit_pages',
+      'pbsg-new-tutorial',
+      [$this, 'render_template_picker_page']
+    );
+  }
+
+  public function render_template_picker_page() {
+    if (!current_user_can('edit_pages')) {
+      wp_die(__('You do not have permission to access this page.'));
+    }
+    require plugin_dir_path(__FILE__) . 'templates/admin-new-tutorial.php';
+  }
+
+  public function ajax_get_templates() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    wp_send_json_success(['templates' => PBSG_Template_Manager::get_templates()]);
+  }
+
+  public function ajax_save_as_template() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    $post_id     = isset($_POST['post_id'])     ? absint($_POST['post_id'])                                          : 0;
+    $name        = isset($_POST['name'])        ? sanitize_text_field(wp_unslash($_POST['name']))                   : '';
+    $description = isset($_POST['description']) ? sanitize_textarea_field(wp_unslash($_POST['description']))        : '';
+    if (!$post_id || !$name) {
+      wp_send_json_error(['message' => 'Name and post_id are required.']);
+    }
+
+    if (!current_user_can('edit_post', $post_id)) {
+      wp_send_json_error(['message' => 'You cannot edit this post.'], 403);
+    }
+
+    $steps_json  = isset($_POST['steps_json'])  ? wp_unslash($_POST['steps_json'])                              : null;
+    $header_note = isset($_POST['header_note']) ? sanitize_text_field(wp_unslash($_POST['header_note']))        : null;
+
+    $id = PBSG_Template_Manager::save_as_template($post_id, $name, $description, '', $steps_json, $header_note);
+    if (!$id) wp_send_json_error(['message' => 'Could not save template.']);
+
+    wp_send_json_success(['id' => $id, 'message' => 'Template saved successfully.']);
+  }
+
+  public function ajax_create_from_template() {
+    check_ajax_referer('pbsg_template_picker', 'nonce');
+    if (!current_user_can('edit_pages')) wp_send_json_error(['message' => 'Forbidden'], 403);
+
+    $template_id = isset($_POST['template_id']) ? absint($_POST['template_id']) : 0;
+    $title       = isset($_POST['title'])       ? sanitize_text_field(wp_unslash($_POST['title'])) : '';
+
+    $post_id = PBSG_Template_Manager::create_from_template($template_id, $title);
+
+    if (is_wp_error($post_id)) {
+      wp_send_json_error(['message' => $post_id->get_error_message()]);
+    }
+
+    wp_send_json_success([
+      'post_id'  => $post_id,
+      'edit_url' => get_edit_post_link($post_id, 'url'),
+    ]);
+  }
+
+  // ── H5P ───────────────────────────────────────────────────────────────────
+
   public function ajax_list_h5p() {
     check_ajax_referer('pbsg_h5p_picker', 'nonce');
 
