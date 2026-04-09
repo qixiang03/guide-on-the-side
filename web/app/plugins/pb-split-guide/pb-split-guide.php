@@ -97,6 +97,8 @@ class PB_Split_Guide_Plugin {
     add_action('wp_ajax_pbsg_list_tutorials', [$this, 'ajax_list_tutorials']);
     add_action('wp_ajax_pbsg_transfer_ownership', [$this, 'ajax_transfer_ownership']);
     add_action('wp_ajax_pbsg_get_transfer_targets', [$this, 'ajax_get_transfer_targets']);
+    add_action('wp_ajax_pbsg_rename_h5p', [$this, 'ajax_rename_h5p']);
+    add_action('wp_ajax_pbsg_duplicate_h5p', [$this, 'ajax_duplicate_h5p']);
 
     // Bulk action: Transfer Ownership on the Tutorials (Pages) list table
     add_filter('bulk_actions-edit-page', [$this, 'register_transfer_bulk_action']);
@@ -372,6 +374,7 @@ class PB_Split_Guide_Plugin {
     $desired_order = [
       'index.php',                   // Dashboard
       'pb_home_page',                // Books (Pressbooks)
+      'pbsg-my-tutorials',           // My Tutorials
       'users.php',                   // Users
       'pbsg-manage-librarians',      // Manage Librarians
       'themes.php',                  // Appearance
@@ -2531,6 +2534,134 @@ class PB_Split_Guide_Plugin {
     wp_send_json_success([
       'quiz'    => $quiz,
       'library' => $row['library_name'],
+    ]);
+  }
+
+  /**
+   * AJAX: Rename an H5P content item. Owner-only.
+   */
+  public function ajax_rename_h5p() {
+    check_ajax_referer('pbsg_h5p_picker', 'nonce');
+
+    if (!current_user_can('edit_h5p_contents')) {
+      wp_send_json_error(['message' => 'Insufficient permissions']);
+    }
+
+    $h5p_id = absint($_POST['h5p_id'] ?? 0);
+    $title  = sanitize_text_field(wp_unslash($_POST['title'] ?? ''));
+
+    if ($h5p_id <= 0) {
+      wp_send_json_error(['message' => 'Invalid H5P ID']);
+    }
+
+    if ($title === '') {
+      wp_send_json_error(['message' => 'Title cannot be empty']);
+    }
+
+    // Verify ownership
+    global $wpdb;
+    $owner_id = (int) $wpdb->get_var($wpdb->prepare(
+      "SELECT user_id FROM {$wpdb->prefix}h5p_contents WHERE id = %d",
+      $h5p_id
+    ));
+
+    if ($owner_id !== get_current_user_id()) {
+      wp_send_json_error(['message' => 'Only the owner can rename this H5P content']);
+    }
+
+    $wpdb->update(
+      $wpdb->prefix . 'h5p_contents',
+      ['title' => $title],
+      ['id' => $h5p_id],
+      ['%s'],
+      ['%d']
+    );
+
+    wp_send_json_success();
+  }
+
+  /**
+   * AJAX: Duplicate an existing H5P content item as a new copy.
+   * Current user becomes the owner. Auto-generates title from tutorial context.
+   */
+  public function ajax_duplicate_h5p() {
+    check_ajax_referer('pbsg_h5p_picker', 'nonce');
+
+    if (!current_user_can('edit_h5p_contents')) {
+      wp_send_json_error(['message' => 'Insufficient permissions']);
+    }
+
+    $source_id  = absint($_POST['h5p_id'] ?? 0);
+    $post_title = sanitize_text_field(wp_unslash($_POST['post_title'] ?? ''));
+    $step_index = absint($_POST['step_index'] ?? 0);
+
+    if ($source_id <= 0) {
+      wp_send_json_error(['message' => 'Invalid source H5P ID']);
+    }
+
+    global $wpdb;
+    $source = $wpdb->get_row($wpdb->prepare(
+      "SELECT c.parameters, c.library_id, c.license, l.name AS library_name,
+              l.major_version, l.minor_version
+       FROM {$wpdb->prefix}h5p_contents c
+       JOIN {$wpdb->prefix}h5p_libraries l ON c.library_id = l.id
+       WHERE c.id = %d",
+      $source_id
+    ), ARRAY_A);
+
+    if (!$source) {
+      wp_send_json_error(['message' => 'Source H5P content not found']);
+    }
+
+    // Build the new title using the same convention as PBSG_H5P_Factory
+    $new_title = PBSG_H5P_Factory::generate_title($post_title, $step_index, '');
+
+    // Reverse the source into a quiz schema, then re-create via Factory
+    $quiz = PBSG_H5P_Factory::reverse($source['library_name'], $source['parameters']);
+
+    if (!$quiz) {
+      // Unsupported content type — fall back to raw parameter copy
+      $core = PBSG_H5P_Factory::get_h5p_core();
+      if (is_wp_error($core)) {
+        wp_send_json_error(['message' => $core->get_error_message()]);
+      }
+
+      $library = [
+        'machineName'  => $source['library_name'],
+        'majorVersion' => (int) $source['major_version'],
+        'minorVersion' => (int) $source['minor_version'],
+      ];
+
+      $content = [
+        'library'  => $library,
+        'params'   => $source['parameters'],
+        'metadata' => [
+          'title'   => $new_title,
+          'license' => $source['license'] ?: 'U',
+        ],
+        'disable' => 1,
+      ];
+
+      $new_id = $core->saveContent($content);
+
+      if (!$new_id || $new_id < 1) {
+        wp_send_json_error(['message' => 'Failed to duplicate H5P content']);
+      }
+    } else {
+      // Supported type — use Factory::create for clean duplication
+      $new_id = PBSG_H5P_Factory::create($quiz, $post_title, $step_index, '');
+
+      if (is_wp_error($new_id)) {
+        wp_send_json_error(['message' => $new_id->get_error_message()]);
+      }
+    }
+
+    // Invalidate usage map transient
+    PBSG_H5P_Usage_Map::invalidate();
+
+    wp_send_json_success([
+      'h5p_id' => (int) $new_id,
+      'title'  => $new_title,
     ]);
   }
 

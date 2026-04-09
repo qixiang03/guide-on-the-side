@@ -535,7 +535,7 @@ final class PBSG_H5P_Factory
         ];
     }
 
-    private static function get_h5p_core()
+    public static function get_h5p_core()
     {
         if (!self::is_h5p_available()) {
             return new \WP_Error('pbsg_h5p_unavailable', 'H5P plugin is not active.');
@@ -551,7 +551,7 @@ final class PBSG_H5P_Factory
         return $core;
     }
 
-    private static function generate_title(string $post_title, int $step_index, string $step_title): string
+    public static function generate_title(string $post_title, int $step_index, string $step_title): string
     {
         $post_title = trim($post_title);
         $step_title = trim($step_title);
