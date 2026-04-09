@@ -1803,6 +1803,9 @@ class PB_Split_Guide_Plugin {
 
     update_post_meta($post_id, self::META_STEPS, wp_json_encode($clean));
 
+    // Invalidate H5P usage map — links may have changed
+    PBSG_H5P_Usage_Map::invalidate();
+
     // Track editors who have touched this tutorial (for "Recently Worked On" tab)
     $editors = get_post_meta($post_id, '_pbsg_editors', true);
     if (!is_array($editors)) {
@@ -2033,6 +2036,7 @@ class PB_Split_Guide_Plugin {
       'isNewPage'       => ($hook === 'post-new.php'),
       'currentTemplate' => $current_template,
       'h5pAvailable'    => PBSG_H5P_Factory::is_h5p_available(),
+      'currentUserId'   => get_current_user_id(),
       'maxUploadSize'   => wp_max_upload_size(),
       'maxUploadLabel'  => size_format(wp_max_upload_size()),
       'postTitle'       => is_string($post_title) ? trim($post_title) : '',
