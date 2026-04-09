@@ -60,9 +60,11 @@ class PBSGH5PAjaxTest extends TestCase
         $table = $this->wpdb->prefix . 'h5p_contents';
         $this->wpdb->returns['get_var'] = $table;
         $this->wpdb->returns['get_results'] = [
-            ['id' => '1', 'title' => 'Quiz One'],
-            ['id' => '2', 'title' => ''],
+            ['id' => '1', 'title' => 'Quiz One', 'user_id' => '0', 'author_name' => null],
+            ['id' => '2', 'title' => '', 'user_id' => '0', 'author_name' => null],
         ];
+        WPStubs::$returns['transients'] = ['pbsg_h5p_usage_map' => []];
+        WPStubs::$returns['get_current_user_id'] = 0;
 
         $plugin = new PB_Split_Guide_Plugin();
 
@@ -91,6 +93,8 @@ class PBSGH5PAjaxTest extends TestCase
         $table = $this->wpdb->prefix . 'h5p_contents';
         $this->wpdb->returns['get_var'] = $table;
         $this->wpdb->returns['get_results'] = [];
+        WPStubs::$returns['transients'] = ['pbsg_h5p_usage_map' => []];
+        WPStubs::$returns['get_current_user_id'] = 0;
 
         $plugin = new PB_Split_Guide_Plugin();
 
@@ -102,6 +106,49 @@ class PBSGH5PAjaxTest extends TestCase
 
         $args = WPStubs::callArgs('wp_send_json_success', 0);
         $this->assertSame([], $args[0]['items']);
+    }
+
+    /**
+     * @covers PB_Split_Guide_Plugin::ajax_list_h5p
+     */
+    public function test_list_h5p_includes_ownership_and_usage_data(): void
+    {
+        $table = $this->wpdb->prefix . 'h5p_contents';
+        $this->wpdb->returns['get_var'] = $table;
+
+        $this->wpdb->returns['get_results'] = [
+            ['id' => '42', 'title' => 'Quiz A', 'user_id' => '5', 'author_name' => 'Cindy Guo'],
+            ['id' => '87', 'title' => 'Quiz B', 'user_id' => '3', 'author_name' => null],
+        ];
+
+        WPStubs::$returns['transients'] = [
+            'pbsg_h5p_usage_map' => [42 => [101, 205, 310], 87 => [101]],
+        ];
+
+        WPStubs::$returns['get_current_user_id'] = 5;
+
+        $plugin = new PB_Split_Guide_Plugin();
+
+        try {
+            $plugin->ajax_list_h5p();
+        } catch (WPDieException $e) {
+            // Expected
+        }
+
+        $this->assertTrue(WPStubs::wasCalled('wp_send_json_success'));
+        $args = WPStubs::callArgs('wp_send_json_success', 0);
+        $items = $args[0]['items'];
+
+        $this->assertSame(42, $items[0]['id']);
+        $this->assertSame(5, $items[0]['user_id']);
+        $this->assertSame('Cindy Guo', $items[0]['author_name']);
+        $this->assertTrue($items[0]['is_owner']);
+        $this->assertSame(3, $items[0]['usage_count']);
+
+        $this->assertSame(87, $items[1]['id']);
+        $this->assertFalse($items[1]['is_owner']);
+        $this->assertSame('Unknown user', $items[1]['author_name']);
+        $this->assertSame(1, $items[1]['usage_count']);
     }
 
     /**

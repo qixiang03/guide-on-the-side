@@ -2451,12 +2451,25 @@ class PB_Split_Guide_Plugin {
       wp_send_json_error(['message' => 'H5P table not found. Are you using the standard H5P plugin?']);
     }
 
-    $rows = $wpdb->get_results("SELECT id, title FROM {$table} ORDER BY id DESC LIMIT 300", ARRAY_A);
+    $rows = $wpdb->get_results(
+      "SELECT c.id, c.title, c.user_id, u.display_name AS author_name
+       FROM {$table} c
+       LEFT JOIN {$wpdb->users} u ON c.user_id = u.ID
+       ORDER BY c.id DESC LIMIT 300",
+      ARRAY_A
+    );
 
-    $items = array_map(function ($r) {
+    $current_user_id = get_current_user_id();
+
+    $items = array_map(function ($r) use ($current_user_id) {
+      $user_id = (int) $r['user_id'];
       return [
-        'id' => (int)$r['id'],
-        'title' => $r['title'] ? $r['title'] : ('H5P #' . (int)$r['id']),
+        'id'          => (int) $r['id'],
+        'title'       => $r['title'] ? $r['title'] : ('H5P #' . (int) $r['id']),
+        'user_id'     => $user_id,
+        'author_name' => $r['author_name'] ?: 'Unknown user',
+        'is_owner'    => $user_id === $current_user_id,
+        'usage_count' => PBSG_H5P_Usage_Map::count((int) $r['id']),
       ];
     }, $rows ?: []);
 

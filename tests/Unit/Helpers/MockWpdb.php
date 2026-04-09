@@ -18,6 +18,9 @@ class MockWpdb
     /** @var string Postmeta table name */
     public string $postmeta = 'wp_postmeta';
 
+    /** @var string Users table name */
+    public string $users = 'wp_users';
+
     /** @var list<array{method: string, args: array}> All recorded calls */
     public array $calls = [];
 
