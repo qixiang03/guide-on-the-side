@@ -977,8 +977,8 @@
                         const pct = t.devices[ deviceType ] || 0;
                         const winClass = ( tids.length > 1 && i === bestIdx && bestVal > 0 ) ? ' winner' : '';
                         html += '<div class="row-value' + winClass + '">';
+                        html += '<div class="metric-big">' + pct + '%</div>';
                         html += '<div class="mini-bar"><div class="mini-bar-fill" style="width:' + pct + '%;"></div></div>';
-                        html += '<span class="metric-unit">' + pct + '%</span>';
                         html += '</div>';
                     } else {
                         html += '<div class="row-value"><span class="metric-unit">—</span></div>';

@@ -21,6 +21,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-librarian-manager.
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-h5p-factory.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-template-manager.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-export-import.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-h5p-usage-map.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
