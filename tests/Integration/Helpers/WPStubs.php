@@ -611,6 +611,14 @@ if (!function_exists('set_transient')) {
     }
 }
 
+if (!function_exists('delete_transient')) {
+    function delete_transient(string $transient): bool
+    {
+        WPStubs::record('delete_transient', [$transient]);
+        return true;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page template stub (used by analytics tutorial validation)         */
 /* ------------------------------------------------------------------ */
