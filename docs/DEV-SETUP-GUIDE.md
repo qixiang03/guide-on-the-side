@@ -1,8 +1,9 @@
 # Guide on the Side - Development Environment Setup Guide
 
-**Project**: Guide on the Side - Interactive Tutorial System for UPEI Library  
-**Tech Stack**: Pressbooks (WordPress-based) + H5P for interactivity  
-**Last Updated**: January 27, 2026
+**Project**: Guide on the Side - Interactive Tutorial System for UPEI Library
+**Tech Stack**: WordPress Multisite (Bedrock) + Pressbooks + H5P
+**Local Dev**: Lando (Docker-based)
+**Last Updated**: April 9, 2026
 
 ---
 
@@ -10,527 +11,624 @@
 
 1. [Overview](#overview)
 2. [Prerequisites](#prerequisites)
-3. [Step 1: Install Docker](#step-1-install-docker)
-4. [Step 2: Create Docker Compose Environment](#step-2-create-docker-compose-environment)
-5. [Step 3: Start the Environment](#step-3-start-the-environment)
-6. [Step 4: Complete WordPress Installation](#step-4-complete-wordpress-installation)
-7. [Step 5: Enable WordPress Multisite](#step-5-enable-wordpress-multisite)
-8. [Step 6: Apply Network Configuration](#step-6-apply-network-configuration)
-9. [Step 7: Install WP-CLI](#step-7-install-wp-cli)
-10. [Step 8: Install H5P Plugin](#step-8-install-h5p-plugin)
-11. [Step 9: Install Pressbooks Plugin](#step-9-install-pressbooks-plugin)
-12. [Step 10: Install Pressbooks Book Theme](#step-10-install-pressbooks-book-theme)
-13. [Step 11: Activate Plugins and Theme](#step-11-activate-plugins-and-theme)
-14. [Step 12: Fix Pressbooks Cache Permissions](#step-12-fix-pressbooks-cache-permissions)
-15. [Step 13: Restart Environment](#step-13-restart-environment-recommended)
-16. [Daily Usage Commands](#daily-usage-commands)
-17. [Access URLs and Credentials](#access-urls-and-credentials)
-18. [Folder Structure](#folder-structure)
-19. [Troubleshooting](#troubleshooting)
+3. [Step 1: Install Lando](#step-1-install-lando)
+4. [Step 2: Clone the Repository](#step-2-clone-the-repository)
+5. [Step 3: Configure Environment](#step-3-configure-environment)
+6. [Step 4: Obtain the Database Dump](#step-4-obtain-the-database-dump)
+7. [Step 5: Start the Environment](#step-5-start-the-environment)
+8. [Step 6: Install the Plugin Dependencies](#step-6-install-the-plugin-dependencies)
+9. [Step 7: Verify the Setup](#step-7-verify-the-setup)
+10. [Running Tests](#running-tests)
+11. [Daily Usage Commands](#daily-usage-commands)
+12. [Access URLs and Credentials](#access-urls-and-credentials)
+13. [Services](#services)
+14. [Repository Structure](#repository-structure)
+15. [XDebug (IDE Debugging)](#xdebug-ide-debugging)
+16. [Git Workflow](#git-workflow)
+17. [CI/CD Pipeline](#cicd-pipeline)
+18. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Overview
 
-This guide walks through setting up a local development environment for the Guide on the Side project. The environment uses:
+This guide walks through setting up a local development environment for the Guide on the Side project. The environment uses **Lando** to orchestrate Docker containers with the following services:
 
-- **Docker & Docker Compose**: Container orchestration
-- **WordPress**: Content management system
-- **Pressbooks**: WordPress plugin for creating structured books/tutorials
-- **H5P**: Interactive content plugin for quizzes and activities
-- **MariaDB**: Database server
-- **phpMyAdmin**: Database administration interface
+- **PHP 8.3 + Nginx** — WordPress application server
+- **MariaDB 10.5.23** — Database
+- **Redis 5.0** — Object caching (optional)
+- **Node.js** — Frontend tooling and Jest tests
+- **Mailhog** — Email capture for testing
+
+The project uses the [Bedrock](https://roots.io/bedrock/) WordPress boilerplate, which separates WordPress core (`web/wp/`) from application code (`web/app/`), manages dependencies via Composer, and uses `.env` files for configuration.
+
+> **Important**: The local dev domain is `pressbooks.test`, **NOT** `localhost:8080`. These are different vhosts with different configurations.
 
 ---
 
 ## Prerequisites
 
-- **Operating System**: Linux (tested on CachyOS/Arch, should work on any Linux distro)
-- **Terminal access**: Required for all commands
-- **Browser**: For WordPress configuration
+- **Docker Desktop** (macOS/Windows) or **Docker Engine** (Linux)
+- **Lando** v3.21+ ([lando.dev](https://lando.dev))
+- **Git**
+- **A browser** (Firefox recommended — see [Troubleshooting](#secure-cookie-rejection) for why)
 
 ---
 
-## Step 1: Install Docker
+## Step 1: Install Lando
 
-### For Arch-based systems (CachyOS, Manjaro, EndeavourOS):
+Lando wraps Docker and provides per-project orchestration via `.lando.yml`.
+
+### macOS
 
 ```bash
-# Install Docker and Docker Compose
-sudo pacman -S docker docker-compose
+# Via Homebrew
+brew install lando
 
-# Enable and start Docker service
-sudo systemctl enable --now docker
-
-# Add your user to the docker group (avoids needing sudo for docker commands)
-sudo usermod -aG docker $USER
+# Or download the .dmg installer from https://lando.dev/download/
 ```
 
-### For Debian/Ubuntu-based systems:
+### Windows
+
+Download the installer from [lando.dev/download](https://lando.dev/download/). Requires WSL2 + Docker Desktop.
+
+### Linux (Debian/Ubuntu)
 
 ```bash
-# Update package index
-sudo apt update
-
-# Install Docker
-sudo apt install docker.io docker-compose
-
-# Enable and start Docker service
-sudo systemctl enable --now docker
-
-# Add your user to the docker group
-sudo usermod -aG docker $USER
+wget https://files.lando.dev/installer/lando-x64-stable.deb
+sudo dpkg -i lando-x64-stable.deb
 ```
 
-### IMPORTANT: After adding yourself to the docker group:
+### Linux (Arch-based)
 
-**You must log out and log back in** for the group change to take effect.
-
-Alternatively, run this command to apply the group change in your current session:
 ```bash
-newgrp docker
+# AUR
+yay -S lando-bin
 ```
 
-### Verify Installation:
+### Verify Installation
 
 ```bash
+lando version
 docker --version
-docker compose version
-groups $USER | grep docker
 ```
 
 ---
 
-## Step 2: Create Docker Compose Environment
+## Step 2: Clone the Repository
 
 ```bash
-# Create the project directory
-mkdir -p ~/pressbooks-simple
-cd ~/pressbooks-simple
-
-# Create the Dockerfile (adds PDO MySQL extension required by Pressbooks)
-cat > Dockerfile << 'EOF'
-FROM wordpress:php8.2-apache
-
-# Install PDO MySQL extension required by Pressbooks
-RUN docker-php-ext-install pdo_mysql
-EOF
-
-# Create the docker-compose.yml file
-cat > docker-compose.yml << 'EOF'
-services:
-  db:
-    image: mariadb:10.6
-    container_name: pressbooks_db
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: pressbooks
-      MYSQL_USER: pressbooks
-      MYSQL_PASSWORD: pressbooks_pw
-      MYSQL_ROOT_PASSWORD: root_pw
-    volumes:
-      - db_data:/var/lib/mysql
-
-  wordpress:
-    build: .
-    container_name: pressbooks_wp
-    restart: unless-stopped
-    depends_on:
-      - db
-    ports:
-      - "8080:80"
-    environment:
-      WORDPRESS_DB_HOST: db:3306
-      WORDPRESS_DB_NAME: pressbooks
-      WORDPRESS_DB_USER: pressbooks
-      WORDPRESS_DB_PASSWORD: pressbooks_pw
-    volumes:
-      - wp_data:/var/www/html
-      - ./wp-content:/var/www/html/wp-content
-
-  phpmyadmin:
-    image: phpmyadmin/phpmyadmin
-    container_name: pressbooks_pma
-    restart: unless-stopped
-    depends_on:
-      - db
-    ports:
-      - "8081:80"
-    environment:
-      PMA_HOST: db
-      PMA_PORT: 3306
-      PMA_USER: pressbooks
-      PMA_PASSWORD: pressbooks_pw
-
-volumes:
-  db_data:
-  wp_data:
-EOF
+git clone https://github.com/qixiang03/guide-on-the-side.git
+cd guide-on-the-side
 ```
 
 ---
 
-## Step 3: Start the Environment
+## Step 3: Configure Environment
+
+Lando's `pre-start` event automatically copies `.env.example` → `.env` and `config_services/.env.example` → `config_services/.env` if they don't exist. However, you should generate unique salts:
 
 ```bash
-cd ~/pressbooks-simple
-
-# Build and start all containers in detached mode
-docker compose up -d --build
-
-# Verify containers are running
-docker compose ps
+# Copy env files (Lando does this automatically, but doing it now lets you edit first)
+cp .env.example .env
+cp config_services/.env.example config_services/.env
 ```
 
-Wait about 30 seconds for all services to fully initialize before proceeding.
+### Generate Auth Salts
 
-**Note**: The `--build` flag ensures the custom WordPress image with PDO MySQL support is built. On subsequent starts, you can omit it unless you've changed the Dockerfile.
+1. Visit [roots.io/salts.html](https://roots.io/salts.html)
+2. Copy the generated salts
+3. Replace the `'generateme'` values in `.env`:
 
----
-
-## Step 4: Complete WordPress Installation
-
-1. Open your browser and navigate to: **http://localhost:8080**
-2. Fill in the WordPress installation wizard:
-   - **Site Title**: Guide on the Side (or your preferred name)
-   - **Username**: admin
-   - **Password**: admin
-   - **Email**: your-email@example.com
-3. Click **Install WordPress**
-4. Log in with the credentials you just created
-
----
-
-## Step 5: Enable WordPress Multisite
-
-Pressbooks requires WordPress Multisite to function.
-
-```bash
-# Add WP_ALLOW_MULTISITE to wp-config.php
-docker exec pressbooks_wp sed -i "/That's all, stop editing/i define('WP_ALLOW_MULTISITE', true);" /var/www/html/wp-config.php
-
-# Verify the change
-docker exec pressbooks_wp grep "WP_ALLOW_MULTISITE" /var/www/html/wp-config.php
+```env
+AUTH_KEY='your-generated-key'
+SECURE_AUTH_KEY='your-generated-key'
+LOGGED_IN_KEY='your-generated-key'
+NONCE_KEY='your-generated-key'
+AUTH_SALT='your-generated-salt'
+SECURE_AUTH_SALT='your-generated-salt'
+LOGGED_IN_SALT='your-generated-salt'
+NONCE_SALT='your-generated-salt'
 ```
 
-### Complete Network Setup in Browser:
+### Set Architecture (Apple Silicon / ARM)
 
-1. Go to **http://localhost:8080/wp-admin**
-2. Navigate to **Tools > Network Setup**
-3. Click **Install**
-4. WordPress will display configuration snippets - save these for the next step
+If you're on Apple Silicon (M1/M2/M3/M4), edit `config_services/.env`:
 
----
-
-## Step 6: Apply Network Configuration
-
-```bash
-# Add the multisite configuration after WP_ALLOW_MULTISITE
-docker exec pressbooks_wp sed -i "/define('WP_ALLOW_MULTISITE', true);/a\\
-define( 'MULTISITE', true );\\
-define( 'SUBDOMAIN_INSTALL', false );\\
-define( 'DOMAIN_CURRENT_SITE', 'localhost:8080' );\\
-define( 'PATH_CURRENT_SITE', '/' );\\
-define( 'SITE_ID_CURRENT_SITE', 1 );\\
-define( 'BLOG_ID_CURRENT_SITE', 1 );" /var/www/html/wp-config.php
+```env
+ARCHITECTURE=arm64
 ```
 
-### Create .htaccess file:
+For Intel/AMD systems:
 
-```bash
-docker exec pressbooks_wp bash -c 'cat > /var/www/html/.htaccess << "EOF"
-RewriteEngine On
-RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
-RewriteBase /
-RewriteRule ^index\.php$ - [L]
-
-# add a trailing slash to /wp-admin
-RewriteRule ^([_0-9a-zA-Z-]+/)?wp-admin$ $1wp-admin/ [R=301,L]
-
-RewriteCond %{REQUEST_FILENAME} -f [OR]
-RewriteCond %{REQUEST_FILENAME} -d
-RewriteRule ^ - [L]
-RewriteRule ^([_0-9a-zA-Z-]+/)?(wp-(content|admin|includes).*) $2 [L]
-RewriteRule ^([_0-9a-zA-Z-]+/)?(.*\.php)$ $2 [L]
-RewriteRule . index.php [L]
-EOF'
-```
-
-### Enable mod_rewrite and restart Apache:
-
-```bash
-docker exec pressbooks_wp a2enmod rewrite
-docker exec pressbooks_wp service apache2 restart
+```env
+ARCHITECTURE=amd64
 ```
 
 ---
 
-## Step 7: Install WP-CLI
+## Step 4: Obtain the Database Dump
+
+The project auto-imports a database dump on first start. You need the file `pb_local_db.sql` in the repository root.
+
+**Ask a team member** (Daniel or Enzo) for the current database dump, then place it at:
+
+```
+guide-on-the-side/pb_local_db.sql
+```
+
+This file is gitignored. On `lando start`, the `post-start` event automatically imports it into MariaDB.
+
+> **Note**: This dump is a **dev-team convenience only** — it contains the entire WordPress/Pressbooks database (users, multisite config, test content) so developers can skip manual setup. It is NOT part of the client deliverable. Melissa's library already runs Pressbooks; she only needs the `pb-split-guide/` plugin folder, which creates its own tables on activation via `dbDelta()`.
+
+> If you don't have a dump, you can set up WordPress from scratch (see [Manual WordPress Setup](#manual-wordpress-setup-without-db-dump) in Troubleshooting), but using the team dump is strongly recommended.
+
+---
+
+## Step 5: Start the Environment
 
 ```bash
-docker exec pressbooks_wp bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
+cd guide-on-the-side
+lando start
+```
 
-# Verify installation
-docker exec pressbooks_wp wp --version --allow-root
+This will:
+1. Pull/build Docker images (first run takes 5–10 minutes)
+2. Run `scripts/pressbooks_required_libraries.sh` (installs Java, epubcheck, PrinceXML, Saxon, Node.js, XSL extension)
+3. Run `composer install` (installs WordPress, Pressbooks, all plugins/themes)
+4. Copy `.env` files if missing
+5. Import `pb_local_db.sql` into the database
+
+When it finishes, Lando prints the proxy URLs:
+
+```
+APPSERVER NGINX URLS
+ https://pressbooks.test
+ http://pressbooks.test
+```
+
+> **First start is slow** due to the build step. Subsequent starts are much faster.
+
+---
+
+## Step 6: Install the Plugin Dependencies
+
+The `pb-split-guide` plugin has its own Composer dependencies (TCPDF for PDF certificates):
+
+```bash
+lando composer install --working-dir=web/app/plugins/pb-split-guide
 ```
 
 ---
 
-## Step 8: Install H5P Plugin
+## Step 7: Verify the Setup
 
-```bash
-docker exec pressbooks_wp wp plugin install h5p --activate --allow-root
-```
+1. **Frontend**: Open [https://pressbooks.test](https://pressbooks.test) — you should see the Pressbooks network catalog
+2. **WP Admin**: Open [https://pressbooks.test/wp/wp-admin/](https://pressbooks.test/wp/wp-admin/)
+3. **Network Admin**: Open [https://pressbooks.test/wp/wp-admin/network/](https://pressbooks.test/wp/wp-admin/network/)
+4. **phpMyAdmin**: Open [http://localhost:8081](http://localhost:8081) (if port is mapped)
+5. **Mailhog**: Open [http://localhost:8026](http://localhost:8026)
 
----
+### Verify the Plugin
 
-## Step 9: Install Pressbooks Plugin
-
-```bash
-# Install git in the container
-docker exec pressbooks_wp apt-get update
-docker exec pressbooks_wp apt-get install -y git unzip
-
-# Clone Pressbooks plugin
-docker exec pressbooks_wp bash -c "cd /var/www/html/wp-content/plugins && git clone https://github.com/pressbooks/pressbooks.git"
-
-# Install Composer in the container
-docker exec pressbooks_wp bash -c "curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer"
-
-# Install Pressbooks dependencies
-docker exec pressbooks_wp bash -c "cd /var/www/html/wp-content/plugins/pressbooks && composer install --no-dev"
-```
+1. Go to **Network Admin → Plugins**
+2. Confirm "PB Split Guide" is listed and network-activated
+3. Create or open a test book site
+4. Create a new page and assign the **"Split Guide"** template
+5. Check the **Split Guide Steps** metabox appears in the page editor
 
 ---
 
-## Step 10: Install Pressbooks Book Theme
+## Running Tests
+
+### PHPUnit (181 tests)
 
 ```bash
-# Clone the theme
-docker exec pressbooks_wp bash -c "cd /var/www/html/wp-content/themes && git clone https://github.com/pressbooks/pressbooks-book.git"
+# Full suite with testdox output
+lando phpunit --configuration phpunit.xml --testdox
 
-# Install theme dependencies
-docker exec pressbooks_wp bash -c "cd /var/www/html/wp-content/themes/pressbooks-book && composer install --no-dev"
+# Unit tests only
+lando phpunit --testsuite "UPEI Guide-on-the-Side Unit Tests"
+
+# Integration tests only
+lando phpunit --testsuite "UPEI Guide-on-the-Side Integration Smoke Tests"
+
+# Via composer script
+lando test
+
+# Without Lando (if PHP/Composer installed locally)
+vendor/bin/phpunit --configuration phpunit.xml --testdox
 ```
 
----
+Test results output to `build/logs/junit.xml` for CI.
 
-## Step 11: Activate Plugins and Theme
+### Jest (JavaScript tests)
 
 ```bash
-# Activate H5P network-wide
-docker exec pressbooks_wp wp plugin activate h5p --network --allow-root
-
-# Activate Pressbooks network-wide
-docker exec pressbooks_wp wp plugin activate pressbooks --network --allow-root
-
-# Enable the Pressbooks Book theme network-wide
-docker exec pressbooks_wp wp theme enable pressbooks-book --network --allow-root
+lando npm test
 ```
 
-### Verify installation:
+### Install Test Dependencies (first time)
 
 ```bash
-docker exec pressbooks_wp wp plugin list --allow-root
-docker exec pressbooks_wp wp theme list --allow-root
+lando install-tests
 ```
-
----
-
-## Step 12: Fix Pressbooks Cache Permissions
-
-Pressbooks uses a cache directory for compiled Blade templates.
-
-```bash
-docker exec pressbooks_wp bash -c "mkdir -p /var/www/html/wp-content/uploads/pressbooks/cache && chown -R www-data:www-data /var/www/html/wp-content/uploads/pressbooks && chmod -R 755 /var/www/html/wp-content/uploads/pressbooks"
-```
-
-After running this command, visit **http://localhost:8080/wp-admin/network/** to verify it loads without errors.
-
----
-
-## Step 13: Restart Environment (Recommended)
-
-After completing all setup steps, do a full restart to clear any cached errors:
-
-```bash
-cd ~/pressbooks-simple
-docker compose down
-docker compose up -d
-```
-
-Wait 30 seconds, then verify everything works:
-- http://localhost:8080/wp-admin/network/ (Network Admin)
-- Try creating a test site: **Sites > Add New**
-
-This avoids permission/cache issues that can occur during initial setup.
 
 ---
 
 ## Daily Usage Commands
 
-**Important**: All `docker compose` commands must be run from the `~/pressbooks-simple` directory (where `docker-compose.yml` is located). Always `cd` there first:
+All commands run from the repository root (`guide-on-the-side/`).
+
+### Starting and Stopping
 
 ```bash
-cd ~/pressbooks-simple
+lando start          # Start all services
+lando stop           # Stop services (preserves data)
+lando restart        # Restart all services
+lando rebuild        # Rebuild from scratch (re-runs build steps)
+lando destroy        # Remove containers and volumes (data loss!)
 ```
 
-Then you can run these commands:
+### Development Tools
 
 ```bash
-# Start environment
-docker compose up -d
-
-# Start environment (with rebuild if you changed the Dockerfile)
-docker compose up -d --build
-
-# Stop environment
-docker compose down
-
-# View logs (Ctrl+C to exit)
-docker compose logs -f
-
-# Check status
-docker compose ps
-
-# Access WordPress container shell (type 'exit' to leave)
-docker exec -it pressbooks_wp bash
-
-# Run WP-CLI commands
-docker exec pressbooks_wp wp plugin list --allow-root
+lando php <args>           # Run PHP CLI
+lando composer <args>      # Run Composer
+lando npm <args>           # Run npm
+lando node <args>          # Run Node.js
+lando phpunit <args>       # Run PHPUnit
+lando test                 # Run composer test script
 ```
 
-### Note: What Persists vs. What Doesn't
+### Database
 
-**Persists across restarts:**
-- WordPress files in `./wp-content` (plugins, themes, uploads)
-- Database in the `db_data` Docker volume
-
-**Doesn't persist (installed inside container):**
-- WP-CLI, git, unzip, composer - these are setup tools only
-
-If you need WP-CLI after a restart, reinstall it:
 ```bash
-docker exec pressbooks_wp bash -c "curl -O https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && chmod +x wp-cli.phar && mv wp-cli.phar /usr/local/bin/wp"
+# Import a SQL dump
+lando db-import-custom /app/path/to/dump.sql
+
+# Direct MySQL access
+lando mysql
+
+# Export database
+lando db-export dump.sql
 ```
+
+### Logs and Debugging
+
+```bash
+lando logs              # All service logs
+lando logs -s appserver # PHP/Nginx logs only
+lando logs -s database  # MariaDB logs only
+lando ssh               # Shell into the app container
+lando info              # Show all service URLs and ports
+```
+
+### What Persists vs. What Doesn't
+
+| Persists across `lando stop` / `lando start` | Persists across `lando rebuild` | Destroyed by `lando destroy` |
+|---|---|---|
+| Database data | Database data | Everything |
+| Composer vendor/ | — (re-runs `composer install`) | Everything |
+| `.env` files | `.env` files | Everything |
+| Uploaded files (`web/app/uploads/`) | Uploaded files | Everything |
 
 ---
 
 ## Access URLs and Credentials
 
+### URLs
+
 | Service | URL |
 |---------|-----|
-| WordPress/Pressbooks | http://localhost:8080 |
-| WordPress Admin | http://localhost:8080/wp-admin |
-| Network Admin | http://localhost:8080/wp-admin/network/ |
-| phpMyAdmin | http://localhost:8081 |
+| Pressbooks (frontend) | https://pressbooks.test |
+| WordPress Admin | https://pressbooks.test/wp/wp-admin/ |
+| Network Admin | https://pressbooks.test/wp/wp-admin/network/ |
+| Mailhog (email) | http://localhost:8026 |
 
-| Service | Username | Password |
-|---------|----------|----------|
-| WordPress Admin | admin | admin |
-| Database | pressbooks | pressbooks_pw |
-| Database Root | root | root_pw |
+> Admin credentials depend on your database dump. Ask a team member for the current credentials.
+
+### Database
+
+| Setting | Value |
+|---------|-------|
+| Host | `database` (from within containers) |
+| Port | `32778` (from host machine) |
+| Database | `pressbooks_oss` |
+| User | `pressbooks_oss_user` |
+| Password | `secretpassword` |
+
+Connect from a GUI tool (e.g., TablePlus, DBeaver):
+- Host: `127.0.0.1`
+- Port: `32778`
 
 ---
 
-## Folder Structure
+## Services
+
+| Service | Technology | Port (Host) | Notes |
+|---------|-----------|-------------|-------|
+| App Server | PHP 8.3 + Nginx | 80/443 via `pressbooks.test` | XDebug enabled |
+| Database | MariaDB 10.5.23 | 32778 | Persistent volume |
+| Redis | Redis 5.0 | 6380 | Optional object cache |
+| Node | Node.js (latest) | — | npm/Jest tooling |
+| Mailhog | Mailhog 1.0.1 | 8026 | Captures outgoing email |
+
+---
+
+## Repository Structure
 
 ```
-~/pressbooks-simple/          # Docker environment (local only, don't push)
-├── Dockerfile                # Custom WordPress image with PDO MySQL
-├── docker-compose.yml
-└── wp-content/
-
-~/guide-on-the-side/          # Team GitHub repo (push/pull here)
-├── docs/
-├── src/
-└── ...
+guide-on-the-side/
+├── .lando.yml                          # Lando configuration
+├── .env.example                        # Environment template
+├── .env                                # Local env (gitignored)
+├── composer.json / composer.lock       # Root dependencies
+├── package.json                        # Node/Jest config
+├── phpunit.xml                         # PHPUnit config
+├── pb_local_db.sql                     # Database dump (gitignored)
+│
+├── config/
+│   └── application.php                 # Bedrock WP configuration
+│
+├── config_services/
+│   ├── php.ini                         # PHP/XDebug settings
+│   ├── nginx.conf                      # Nginx vhost config
+│   ├── my.cnf                          # MariaDB config
+│   ├── .env                            # Service-level env (gitignored)
+│   └── .env.example                    # Service env template
+│
+├── scripts/
+│   ├── import_db.sh                    # Database import (used by Lando)
+│   ├── prepare_test_environment.sh     # PHPUnit test DB setup
+│   ├── prepare_acceptance_tests_environment.sh
+│   └── pressbooks_required_libraries.sh  # Build-time deps (Java, epubcheck, etc.)
+│
+├── web/
+│   ├── wp/                             # WordPress core (Composer-managed)
+│   └── app/
+│       ├── plugins/
+│       │   ├── pb-split-guide/         # ← THE PLUGIN (our code)
+│       │   │   ├── pb-split-guide.php          # Entry point
+│       │   │   ├── class-pbsg-analytics.php    # Analytics engine
+│       │   │   ├── class-pbsg-analytics-dashboard.php
+│       │   │   ├── includes/                   # Helper classes
+│       │   │   ├── templates/                  # Page templates
+│       │   │   ├── assets/                     # CSS/JS
+│       │   │   ├── accessibility-dashboard/    # A11y features
+│       │   │   └── vendor/                     # Plugin Composer deps (TCPDF)
+│       │   ├── pressbooks/             # Pressbooks core plugin
+│       │   ├── h5p/                    # H5P quiz plugin
+│       │   └── pressbooks-*/           # SSO, catalog, etc.
+│       ├── themes/                     # Aldine, Clarke, Donham, Jacobs
+│       ├── mu-plugins/                 # Must-use plugins (Bedrock)
+│       └── uploads/                    # Media uploads
+│
+├── tests/
+│   ├── bootstrap.php                   # Test bootstrap (loads stubs)
+│   ├── Unit/                           # 8 test classes
+│   └── Integration/                    # Smoke tests
+│
+├── docs/                               # Project documentation
+│   ├── DEV-SETUP-GUIDE.md              # ← You are here
+│   ├── DEPLOYMENT-STAGING.md
+│   ├── TUTORIAL-DATA-MODEL.md
+│   ├── TUTORIAL-STORAGE-SYSTEM.md
+│   └── ...
+│
+├── .github/workflows/ci.yml           # CI pipeline
+└── CLAUDE.local.md                     # AI context (gitignored)
 ```
+
+---
+
+## XDebug (IDE Debugging)
+
+XDebug is pre-configured and enabled. To use it with your IDE:
+
+### VS Code
+
+Install the **PHP Debug** extension, then add to `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Listen for Lando XDebug",
+      "type": "php",
+      "request": "launch",
+      "port": 9003,
+      "pathMappings": {
+        "/app/": "${workspaceFolder}/"
+      },
+      "hostname": "0.0.0.0"
+    }
+  ]
+}
+```
+
+### PHPStorm
+
+1. **Settings → PHP → Servers**: Add server named `appserver`, host `pressbooks.test`, port 443, debugger Xdebug
+2. Map `/app/` → your project root
+3. **Settings → PHP → Debug**: Port `9003`
+4. Click **Start Listening for PHP Debug Connections**
+
+### Configuration Reference
+
+The XDebug settings in `config_services/php.ini`:
+
+```ini
+xdebug.mode=debug
+xdebug.client_port=9003
+xdebug.start_with_request=yes
+xdebug.max_nesting_level=256
+```
+
+---
+
+## Git Workflow
+
+### Branch Strategy (Gitflow)
+
+| Branch | Purpose | Merges Into |
+|--------|---------|-------------|
+| `main` | Production (protected) | — |
+| `develop` | Integration (protected) | `main` via release |
+| `feature/{issue#}-{desc}` | New features | `develop` |
+| `bugfix/{issue#}-{desc}` | Bug fixes | `develop` |
+| `hotfix/{issue#}-{desc}` | Urgent fixes | `main` |
+| `release/*` | Release prep | `main` |
+
+### Commit Convention
+
+Format: `type(scope): description`
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`
+
+**Scopes**: `editor`, `student`, `quiz`, `embed`, `auth`, `api`, `ui`, `db`, `a11y`, `config`, `analytics`, `settings`
+
+Examples:
+```
+feat(analytics): add retry tracking columns
+fix(admin): reset sliders to site defaults
+docs(setup): update dev environment guide
+```
+
+### Pull Requests
+
+- Target: `main` (for releases) or `develop` (for features)
+- Strategy: **Squash and Merge**
+- Requirements: 1 reviewer + CI passing
+
+---
+
+## CI/CD Pipeline
+
+The GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on:
+- Push to `main`
+- Pull requests against `main`
+
+### Pipeline Steps
+
+1. Checkout code
+2. Set up PHP 8.3 (extensions: mbstring, xml, ctype, iconv, mysql, dom)
+3. `composer install`
+4. Run PHPUnit with JUnit output
+5. Archive test logs as artifact (`phpunit-test-log`)
+6. Auto-comment on PR with test results
 
 ---
 
 ## Troubleshooting
 
-### Docker Permission Denied
+### SSL Certificate Warning
+
+Lando uses self-signed certificates. Your browser will warn about this on first visit to `https://pressbooks.test`. Click **Advanced → Proceed** (or add an exception).
+
+### Secure Cookie Rejection
+
+`config/application.php` sets `$_SERVER['HTTPS'] = 'on'`, which can cause secure cookie rejection over plain HTTP. **Workarounds**:
+- Use `https://pressbooks.test` (recommended)
+- Use Firefox or incognito mode if cookies aren't sticking
+- This is a known issue — Daniel should fix server-side for production
+
+### "pressbooks.test" Doesn't Resolve
+
+Lando adds the proxy domain automatically on most systems. If it doesn't resolve:
 
 ```bash
-sudo usermod -aG docker $USER
-# Then log out and back in
+# macOS/Linux: Add manually to /etc/hosts
+echo "127.0.0.1 pressbooks.test" | sudo tee -a /etc/hosts
+
+# Verify
+ping pressbooks.test
 ```
 
-### Port Already in Use
+### Port Conflicts
+
+If port 32778 (MariaDB) or 8026 (Mailhog) is in use:
 
 ```bash
-sudo lsof -i :8080
-# Change port in docker-compose.yml to "8088:80" if needed
+# Check what's using the port
+lsof -i :32778
+lsof -i :8026
+
+# Change ports in .lando.yml under services → database → portforward / mailhog → portforward
 ```
 
-### Containers Not Starting
+### Lando Build Fails
 
 ```bash
-docker compose logs
-docker compose down
-docker compose up -d
+# View detailed build output
+lando rebuild --debug
+
+# Common fixes
+lando destroy        # Clean slate
+lando start          # Fresh build
 ```
 
-### Pressbooks Cache Error
+### Composer Memory Errors
 
 ```bash
-docker exec pressbooks_wp bash -c "mkdir -p /var/www/html/wp-content/uploads/pressbooks/cache && chown -R www-data:www-data /var/www/html/wp-content/uploads/pressbooks && chmod -R 755 /var/www/html/wp-content/uploads/pressbooks"
+# Increase PHP memory for Composer
+lando php -d memory_limit=-1 /usr/local/bin/composer install
 ```
 
-### PDO Driver Error ("could not find driver")
-
-If you see an error like `PDOException: could not find driver` when creating a new site, the PDO MySQL extension is missing. This happens if you're using the standard WordPress image instead of our custom Dockerfile.
-
-**Quick fix (temporary, won't survive container restart):**
-```bash
-docker exec pressbooks_wp docker-php-ext-install pdo_mysql
-docker exec pressbooks_wp service apache2 restart
-```
-
-**Permanent fix:** Ensure you have the `Dockerfile` in your `~/pressbooks-simple` directory and that `docker-compose.yml` uses `build: .` instead of `image: wordpress:php8.2-apache`. Then rebuild:
-```bash
-cd ~/pressbooks-simple
-docker compose down
-docker compose up -d --build
-```
-
-### Sub-site Shows "Critical Error" But Was Working Before
-
-This is often browser cache. Try:
-1. Hard refresh: `Ctrl+Shift+R`
-2. Open in incognito/private window
-3. Clear browser cache
-
-The site may actually be working - test with:
-```bash
-curl -I http://localhost:8080/your-site-name/
-# If you see "HTTP/1.1 200 OK" - the site works, it's browser cache
-```
-
-### Reset Everything (Nuclear Option)
+### Database Connection Errors
 
 ```bash
-cd ~/pressbooks-simple
-docker compose down -v
-docker compose up -d
+# Verify database is running
+lando info | grep database
+
+# Re-import the database
+lando db-import-custom /app/pb_local_db.sql
 ```
 
-**Warning**: This deletes all WordPress data!
+### PHPUnit Fails on First Run
 
----
+```bash
+# Install test environment first
+lando install-tests
 
-## Next Steps
+# Then run tests
+lando phpunit --configuration phpunit.xml --testdox
+```
 
-1. Create a test book in Pressbooks (Network Admin > Sites > Add New)
-2. Add H5P content to test interactive quizzes
-3. Test iframe embedding for the split-screen layout
+### TCPDF Warning in Tests
+
+The test bootstrap suppresses a benign `file_exists()` deprecation warning from TCPDF. This is expected — if you see it, the suppression may need updating.
+
+### Manual WordPress Setup (Without DB Dump)
+
+If you don't have `pb_local_db.sql`, you'll need to configure WordPress manually:
+
+1. `lando start` (skip the DB import error)
+2. Visit `https://pressbooks.test` and complete the WordPress installer
+3. Enable Multisite in `config/application.php` (already configured in Bedrock)
+4. Network-activate Pressbooks and H5P via **Network Admin → Plugins**
+5. Create a test book site via **Network Admin → Sites → Add New**
+6. Activate the `pb-split-guide` plugin on your test site
+
+This gives you a clean environment but without the team's shared test content.
+
+### Reset Everything
+
+```bash
+# Remove containers but keep code
+lando destroy
+
+# Start fresh
+lando start
+```
+
+**Warning**: `lando destroy` deletes all database data and container state.
 
 ---
 
 ## Notes
 
-**Tested Environment**: This guide was written and fully tested on a CachyOS (Arch-based) laptop on January 27, 2026. All commands verified working with Docker 29.x and WordPress 6.x.
+**Tested Environments**: This guide has been verified on macOS (Apple Silicon) and Linux (Arch-based) with Lando 3.21+ and Docker Desktop 4.x.
 
 **AI Disclosure**: This documentation was created with assistance from Claude AI (Anthropic). Per course policy, all AI-assisted work must be disclosed.
