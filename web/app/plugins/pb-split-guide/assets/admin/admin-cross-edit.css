@@ -53,6 +53,158 @@
   background: #e8f0dc;
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+ * Tutorial Owner metabox — unified identity card
+ *
+ * Rendered by render_owner_metabox() in pb-split-guide.php for all
+ * three states (owner, admin, non-owner). Shows an identity card
+ * (avatar + name + optional "You" badge + role) followed by either the
+ * Transfer Ownership button (owners + admins) or a "Contact the owner"
+ * mailto link (non-owner non-admin).
+ *
+ * Palette:  #333333 text · #517E1B green accent · #F8F8F8 surface
+ *           #E0E0E0 border · #6B6B6B muted
+ * Typography: Roboto (body) / Roboto Condensed (role + CTA)
+ * ────────────────────────────────────────────────────────────────────── */
+
+.pbsg-owner-metabox--card {
+  font-family: 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
+  color: #333333;
+  margin: 0;
+}
+
+.pbsg-owner-metabox--card .pbsg-owner-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #F8F8F8;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.pbsg-owner-card__avatar-wrap {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pbsg-owner-card__avatar-wrap img,
+.pbsg-owner-card__avatar {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+}
+
+.pbsg-owner-card__avatar-wrap--placeholder {
+  color: #6B6B6B;
+}
+
+.pbsg-owner-card__avatar-wrap--placeholder .pbsg-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.pbsg-owner-card__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.pbsg-owner-card__name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pbsg-owner-card__name {
+  font-family: 'Roboto', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.3;
+  color: #333333;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.pbsg-owner-card__name-row .pbsg-owner-badge--self {
+  flex-shrink: 0;
+  font-size: 10px;
+  line-height: 1.4;
+  padding: 1px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+
+.pbsg-owner-card__role {
+  font-family: 'Roboto Condensed', 'Roboto', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6B6B6B;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Transfer Ownership button when embedded in the identity card metabox */
+.pbsg-owner-metabox--card .pbsg-owner-metabox__action.pbsg-transfer-single {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin: 0;
+}
+
+.pbsg-owner-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Roboto Condensed', 'Roboto', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #517E1B;
+  text-decoration: none;
+  padding: 6px 0;
+  border-radius: 3px;
+  transition: color 0.15s ease;
+}
+
+.pbsg-owner-contact:hover,
+.pbsg-owner-contact:focus {
+  color: #3F6415;
+  text-decoration: underline;
+  outline: none;
+}
+
+.pbsg-owner-contact:focus-visible {
+  outline: 2px solid #517E1B;
+  outline-offset: 2px;
+}
+
+.pbsg-owner-contact .pbsg-icon {
+  width: 14px;
+  height: 14px;
+}
+
 /* My Tutorials tabs */
 .pbsg-tutorials-tabs {
   display: flex;

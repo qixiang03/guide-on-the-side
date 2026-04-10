@@ -3,6 +3,31 @@
    Card-based step editor with inline quiz authoring
    ================================================================ */
 
+/* ── Marginalia icon baseline ─────────────────────────────────
+   All .pbsg-icon SVGs share: inline-block, square 1em box,
+   currentColor stroke, vertical-aligned with adjacent text.
+   Local variants may override size/stroke via .pbsg-icon--NAME.
+   ─────────────────────────────────────────────────────────────── */
+.pbsg-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+  stroke: currentColor;
+  fill: none;
+  overflow: visible;
+}
+.pbsg-icon--ok    { color: var(--pbsg-green); }
+.pbsg-icon--warn  { color: var(--pbsg-red); }
+.pbsg-icon--muted { color: var(--pbsg-grey-mid); }
+/* Contexts where we want a larger glyph */
+.pbsg-section-icon .pbsg-icon,
+.pbsg-panel-icon .pbsg-icon,
+.pbsg-empty-icon .pbsg-icon { width: 1.25em; height: 1.25em; }
+.pbsg-empty-icon .pbsg-icon { width: 48px; height: 48px; }
+
+
 /* ── Design Tokens ─────────────────────────────────────────── */
 :root {
   --pbsg-green: #517E1B;
@@ -271,6 +296,32 @@
   color: var(--pbsg-grey-mid);
   margin-top: 4px;
   line-height: 1.6;
+}
+
+/* Close Tutorial Behavior — two-state bullet list */
+.pbsg-close-url-states {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--pbsg-grey-mid);
+  line-height: 1.6;
+}
+
+.pbsg-close-url-states li {
+  position: relative;
+  padding-left: 14px;
+  margin: 0;
+}
+
+.pbsg-close-url-states li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.65em;
+  width: 6px;
+  height: 1px;
+  background: var(--pbsg-green, #517E1B);
 }
 
 .pbsg-field-hint code {

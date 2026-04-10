@@ -1,3 +1,17 @@
+/* ── Marginalia icon baseline (analytics) ──────────────────── */
+.pbsg-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+  stroke: currentColor;
+  fill: none;
+  overflow: visible;
+}
+.pbsg-empty-icon .pbsg-icon { width: 48px; height: 48px; color: #646970; }
+.pbsg-badge .pbsg-icon { width: 0.9em; height: 0.9em; }
+
 /**
  * Analytics Dashboard Styles — UPEI Library Design System
  *
