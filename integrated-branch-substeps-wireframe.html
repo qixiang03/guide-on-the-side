@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Integrated Branching + Give-Up Design — Final Spec v2</title>
+<style>
+  :root {
+    --gots-dark: #333333;
+    --gots-green: #517E1B;
+    --gots-red: #8C2004;
+    --gots-light: #F8F8F8;
+    --gots-border: #E0E0E0;
+    --gots-blue: #2271b1;
+    --gots-amber: #E6A817;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Roboto', Arial, sans-serif; background: #eee; color: var(--gots-dark); }
+
+  .page-label {
+    text-align: center; padding: 18px; background: var(--gots-dark); color: #fff;
+    font-family: 'Lusitana', Georgia, serif; font-size: 20px;
+  }
+  .page-label span { font-size: 13px; opacity: .7; display: block; margin-top: 4px; }
+
+  .section-divider {
+    max-width: 1100px; margin: 40px auto 16px; padding-bottom: 8px;
+    border-bottom: 3px solid var(--gots-dark);
+    font-family: 'Lusitana', Georgia, serif; font-size: 22px;
+  }
+  .section-divider small { font-size: 13px; font-weight: normal; color: #666; display: block; margin-top: 2px; }
+
+  .state-label {
+    text-align: center; padding: 8px 16px; font-size: 13px; font-weight: bold; letter-spacing: .3px;
+    max-width: 1100px; margin: 0 auto;
+  }
+  .state-label.normal { background: #e8f5e9; color: #2e7d32; }
+  .state-label.branch-trigger { background: #fff3e0; color: #e65100; }
+  .state-label.giveup { background: #fce4ec; color: #c62828; }
+  .state-label.info { background: #e3f2fd; color: #1565c0; }
+
+  /* ── Split screen ── */
+  .split-wrap {
+    display: flex; max-width: 1100px; margin: 0 auto; height: 380px; background: #fff;
+    border: 1px solid var(--gots-border); border-top: none;
+  }
+  .left-pane {
+    width: 40%; border-right: 2px solid var(--gots-border);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .right-pane {
+    width: 60%; background: var(--gots-light); display: flex; align-items: center; justify-content: center;
+  }
+
+  .quiz-header {
+    padding: 10px 16px; background: var(--gots-green); color: #fff;
+    font-size: 13px; display: flex; justify-content: space-between; align-items: center;
+  }
+
+  .quiz-area {
+    flex: 1; overflow-y: auto; padding: 16px;
+  }
+  .h5p-placeholder {
+    border: 2px dashed var(--gots-border); border-radius: 8px; padding: 24px 16px;
+    text-align: center; color: #888; font-size: 14px; background: #fafafa;
+  }
+
+  .nav-bar {
+    padding: 10px 16px; border-top: 1px solid var(--gots-border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .nav-bar button {
+    padding: 8px 20px; border: 1px solid var(--gots-border); border-radius: 4px;
+    cursor: pointer; font-size: 14px; background: #fff;
+  }
+  .nav-bar button.primary { background: var(--gots-green); color: #fff; border-color: var(--gots-green); }
+  .nav-bar button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .progress-wrap { height: 4px; background: var(--gots-border); }
+  .progress-fill { height: 100%; transition: width .3s; }
+
+  .iframe-placeholder {
+    text-align: center; color: #999; font-size: 14px; padding: 20px;
+  }
+  .iframe-placeholder .icon { font-size: 48px; margin-bottom: 8px; }
+
+  /* ── Admin panel mockups ── */
+  .admin-panel {
+    max-width: 1100px; margin: 16px auto; background: #fff; border: 1px solid var(--gots-border);
+    border-radius: 8px; overflow: hidden;
+  }
+  .admin-panel-header {
+    padding: 12px 20px; background: #23282d; color: #fff; font-size: 14px;
+  }
+  .admin-panel-body { padding: 20px; }
+
+  .admin-field { margin-bottom: 16px; }
+  .admin-field label { display: block; font-weight: bold; font-size: 13px; margin-bottom: 4px; color: var(--gots-dark); }
+  .admin-field input[type="text"],
+  .admin-field input[type="number"],
+  .admin-field textarea,
+  .admin-field select {
+    width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+  }
+  .admin-field textarea { min-height: 60px; resize: vertical; }
+  .admin-field small { color: #888; font-size: 12px; display: block; margin-top: 2px; }
+
+  .toggle-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .toggle-switch {
+    width: 44px; height: 24px; border-radius: 12px; position: relative; cursor: pointer; flex-shrink: 0;
+  }
+  .toggle-switch.off { background: #ccc; }
+  .toggle-switch.on { background: var(--gots-green); }
+  .toggle-switch.on-amber { background: var(--gots-amber); }
+  .toggle-switch::after {
+    content: ''; position: absolute; top: 2px; width: 20px; height: 20px;
+    border-radius: 50%; background: #fff; transition: left .2s;
+  }
+  .toggle-switch.off::after { left: 2px; }
+  .toggle-switch.on::after, .toggle-switch.on-amber::after { left: 22px; }
+  .toggle-label { font-size: 14px; }
+  .toggle-label strong { display: block; }
+  .toggle-label small { color: #888; font-size: 12px; }
+
+  .disabled-row { opacity: .35; pointer-events: none; }
+
+  .sub-config {
+    margin-left: 56px; padding: 12px 16px; background: #fafafa;
+    border-left: 3px solid var(--gots-green); border-radius: 0 4px 4px 0;
+    margin-bottom: 12px;
+  }
+  .sub-config.amber { border-left-color: var(--gots-amber); background: #fffdf0; }
+
+  /* ── Menu mockups ── */
+  .menu-dropdown {
+    background: #fff; border: 1px solid var(--gots-border); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.12); padding: 8px 0; min-width: 260px;
+  }
+  .menu-item {
+    padding: 10px 16px; font-size: 14px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .menu-item:last-child { border-bottom: none; }
+  .menu-item .num {
+    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: bold; flex-shrink: 0;
+  }
+  .menu-item .num.green { background: #c8e6c9; color: #2e7d32; }
+  .menu-item .num.red { background: #fdecea; color: var(--gots-red); }
+  .menu-item .num.active { background: var(--gots-green); color: #fff; }
+  .menu-item .num.grey { background: var(--gots-border); color: #999; }
+  .menu-item .num.amber { background: #ffe0b2; color: #e65100; }
+  .menu-item.current { background: #f0f8ff; font-weight: bold; }
+  .menu-item.disabled { opacity: .4; }
+
+  /* ── Give-up box ── */
+  .giveup-box {
+    margin-top: 12px; padding: 14px; border-radius: 8px;
+    border: 1px solid #ef9a9a; background: #fff5f5;
+  }
+  .giveup-box .giveup-header {
+    font-size: 13px; font-weight: bold; color: var(--gots-red); margin-bottom: 8px;
+  }
+  .giveup-box .correct-answer {
+    font-size: 15px; font-weight: bold; color: var(--gots-dark); margin-bottom: 6px;
+  }
+  .giveup-box .explanation {
+    font-size: 14px; color: #555; line-height: 1.5;
+  }
+
+  /* ── Comparison table ── */
+  .rule-table {
+    max-width: 1100px; margin: 16px auto; border-collapse: collapse; width: 100%; font-size: 13px;
+  }
+  .rule-table th { background: var(--gots-dark); color: #fff; padding: 10px 12px; text-align: left; }
+  .rule-table td { padding: 10px 12px; border-bottom: 1px solid var(--gots-border); }
+  .rule-table tr:nth-child(even) { background: #fafafa; }
+
+  /* ── Notes ── */
+  .notes {
+    max-width: 1100px; margin: 20px auto; padding: 20px; background: #fff;
+    border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+  .notes h2 { font-family: 'Lusitana', Georgia, serif; margin-bottom: 12px; }
+  .notes p { font-size: 14px; line-height: 1.6; margin-bottom: 8px; }
+  .notes code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+
+  .flow-box {
+    font-family: monospace; font-size: 13px; line-height: 1.8; padding: 16px;
+    background: #1e1e1e; color: #d4d4d4; border-radius: 8px; overflow-x: auto;
+    white-space: pre; margin: 12px 0;
+  }
+  .flow-box .green { color: #6A9955; }
+  .flow-box .red { color: #F44747; }
+  .flow-box .amber { color: #DCDCAA; }
+  .flow-box .blue { color: #569CD6; }
+</style>
+</head>
+<body>
+
+<div class="page-label">
+  Integrated Branching + Give-Up Design — Final Spec v2
+  <span>Resolved from Enzo's clarifications on 2026-03-24 | Targets: main branch via feature/branch-substeps-integration</span>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART A: ADMIN / LIBRARIAN AUTHORING UI
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part A: Librarian Authoring — Quiz Toggle Configuration
+  <small>What the librarian sees when creating/editing a step's inline quiz</small>
+</div>
+
+<!-- ADMIN: Main quiz with branching toggled ON -->
+<div class="admin-panel">
+  <div class="admin-panel-header">Step 3 — Quiz Settings (Main Quiz)</div>
+  <div class="admin-panel-body">
+
+    <div class="admin-field">
+      <label>Quiz Type</label>
+      <select><option>Multiple Choice</option></select>
+    </div>
+    <div class="admin-field">
+      <label>Question</label>
+      <input type="text" value="Which catalog search finds journal articles?">
+    </div>
+
+    <div style="border-top: 2px solid var(--gots-border); margin: 20px 0 16px; padding-top: 16px;">
+      <div style="font-size: 15px; font-weight: bold; margin-bottom: 12px;">Quiz Behavior</div>
+
+      <!-- Branching Toggle (ON) -->
+      <div class="toggle-row">
+        <div class="toggle-switch on"></div>
+        <div class="toggle-label">
+          <strong>Enable Branching</strong>
+          <small>After max attempts, student is routed to sub-questions. Main quiz is marked as failed.</small>
+        </div>
+      </div>
+
+      <!-- Branching sub-config -->
+      <div class="sub-config">
+        <div class="admin-field" style="margin-bottom:12px;">
+          <label>Max attempts before branching triggers</label>
+          <input type="number" value="3" min="1" max="20" style="width:100px;">
+          <small>Default: 3. After this many wrong answers, branching questions appear.</small>
+        </div>
+        <div class="admin-field" style="margin-bottom:12px;">
+          <label>Number of branching sub-questions</label>
+          <select style="width:100px;"><option>1</option><option selected>2</option></select>
+          <small>Up to 2 branching sub-questions per main quiz.</small>
+        </div>
+        <div style="background:#fff; border:1px solid var(--gots-border); border-radius:6px; padding:14px; margin-bottom:10px;">
+          <div style="font-weight:bold; font-size:13px; margin-bottom:8px;">Sub-Question 3a</div>
+          <div class="admin-field" style="margin-bottom:8px;">
+            <label>Quiz Type</label>
+            <select><option>Multiple Choice</option></select>
+          </div>
+          <div class="admin-field" style="margin-bottom:8px;">
+            <label>Question</label>
+            <input type="text" value="What is the difference between a catalog and a database?">
+          </div>
+          <div class="admin-field" style="margin-bottom:8px;">
+            <label>Tutorial Content (Right Pane)</label>
+            <div style="display:flex;gap:8px;">
+              <label style="font-weight:normal;font-size:13px;"><input type="radio" name="3a_tut" checked> URL</label>
+              <label style="font-weight:normal;font-size:13px;"><input type="radio" name="3a_tut"> Upload File</label>
+            </div>
+            <input type="text" value="https://library.upei.ca/help/catalog-basics" style="margin-top:4px;">
+          </div>
+          <!-- Give-up toggle for sub-question -->
+          <div class="toggle-row" style="border-bottom:none; padding-bottom:0;">
+            <div class="toggle-switch on-amber" style="width:36px;height:20px;"></div>
+            <div class="toggle-label">
+              <strong style="font-size:13px;">Enable Give-Up</strong>
+              <small>After max attempts, reveal answer and let student move on.</small>
+            </div>
+          </div>
+          <div class="sub-config amber" style="margin-left:48px;">
+            <div class="admin-field" style="margin-bottom:8px;">
+              <label>Max attempts before give-up</label>
+              <input type="number" value="3" min="1" style="width:80px;">
+            </div>
+            <div class="admin-field" style="margin-bottom:0;">
+              <label>Explanation text (shown on give-up, optional)</label>
+              <textarea placeholder="Explain the correct answer to help the student understand...">A catalog lists what the library physically owns, while a database indexes articles from many journals.</textarea>
+              <small>The correct H5P answer is auto-displayed. This adds context.</small>
+            </div>
+          </div>
+        </div>
+        <div style="background:#fff; border:1px solid var(--gots-border); border-radius:6px; padding:14px;">
+          <div style="font-weight:bold; font-size:13px; margin-bottom:8px;">Sub-Question 3b</div>
+          <div class="admin-field" style="margin-bottom:8px;">
+            <label>Question</label>
+            <input type="text" value="Which filter narrows results to peer-reviewed articles only?">
+          </div>
+          <div class="toggle-row" style="border-bottom:none; padding-bottom:0;">
+            <div class="toggle-switch off" style="width:36px;height:20px;"></div>
+            <div class="toggle-label">
+              <strong style="font-size:13px;">Enable Give-Up</strong>
+              <small>Off — student must answer correctly to proceed.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Give-Up Toggle (DISABLED because Branching is ON) -->
+      <div class="toggle-row disabled-row">
+        <div class="toggle-switch off"></div>
+        <div class="toggle-label">
+          <strong>Enable Give-Up</strong>
+          <small>Disabled when Branching is enabled. Only one can be active.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN: Main quiz with give-up toggled ON -->
+<div class="admin-panel">
+  <div class="admin-panel-header">Step 5 — Quiz Settings (Main Quiz — Give-Up Enabled, No Branching)</div>
+  <div class="admin-panel-body">
+    <div class="admin-field">
+      <label>Question</label>
+      <input type="text" value="How do you export a citation in APA format?">
+    </div>
+
+    <div style="border-top: 2px solid var(--gots-border); margin: 20px 0 16px; padding-top: 16px;">
+      <div style="font-size: 15px; font-weight: bold; margin-bottom: 12px;">Quiz Behavior</div>
+
+      <div class="toggle-row disabled-row">
+        <div class="toggle-switch off"></div>
+        <div class="toggle-label">
+          <strong>Enable Branching</strong>
+          <small>Disabled when Give-Up is enabled. Only one can be active.</small>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-switch on-amber"></div>
+        <div class="toggle-label">
+          <strong>Enable Give-Up</strong>
+          <small>After max attempts, reveal correct answer and unlock Next button.</small>
+        </div>
+      </div>
+
+      <div class="sub-config amber">
+        <div class="admin-field" style="margin-bottom:8px;">
+          <label>Max attempts before give-up</label>
+          <input type="number" value="5" min="1" style="width:80px;">
+        </div>
+        <div class="admin-field" style="margin-bottom:0;">
+          <label>Explanation text (optional)</label>
+          <textarea placeholder="Explain the correct answer...">Click the citation icon (") next to the article, then select APA 7th from the format dropdown. Click "Copy" to copy it to your clipboard.</textarea>
+          <small>Auto-extracted H5P answer + this custom explanation are both shown.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART B: STUDENT-FACING UX — NORMAL FLOW
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part B: Student UX — Normal Quiz Flow (No Branching Triggered)
+  <small>Student sees a seamless linear quiz flow. No awareness of branching configuration.</small>
+</div>
+
+<div class="state-label normal">7 main questions | Progress: Q3 of 7 | Student answering normally</div>
+<div class="split-wrap">
+  <div class="left-pane">
+    <div class="quiz-header">
+      <span>☰ Steps</span>
+      <span>Page 3 of 7</span>
+    </div>
+    <div class="quiz-area">
+      <div class="h5p-placeholder">
+        📝 H5P Quiz<br>
+        <small>"Which catalog search finds journal articles?"</small><br><br>
+        <small style="color:#aaa;">Next locked until correct | Unlimited retries (no branching/give-up configured)</small>
+      </div>
+    </div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:42.8%;background:var(--gots-green);"></div></div>
+    <div class="nav-bar">
+      <button>← Prev</button>
+      <span style="font-size:13px;color:#666;">Page 3 of 7</span>
+      <button class="primary" disabled>Next →</button>
+    </div>
+  </div>
+  <div class="right-pane">
+    <div class="iframe-placeholder">
+      <div class="icon">🌐</div>Library Catalog<br><small>(60% width)</small>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART C: BRANCHING TRIGGER
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part C: Student UX — Branching Triggered
+  <small>Student answered Q3 wrong 3 times → sub-questions 3a and 3b injected → total becomes 9</small>
+</div>
+
+<div class="state-label branch-trigger">
+  Q3 answered wrong 3× → marked permanently wrong → sub-Qs injected: [1, 2, 3*, <strong>3a, 3b</strong>, 4, 5, 6, 7] → total 9
+</div>
+<div class="split-wrap">
+  <div class="left-pane">
+    <div class="quiz-header">
+      <span>☰ Steps</span>
+      <span>Page 4 of 9</span>
+    </div>
+    <div class="quiz-area">
+      <div class="h5p-placeholder">
+        📝 H5P Quiz (Sub-Question 3a)<br>
+        <small>"What is the difference between a catalog and a database?"</small><br><br>
+        <small style="color:#aaa;">Student doesn't know this is a "branch" — it's just the next question</small>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div style="height:100%;display:flex;">
+        <div style="width:33.3%;background:var(--gots-green);"></div>
+        <div style="width:11.1%;background:var(--gots-green);"></div>
+        <div style="width:55.6%;background:var(--gots-border);"></div>
+      </div>
+    </div>
+    <div class="nav-bar">
+      <button>← Prev</button>
+      <span style="font-size:13px;color:#666;">Page 4 of 9</span>
+      <button class="primary" disabled>Next →</button>
+    </div>
+  </div>
+  <div class="right-pane">
+    <div class="iframe-placeholder">
+      <div class="icon">📚</div>
+      <strong>Branch tutorial content</strong><br>
+      <small>library.upei.ca/help/catalog-basics</small><br>
+      <small style="color:#999;">Loaded from librarian-configured branch URL</small>
+    </div>
+  </div>
+</div>
+
+<div style="max-width:1100px; margin:12px auto; font-size:13px; color:#666; text-align:center;">
+  ↑ Notice: the student sees "Page 4 of 9" — no "branch" or "review" language anywhere. It's just the next question.
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART D: GIVE-UP FLOW
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part D: Student UX — Give-Up Triggered
+  <small>Student hit max attempts on a give-up quiz → correct answer revealed, Next unlocked</small>
+</div>
+
+<div class="state-label giveup">
+  Q5 answered wrong 5× (give-up threshold) → correct answer + explanation revealed → Next unlocked
+</div>
+<div class="split-wrap" style="height:440px;">
+  <div class="left-pane">
+    <div class="quiz-header">
+      <span>☰ Steps</span>
+      <span>Page 6 of 9</span>
+    </div>
+    <div class="quiz-area">
+      <div class="h5p-placeholder" style="border-color:#ef9a9a; background:#fff5f5;">
+        📝 H5P Quiz (Give-Up State)<br>
+        <small>"How do you export a citation in APA format?"</small><br>
+        <small style="color:var(--gots-red);">5 incorrect attempts — maximum reached</small>
+      </div>
+
+      <!-- THE GIVE-UP BOX -->
+      <div class="giveup-box">
+        <div class="giveup-header">Correct Answer</div>
+        <div class="correct-answer">Click the citation icon (") → select APA 7th → Copy</div>
+        <div class="explanation">
+          <strong>Explanation:</strong> Click the citation icon (") next to the article, then select APA 7th from the format dropdown. Click "Copy" to copy it to your clipboard.
+        </div>
+        <div style="margin-top:8px; font-size:12px; color:#999;">
+          ↑ H5P correct answer auto-extracted + librarian explanation
+        </div>
+      </div>
+    </div>
+    <div class="progress-wrap"><div class="progress-fill" style="width:66.7%;background:var(--gots-green);"></div></div>
+    <div class="nav-bar">
+      <button>← Prev</button>
+      <span style="font-size:13px;color:#666;">Page 6 of 9</span>
+      <button class="primary">Next →</button>
+    </div>
+  </div>
+  <div class="right-pane">
+    <div class="iframe-placeholder">
+      <div class="icon">🌐</div>Library citation page
+    </div>
+  </div>
+</div>
+
+<div style="max-width:1100px; margin:12px auto; font-size:13px; color:#666; text-align:center;">
+  ↑ Next button is now ENABLED (green). Student can proceed. Quiz marked as given-up in summary.
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART E: NAVIGATION RULES
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part E: Navigation Rules — Back/Forward with State Preservation
+  <small>All previous answers preserved. Forward limited to furthest reached step.</small>
+</div>
+
+<div style="max-width:1100px; margin:16px auto; display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
+
+  <!-- Scenario 1: Student on 3a, going back -->
+  <div>
+    <div style="text-align:center;font-size:13px;font-weight:bold;margin-bottom:8px;color:#e65100;">Student on Q3a</div>
+    <div class="menu-dropdown">
+      <div class="menu-item"><div class="num green">✓</div> Q1 <span style="margin-left:auto;font-size:11px;color:#2e7d32;">correct</span></div>
+      <div class="menu-item"><div class="num green">✓</div> Q2 <span style="margin-left:auto;font-size:11px;color:#2e7d32;">correct</span></div>
+      <div class="menu-item"><div class="num red">✗</div> Q3 <span style="margin-left:auto;font-size:11px;color:var(--gots-red);">wrong (3×)</span></div>
+      <div class="menu-item current"><div class="num active">→</div> <strong>Q3a</strong></div>
+      <div class="menu-item disabled"><div class="num grey">3b</div> Q3b</div>
+      <div class="menu-item disabled"><div class="num grey">4</div> Q4</div>
+      <div class="menu-item disabled"><div class="num grey">...</div></div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:#555;text-align:center;">
+      ← Back: can go to Q1, Q2, or Q3*<br>
+      → Forward: only to Q3a (current)<br>
+      <small>*Q3 shows last wrong attempt state</small>
+    </div>
+  </div>
+
+  <!-- Scenario 2: Student finished 3a, 3b, now on Q4 -->
+  <div>
+    <div style="text-align:center;font-size:13px;font-weight:bold;margin-bottom:8px;color:#2e7d32;">Student on Q4 (branches done)</div>
+    <div class="menu-dropdown">
+      <div class="menu-item"><div class="num green">✓</div> Q1</div>
+      <div class="menu-item"><div class="num green">✓</div> Q2</div>
+      <div class="menu-item"><div class="num red">✗</div> Q3 <span style="margin-left:auto;font-size:11px;color:var(--gots-red);">wrong</span></div>
+      <div class="menu-item"><div class="num green" style="width:22px;height:22px;font-size:9px;">✓</div> <span style="font-size:13px;">Q3a</span></div>
+      <div class="menu-item"><div class="num green" style="width:22px;height:22px;font-size:9px;">✓</div> <span style="font-size:13px;">Q3b</span></div>
+      <div class="menu-item current"><div class="num active">→</div> <strong>Q4</strong></div>
+      <div class="menu-item disabled"><div class="num grey">5</div> Q5</div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:#555;text-align:center;">
+      ← Back: Q1, Q2, Q3, Q3a, Q3b<br>
+      → Forward: only to Q4 (current)<br>
+      <small>All show preserved states</small>
+    </div>
+  </div>
+
+  <!-- Scenario 3: Student went back from 3a to Q1, now going forward -->
+  <div>
+    <div style="text-align:center;font-size:13px;font-weight:bold;margin-bottom:8px;color:#1565c0;">Went back from Q3a to Q1, going forward</div>
+    <div class="menu-dropdown">
+      <div class="menu-item current"><div class="num active">→</div> <strong>Q1</strong> <span style="margin-left:auto;font-size:11px;color:#2e7d32;">✓</span></div>
+      <div class="menu-item"><div class="num green">✓</div> Q2</div>
+      <div class="menu-item"><div class="num red">✗</div> Q3 <span style="margin-left:auto;font-size:11px;color:var(--gots-red);">wrong</span></div>
+      <div class="menu-item"><div class="num amber">3a</div> Q3a <span style="margin-left:auto;font-size:11px;color:#888;">furthest</span></div>
+      <div class="menu-item disabled"><div class="num grey">3b</div> Q3b</div>
+      <div class="menu-item disabled"><div class="num grey">4</div> Q4</div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:#555;text-align:center;">
+      → Forward: Q2, Q3, or Q3a<br>
+      (but NOT Q3b — hasn't reached it yet)<br>
+      <small>Forward limited to furthest reached</small>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART F: TOGGLE LOGIC RULES TABLE
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part F: Complete Toggle Logic Rules
+</div>
+
+<table class="rule-table">
+  <thead>
+    <tr>
+      <th>Quiz Type</th>
+      <th>Branching</th>
+      <th>Give-Up</th>
+      <th>On Max Attempts</th>
+      <th>Next Button</th>
+      <th>Summary Display</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Main — Neither</strong></td>
+      <td>OFF</td>
+      <td>OFF</td>
+      <td>Unlimited retries</td>
+      <td>Locked until correct</td>
+      <td>✅ Correct (N attempts)</td>
+    </tr>
+    <tr>
+      <td><strong>Main — Branching</strong></td>
+      <td>ON (max N)</td>
+      <td>OFF (disabled)</td>
+      <td>Sub-Qs injected, main marked wrong permanently</td>
+      <td>Auto-advances to sub-Q after trigger</td>
+      <td>❌ Wrong (N attempts, branched)</td>
+    </tr>
+    <tr>
+      <td><strong>Main — Give-Up</strong></td>
+      <td>OFF (disabled)</td>
+      <td>ON (max N)</td>
+      <td>Answer + explanation revealed, Next unlocked</td>
+      <td>Unlocked after give-up</td>
+      <td>⚠ Given up (N attempts)</td>
+    </tr>
+    <tr>
+      <td><strong>Branch sub-Q — Neither</strong></td>
+      <td>N/A (not available)</td>
+      <td>OFF</td>
+      <td>Unlimited retries</td>
+      <td>Locked until correct</td>
+      <td>&nbsp;&nbsp;↳ ✅ Correct (N attempts)</td>
+    </tr>
+    <tr>
+      <td><strong>Branch sub-Q — Give-Up</strong></td>
+      <td>N/A (not available)</td>
+      <td>ON (max M)</td>
+      <td>Answer + explanation revealed, Next unlocked</td>
+      <td>Unlocked after give-up</td>
+      <td>&nbsp;&nbsp;↳ ⚠ Given up (M attempts)</td>
+    </tr>
+  </tbody>
+</table>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART G: SUMMARY SCREEN
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part G: Summary Screen — With Branch + Give-Up Results
+</div>
+
+<div class="admin-panel" style="max-width:600px;">
+  <div class="admin-panel-header" style="background:var(--gots-green);">Tutorial Complete — Results Summary</div>
+  <div class="admin-panel-body">
+    <div style="padding:8px 0; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:18px;">✅</span>
+      <span>Q1: Getting Started</span>
+      <span style="margin-left:auto; font-size:12px; color:#2e7d32;">1 attempt</span>
+    </div>
+    <div style="padding:8px 0; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:18px;">✅</span>
+      <span>Q2: Basic Search</span>
+      <span style="margin-left:auto; font-size:12px; color:#2e7d32;">2 attempts</span>
+    </div>
+    <div style="padding:8px 0; border-bottom:1px solid #eee;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="font-size:18px;">❌</span>
+        <span>Q3: Search Filters</span>
+        <span style="margin-left:auto; font-size:12px; color:var(--gots-red);">3 attempts (branched)</span>
+      </div>
+      <div style="margin-left:36px; padding:8px 0 4px; border-left:2px solid var(--gots-border); padding-left:12px;">
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px; padding:3px 0;">
+          <span>✅</span> Q3a: Catalog vs Database <span style="margin-left:auto;font-size:11px;color:#2e7d32;">1 attempt</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; font-size:13px; padding:3px 0;">
+          <span>✅</span> Q3b: Peer-Review Filters <span style="margin-left:auto;font-size:11px;color:#2e7d32;">2 attempts</span>
+        </div>
+      </div>
+    </div>
+    <div style="padding:8px 0; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:18px;">✅</span>
+      <span>Q4: Advanced Search</span>
+      <span style="margin-left:auto; font-size:12px; color:#2e7d32;">1 attempt</span>
+    </div>
+    <div style="padding:8px 0; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:18px;">⚠️</span>
+      <span>Q5: Exporting Citations</span>
+      <span style="margin-left:auto; font-size:12px; color:var(--gots-amber);">5 attempts (given up)</span>
+    </div>
+    <div style="padding:8px 0; border-bottom:1px solid #eee; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:18px;">✅</span>
+      <span>Q6: Interlibrary Loan</span>
+      <span style="margin-left:auto; font-size:12px; color:#2e7d32;">1 attempt</span>
+    </div>
+    <div style="padding:8px 0; display:flex; align-items:center; gap:10px;">
+      <span style="font-size:18px;">✅</span>
+      <span>Q7: Saving Results</span>
+      <span style="margin-left:auto; font-size:12px; color:#2e7d32;">1 attempt</span>
+    </div>
+
+    <div style="margin-top:20px; padding:16px; background:#e8f5e9; border-radius:8px; text-align:center;">
+      <div style="font-size:18px; font-weight:bold; color:#2e7d32;">🎓 Tutorial Completed</div>
+      <div style="font-size:13px; color:#555; margin-top:4px;">5/7 correct on first route · 2 required additional support</div>
+      <button style="margin-top:12px; padding:10px 24px; background:var(--gots-green); color:#fff; border:none; border-radius:6px; font-size:14px; cursor:pointer;">Download Certificate</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     PART H: FLOW DIAGRAMS
+     ══════════════════════════════════════════════════════════════ -->
+<div class="section-divider">
+  Part H: State Machine / Navigation Flow
+</div>
+
+<div class="notes">
+<div class="flow-box"><span class="green">// NORMAL FLOW (no branching/give-up on any quiz)</span>
+[Q1] → [Q2] → [Q3] → [Q4] → [Q5] → [Q6] → [Q7] → [Summary]
+  ✓      ✓      ✓      ✓      ✓      ✓      ✓
+                                            total: 7
+
+<span class="red">// BRANCHING TRIGGERED (Q3 wrong 3×, 2 sub-Qs)</span>
+<span class="amber">steps[] mutated at runtime:</span>
+
+BEFORE: [ Q1, Q2, Q3,         Q4, Q5, Q6, Q7 ]  <span class="green">// length = 7</span>
+AFTER:  [ Q1, Q2, Q3*, Q3a, Q3b, Q4, Q5, Q6, Q7 ]  <span class="green">// length = 9</span>
+                   ↑    ↑    ↑
+            <span class="red">perm-wrong</span>  <span class="amber">injected sub-questions</span>
+
+<span class="blue">Q3* = main quiz, permanently marked wrong, showing last failed attempt state</span>
+<span class="blue">Q3a, Q3b = new H5P quizzes from librarian branch config, with own tutorial URLs</span>
+
+After student answers Q3a correctly → moves to Q3b
+After student answers Q3b correctly → moves to Q4
+<span class="green">Sub-questions stay in the array — they don't collapse.</span>
+
+<span class="red">// GIVE-UP TRIGGERED (Q5 wrong 5×)</span>
+[...Q4] → [Q5⚠] → [Q6] → [Q7] → [Summary]
+             ↑
+      <span class="amber">answer revealed, Next unlocked</span>
+      <span class="amber">quiz stays in failed state (not re-attemptable)</span>
+
+<span class="green">// NAVIGATION BACK RULES</span>
+<span class="blue">Rule 1:</span> Back goes to any previously visited step (shows preserved state)
+<span class="blue">Rule 2:</span> Forward goes to any step up to the FURTHEST REACHED (not beyond)
+<span class="blue">Rule 3:</span> Correctly answered questions are NOT re-attemptable (frozen ✓)
+<span class="blue">Rule 4:</span> Wrong/given-up questions show their last attempt state (frozen ✗/⚠)
+<span class="blue">Rule 5:</span> Only the CURRENT (furthest unanswered) step accepts quiz input</div>
+</div>
+
+
+</body>
+</html>

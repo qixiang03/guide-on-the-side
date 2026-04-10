@@ -25,6 +25,104 @@ const startTutorialBtn = document.getElementById('pbsgStartTutorial');
 const menuBtn = document.getElementById('pbsgMenuBtn');
 const menuDd  = document.getElementById('pbsgMenuDropdown');
 
+
+const h5pFrameHost = h5pFrame ? h5pFrame.parentElement : null;
+const h5pFrameCache = new Map();
+let activeH5PFrame = h5pFrame || null;
+
+function getActiveH5PFrame() {
+  return activeH5PFrame;
+}
+
+function hideAllH5PFrames() {
+  h5pFrameCache.forEach((frame) => {
+    frame.style.display = 'none';
+    frame.style.opacity = '0';
+  });
+
+  if (h5pFrame && !h5pFrameCache.size) {
+    h5pFrame.style.display = 'none';
+    h5pFrame.style.opacity = '0';
+  }
+}
+
+function getOrCreateH5PFrameForStep(stepIndex) {
+  if (!h5pFrameHost || !h5pFrame) return null;
+
+  if (h5pFrameCache.has(stepIndex)) {
+    return h5pFrameCache.get(stepIndex);
+  }
+
+  let frame;
+
+  if (h5pFrameCache.size === 0 && !h5pFrame.dataset.pbsgOwned) {
+    frame = h5pFrame;
+    frame.dataset.pbsgOwned = '1';
+  } else {
+    frame = document.createElement('iframe');
+    frame.className = h5pFrame.className;
+    frame.setAttribute('aria-label', 'Quiz Frame');
+    frame.setAttribute('allowfullscreen', '');
+    frame.style.display = 'none';
+    frame.style.opacity = '0';
+    h5pFrameHost.appendChild(frame);
+  }
+
+  frame.dataset.stepIndex = String(stepIndex);
+  h5pFrameCache.set(stepIndex, frame);
+  return frame;
+}
+
+function showStepH5PFrame(stepIndex, h5pId) {
+  hideAllH5PFrames();
+
+  if (!h5pId) {
+    activeH5PFrame = null;
+    return null;
+  }
+
+  const frame = getOrCreateH5PFrameForStep(stepIndex);
+  if (!frame) {
+    activeH5PFrame = null;
+    return null;
+  }
+
+  const wantedId = String(h5pId);
+
+  if (frame.dataset.loadedH5pId !== wantedId) {
+    frame.src = h5pUrl(h5pId);
+    frame.dataset.loadedH5pId = wantedId;
+  }
+
+  frame.style.display = '';
+  frame.style.opacity = '1';
+  activeH5PFrame = frame;
+
+  return frame;
+}
+
+function resetH5PFrameCache() {
+  h5pFrameCache.forEach((frame) => {
+    if (frame !== h5pFrame && frame.parentNode) {
+      frame.parentNode.removeChild(frame);
+    }
+  });
+
+  h5pFrameCache.clear();
+
+  if (h5pFrame) {
+    h5pFrame.removeAttribute('data-step-index');
+    h5pFrame.removeAttribute('data-loaded-h5p-id');
+    h5pFrame.removeAttribute('data-pbsg-owned');
+    h5pFrame.src = '';
+    h5pFrame.style.display = '';
+    h5pFrame.style.opacity = '0';
+  }
+
+  activeH5PFrame = h5pFrame || null;
+}
+
+
 function openMenu(){
   if (!menuDd || !menuBtn) return;
   menuDd.classList.add('is-open');
@@ -82,6 +180,10 @@ window.pbsgGoToStep = function(index){
   // block jumping forward
   if (index > i) return;
 
+  if (!inBranch) {
+    saveH5PAnswerState(i);
+  }
+
   i = index;
   render();
 };
@@ -91,6 +193,7 @@ window.pbsgGoToStep = function(index){
 // Gate NEXT by quiz correctness (H5P)
 // --------------------
 const passedSteps = new Set(); // remember which steps are already correct
+const h5pAnswerState = {}; // remember current student answers per step
 
 const triggeredBranchSteps = new Set();
 const completedBranchSteps = new Set();
@@ -99,6 +202,150 @@ const completedBranchSteps = new Set();
 let h5pObs = null;
 let h5pClickHandler = null;
 let h5pBoundDoc = null;
+let h5pInputHandler = null;
+let h5pChangeHandler = null;
+
+
+function buildH5PFieldKey(el, index) {
+  return [
+    el.name || '',
+    el.id || '',
+    el.type || '',
+    index
+  ].join('::');
+}
+
+function saveH5PAnswerState(stepIndex) {
+  const frame = getActiveH5PFrame();
+  if (!Number.isFinite(stepIndex) || !frame) return;
+
+  let doc;
+  try {
+    doc = frame.contentDocument || frame.contentWindow.document;
+  } catch (e) {
+    return;
+  }
+
+  if (!doc || !doc.body) return;
+
+  const state = {
+    choiceSelections: [],
+    textValues: []
+  };
+
+  // Save visible H5P choice selections by position
+  const choiceInputs = Array.from(
+    doc.querySelectorAll(
+      '.h5p-alternative-container input[type="radio"], ' +
+      '.h5p-alternative-container input[type="checkbox"], ' +
+      '.h5p-answer input[type="radio"], ' +
+      '.h5p-answer input[type="checkbox"]'
+    )
+  );
+
+  choiceInputs.forEach((el, index) => {
+    state.choiceSelections.push({
+      index,
+      type: (el.type || '').toLowerCase(),
+      checked: !!el.checked
+    });
+  });
+
+  // Save visible text fields by position
+  const textFields = Array.from(
+    doc.querySelectorAll(
+      'textarea, input[type="text"], input[type="search"], input:not([type])'
+    )
+  ).filter(el => {
+    const type = (el.type || '').toLowerCase();
+    return !['hidden', 'radio', 'checkbox', 'button', 'submit'].includes(type);
+  });
+
+  textFields.forEach((el, index) => {
+    state.textValues.push({
+      index,
+      value: el.value != null ? el.value : ''
+    });
+  });
+
+  h5pAnswerState[stepIndex] = state;
+}
+
+function restoreH5PAnswerState(stepIndex, doc) {
+  const state = h5pAnswerState[stepIndex];
+  if (!state || !doc || !doc.body) return false;
+
+  let restoredAny = false;
+
+  // Restore visible H5P choices by position
+  const choiceInputs = Array.from(
+    doc.querySelectorAll(
+      '.h5p-alternative-container input[type="radio"], ' +
+      '.h5p-alternative-container input[type="checkbox"], ' +
+      '.h5p-answer input[type="radio"], ' +
+      '.h5p-answer input[type="checkbox"]'
+    )
+  );
+
+  if (Array.isArray(state.choiceSelections) && choiceInputs.length) {
+    state.choiceSelections.forEach(saved => {
+      const el = choiceInputs[saved.index];
+      if (!el) return;
+
+      const wantChecked = !!saved.checked;
+      const isChecked = !!el.checked;
+
+      if (wantChecked !== isChecked) {
+        const clickable =
+          el.closest('.h5p-alternative-container') ||
+          el.closest('.h5p-answer') ||
+          el.closest('label') ||
+          el;
+
+        try {
+          clickable.click();
+        } catch (e) {
+          el.checked = wantChecked;
+          try {
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          } catch (err) {}
+        }
+      }
+
+      restoredAny = true;
+    });
+  }
+
+  // Restore visible text fields by position
+  const textFields = Array.from(
+    doc.querySelectorAll(
+      'textarea, input[type="text"], input[type="search"], input:not([type])'
+    )
+  ).filter(el => {
+    const type = (el.type || '').toLowerCase();
+    return !['hidden', 'radio', 'checkbox', 'button', 'submit'].includes(type);
+  });
+
+  if (Array.isArray(state.textValues) && textFields.length) {
+    state.textValues.forEach(saved => {
+      const el = textFields[saved.index];
+      if (!el) return;
+
+      el.value = saved.value != null ? saved.value : '';
+
+      try {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (e) {}
+
+      restoredAny = true;
+    });
+  }
+
+  return restoredAny;
+}
 
 function cleanupH5PWatcher() {
   if (h5pObs) {
@@ -106,14 +353,24 @@ function cleanupH5PWatcher() {
     h5pObs = null;
   }
 
-  if (h5pBoundDoc && h5pClickHandler) {
-    try {
+  if (h5pBoundDoc) {
+  try {
+    if (h5pClickHandler) {
       h5pBoundDoc.removeEventListener('click', h5pClickHandler, true);
-    } catch (e) {}
-  }
+    }
+    if (h5pInputHandler) {
+      h5pBoundDoc.removeEventListener('input', h5pInputHandler, true);
+    }
+    if (h5pChangeHandler) {
+      h5pBoundDoc.removeEventListener('change', h5pChangeHandler, true);
+    }
+  } catch (e) {}
+}
 
   h5pBoundDoc = null;
   h5pClickHandler = null;
+  h5pInputHandler = null;
+  h5pChangeHandler = null;
 }
 
 function lockNext(locked){
@@ -256,8 +513,10 @@ function isCheckButton(el){
 }
 
 function attachH5PWatcher(stepIndex){
+  const frame = getActiveH5PFrame();
+
   // If no quiz in this step, no gating needed
-  if (!h5pFrame || !steps[stepIndex]?.h5p_id) {
+  if (!frame || !steps[stepIndex]?.h5p_id) {
     lockNext(false);
     return;
   }
@@ -267,7 +526,7 @@ function attachH5PWatcher(stepIndex){
   const tryAttach = () => {
     let doc;
     try {
-      doc = h5pFrame.contentDocument || h5pFrame.contentWindow.document;
+      doc = frame.contentDocument || frame.contentWindow.document;
     } catch (e) {
       // Cross-origin -> can't read, fail open
       lockNext(false);
@@ -395,12 +654,36 @@ function attachH5PWatcher(stepIndex){
       console.warn('H5P style injection failed:', e);
     }
 
-    h5pFrame.style.transition = 'opacity 0.12s ease';
-    h5pFrame.style.opacity = '1';
+    frame.style.transition = 'opacity 0.12s ease';
+    frame.style.opacity = '1';
+
+    let restoreDone = false;
+
+    const tryRestoreAnswers = () => {
+      if (restoreDone) return;
+      const ok = restoreH5PAnswerState(stepIndex, doc);
+      if (ok) {
+        restoreDone = true;
+      }
+    };
+
+    tryRestoreAnswers();
+    setTimeout(tryRestoreAnswers, 100);
+    setTimeout(tryRestoreAnswers, 300);
+    setTimeout(tryRestoreAnswers, 600);
 
     const updatePassState = ({ allowBranchPrompt = false } = {}) => {
     const correct = isH5PCorrect(doc);
     const step = steps[stepIndex];
+    const hasChecked = (attemptCounts[stepIndex] || 0) > 0;
+
+    // Global rule: until Check is clicked, Next must stay disabled
+    if (!hasChecked) {
+      lockNext(true);
+      updateRunningScore();
+      updateCertificateGate();
+      return;
+    }
 
     if (correct) {
       passedSteps.add(stepIndex);
@@ -410,32 +693,37 @@ function attachH5PWatcher(stepIndex){
       return;
     }
 
-    passedSteps.delete(stepIndex);
-
-    // Default rule:
-    // Wrong answer should NOT block Next anymore,
-    // unless this step has a triggered mandatory branch.
-    lockNext(false);
-    updateRunningScore();
-
-    // Show branch popup ONLY after a real Check click,
-    // not during every MutationObserver redraw
-    if (allowBranchPrompt && shouldTriggerBranch(stepIndex)) {
-      triggeredBranchSteps.add(stepIndex);
-
-      if (!inBranch && stepIndex === i) {
-        showLearnMoreButton();
-
-        if (isMandatoryBranch(step)) {
-          // Mandatory branch blocks Next
-          lockNext(true);
-        } else {
-          // Optional branch still allows Next
-          lockNext(false);
-        }
-      }
+    // Only remove passed state after a real Check action
+    // Only remove passed state after a real Check action
+    if (allowBranchPrompt) {
+      passedSteps.delete(stepIndex);
     }
 
+    // A wrong checked answer may trigger branch state
+    if (allowBranchPrompt && shouldTriggerBranch(stepIndex)) {
+      triggeredBranchSteps.add(stepIndex);
+    }
+
+    // Show the Learn More button whenever this step already has a triggered branch
+    if (
+      triggeredBranchSteps.has(stepIndex) &&
+      !completedBranchSteps.has(stepIndex) &&
+      !inBranch &&
+      stepIndex === i
+    ) {
+      showLearnMoreButton();
+    }
+
+    // For mandatory branch: keep Next locked until branch is completed
+    const mustStayLocked =
+      isMandatoryBranch(step) &&
+      triggeredBranchSteps.has(stepIndex) &&
+      !completedBranchSteps.has(stepIndex);
+
+    // Optional branch or no branch: can continue after Check
+    lockNext(mustStayLocked);
+
+    updateRunningScore();
     updateCertificateGate();
   };
 
@@ -463,8 +751,26 @@ function attachH5PWatcher(stepIndex){
     doc.addEventListener('click', h5pClickHandler, true);
     h5pBoundDoc = doc;
 
+    h5pInputHandler = (e) => {
+      const el = e.target;
+      if (!el) return;
+      if (!el.matches('input, textarea, select')) return;
+      saveH5PAnswerState(stepIndex);
+    };
+
+    h5pChangeHandler = (e) => {
+      const el = e.target;
+      if (!el) return;
+      if (!el.matches('input, textarea, select')) return;
+      saveH5PAnswerState(stepIndex);
+    };
+
+    doc.addEventListener('input', h5pInputHandler, true);
+    doc.addEventListener('change', h5pChangeHandler, true);
+
     // Keep pass/fail state updated when H5P redraws result UI
     h5pObs = new MutationObserver(() => {
+      tryRestoreAnswers();
       updatePassState({ allowBranchPrompt: false });
     });
     h5pObs.observe(doc.body, { childList: true, subtree: true, attributes: true });
@@ -545,7 +851,7 @@ function updateRunningScore() {
   const correct = passedQuizStepsCount();
   const attempted = attemptedQuizStepsCount();
 
-  runningScoreEl.textContent = `${correct}/${attempted} ✓`;
+  runningScoreEl.textContent = `Correct/Attempted ${correct}/${attempted} ✓`;
 }
 
 function resetTutorialToStart(){
@@ -563,13 +869,15 @@ function resetTutorialToStart(){
   branchParentIndex = null;
   branchStepIndex = 0;
   currentTutorialSignature = null;
+  resetH5PFrameCache();
   showH5PFrame();
   hideLearnMoreButton();
 
-  steps.forEach((step, idx) => {
-    attemptCounts[idx] = 0;
-    passedSteps.delete(idx);
-  });
+    steps.forEach((step, idx) => {
+      attemptCounts[idx] = 0;
+      passedSteps.delete(idx);
+      delete h5pAnswerState[idx];
+    });
 
   if (hasIntroScreen()) {
     if (introScreen) introScreen.style.display = '';
@@ -937,11 +1245,7 @@ function render(){
     }
   }
 
-  if (step.h5p_id) {
-    h5pFrame.src = h5pUrl(step.h5p_id);
-  } else {
-    h5pFrame.src = '';
-  }
+  showStepH5PFrame(i, step.h5p_id);
 
   renderTutorial(step);
 
@@ -961,7 +1265,11 @@ function render(){
   prevBtn.disabled = i === 0;
 
   if (step.h5p_id) {
-    if (isCurrentStepBlockedByMandatoryBranch()) {
+    const hasChecked = (attemptCounts[i] || 0) > 0;
+
+    if (!hasChecked) {
+      lockNext(true);
+    } else if (isCurrentStepBlockedByMandatoryBranch()) {
       lockNext(true);
     } else {
       lockNext(false);
@@ -998,6 +1306,7 @@ prevBtn.onclick = () => {
   }
 
   if (i > 0) {
+    saveH5PAnswerState(i);
     i--;
     render();
   }
@@ -1023,10 +1332,8 @@ nextBtn.onclick = async () => {
 
     if (nextMainIndex < steps.length) {
       i = nextMainIndex;
-      const oldParent = branchParentIndex;
       branchParentIndex = null;
       branchStepIndex = 0;
-      showBranchExitNotice(oldParent);
       render();
     } else {
       branchParentIndex = null;
@@ -1038,19 +1345,16 @@ nextBtn.onclick = async () => {
     return;
   }
 
-  if (i < steps.length - 1) {
+   if (i < steps.length - 1) {
+    saveH5PAnswerState(i);
     i++;
     render();
   } else {
+    saveH5PAnswerState(i);
     await finalizeCompletionIfReady();
     showSummaryScreen();
   }
 };
-
-function showBranchExitNotice(parentIdx) {
-  const stepTitle = steps[parentIdx]?.title || `Question ${parentIdx + 1}`;
-  alert(`You have completed the branch. You can go back to ${stepTitle} later if you want to retry it for a correct score.`);
-}
 
 if (learnMoreBtn) {
   learnMoreBtn.onclick = () => {
@@ -1093,14 +1397,14 @@ function hideLearnMoreButton() {
 }
 
 function showH5PFrame() {
-  if (h5pFrame) {
-    h5pFrame.style.display = '';
-    h5pFrame.style.opacity = '0';
-  }
-
   if (branchQuizHost) {
     branchQuizHost.style.display = 'none';
     branchQuizHost.innerHTML = '';
+  }
+
+  const frame = getActiveH5PFrame();
+  if (frame) {
+    frame.style.display = '';
   }
 }
 
@@ -1118,10 +1422,8 @@ function resetLeftQuizScroll() {
 }
 
 function showBranchQuizHost() {
-  if (h5pFrame) {
-    h5pFrame.style.display = 'none';
-    h5pFrame.src = '';
-  }
+  hideAllH5PFrames();
+  activeH5PFrame = null;
 
   if (branchQuizHost) {
     branchQuizHost.style.display = '';
@@ -1426,7 +1728,7 @@ if (summaryCertBtn) {
 }
 
 if (certModalGenerate) {
-  certModalGenerate.onclick = () => {
+  certModalGenerate.onclick = async () => {
     const name = (certModalName?.value || '').trim();
 
     if (!name) {
@@ -1438,8 +1740,19 @@ if (certModalGenerate) {
       return;
     }
 
+    await finalizeCompletionIfReady();
+
     const previewUrl = buildCertificateUrl(name);
+
+    // Disable both buttons so certificate cannot be generated again
+    certModalGenerate.disabled = true;
+    if (summaryCertBtn) {
+      summaryCertBtn.disabled = true;
+      summaryCertBtn.classList.add('pbsg-locked');
+    }
+
     window.open(previewUrl, '_blank');
+
     closeCertModal();
   };
 }
@@ -1471,8 +1784,20 @@ document.addEventListener('keydown', (e) => {
 });
 
 
+function handleCloseTutorialAction() {
+  const closeUrl = (window.PBSG_CERT?.closeTutorialUrl || '').trim();
+
+  if (closeUrl) {
+    window.location.href = closeUrl;
+    return;
+  }
+
+  // Try to close the current tab
+  window.close();
+}
+
 retakeBtn.onclick = () => {
-  window.location.href = '/';
+  handleCloseTutorialAction();
 };
 
 // ===== Focus System =====

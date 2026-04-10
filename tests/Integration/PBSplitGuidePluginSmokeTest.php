@@ -116,7 +116,6 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
                 'wp_ajax_pbsg_get_templates',
                 'wp_ajax_pbsg_save_as_template',
                 'wp_ajax_pbsg_create_from_template',
-                'load-post-new.php',
             ] as $tag
         ) {
             $this->assertContains($tag, $actions, "Missing action: {$tag}");

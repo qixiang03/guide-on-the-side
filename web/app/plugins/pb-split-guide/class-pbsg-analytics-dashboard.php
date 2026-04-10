@@ -179,10 +179,11 @@ class PBSG_Analytics_Dashboard {
 
             <!-- Filter Bar -->
             <div class="pbsg-filter-bar" id="pbsg-filter-bar">
-                <label class="label" for="pbsg-date-from"><?php esc_html_e( 'Date Range', 'pb-split-guide' ); ?></label>
-                <input type="date" id="pbsg-date-from" value="<?php echo esc_attr( date( 'Y-m-d', strtotime( '-30 days' ) ) ); ?>">
-                <span class="span pbsg-filter-sep"><?php esc_html_e( 'to', 'pb-split-guide' ); ?></span>
-                <input type="date" id="pbsg-date-to" value="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
+                <label class="label" for="pbsg-date-from"><?php esc_html_e( 'Date Range', 'pb-split-guide' ); ?>
+                    <input type="date" id="pbsg-date-from" value="<?php echo esc_attr( date( 'Y-m-d', strtotime( '-30 days' ) ) ); ?>">
+                    <span class="span pbsg-filter-sep"><?php esc_html_e( 'to', 'pb-split-guide' ); ?></span>
+                    <input type="date" id="pbsg-date-to" value="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
+                </label>
 
                 <?php if ( in_array( $current_view, array( 'overview', 'tutorial', 'compare' ), true ) ) : ?>
                 <label for="pbsg-device-filter" class="pbsg-filter-device-label">

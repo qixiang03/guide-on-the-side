@@ -36,16 +36,13 @@ class PBSG_Certificate {
     $user_id = get_current_user_id();
     $meta_key = self::META_PREFIX . $page_id;
 
-    // Store completion timestamp if not already stored
-    $existing = get_user_meta($user_id, $meta_key, true);
-    if (empty($existing)) {
-      update_user_meta($user_id, $meta_key, current_time('timestamp'));
-      $existing = get_user_meta($user_id, $meta_key, true);
-    }
+    // Always store the latest completion timestamp
+    $completed_ts = current_time('timestamp');
+    update_user_meta($user_id, $meta_key, $completed_ts);
 
     wp_send_json_success([
-      'tutorial_id' => $page_id,
-      'completed_ts' => (int)$existing,
+      'tutorial_id'  => $page_id,
+      'completed_ts' => (int) $completed_ts,
     ]);
   }
 
