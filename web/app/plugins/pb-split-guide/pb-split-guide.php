@@ -1959,6 +1959,52 @@ class PB_Split_Guide_Plugin {
           }
         }
       }
+
+      // Branch question H5P creation/update — mirrors the main quiz path above.
+      // Each branch sub-question becomes a real H5P content row so the student-side
+      // renderer can load it as an iframe (same UX as main quiz).
+      if (!empty($step['branch']['questions']) && is_array($step['branch']['questions']) && PBSG_H5P_Factory::is_h5p_available()) {
+        foreach ($step['branch']['questions'] as $qIdx => &$bq) {
+          $quiz = self::branch_question_to_quiz($bq);
+          if (!$quiz) {
+            // Unsupported type — strip the transient flag and skip
+            unset($bq['_editing_h5p']);
+            continue;
+          }
+
+          // Type-change defense: if H5P content already exists but its library
+          // no longer matches the current quiz type, orphan it and force a fresh create.
+          if (!empty($bq['h5p_id']) && $bq['h5p_id'] > 0) {
+            $current_library  = self::get_h5p_library_name((int) $bq['h5p_id']);
+            $expected_library = PBSG_H5P_Factory::get_library_for_type($quiz['type']);
+            if ($current_library && $expected_library && $current_library !== $expected_library) {
+              $bq['h5p_id'] = 0;
+            }
+          }
+
+          if (!empty($bq['_editing_h5p']) && !empty($bq['h5p_id']) && $bq['h5p_id'] > 0) {
+            // Update existing branch H5P content
+            $result = PBSG_H5P_Factory::update($bq['h5p_id'], $quiz);
+            if (is_wp_error($result)) {
+              $h5p_errors[] = sprintf('Step %d Branch Q%d (update): %s', $idx + 1, $qIdx + 1, $result->get_error_message());
+            }
+          } elseif (empty($bq['h5p_id']) || $bq['h5p_id'] === 0) {
+            // Create new branch H5P content
+            $branch_title = sprintf('%s - Step %d - Branch Q%d', $post_title, $idx + 1, $qIdx + 1);
+            $new_id = PBSG_H5P_Factory::create($quiz, $post_title, $idx + 1, $branch_title);
+            if (is_wp_error($new_id)) {
+              $h5p_errors[] = sprintf('Step %d Branch Q%d: %s', $idx + 1, $qIdx + 1, $new_id->get_error_message());
+            } else {
+              $bq['h5p_id'] = $new_id;
+            }
+          }
+
+          // Strip transient editing flag (keep h5p_id and source fields for re-editing)
+          unset($bq['_editing_h5p']);
+        }
+        unset($bq);
+      }
+
       // Strip transient data from stored JSON
       unset($step['quiz'], $step['_editing_h5p']);
     }
