@@ -896,17 +896,17 @@ body.pbsg-standalone .pbsg-wrap{
 }
 
 .pbsg-intro-cover {
-  flex: 0 0 55%;
+  flex: 0 0 auto;
   min-height: 440px;
+  max-width: 60%;
   margin: 0;
-  position: relative;
 }
 
-.pbsg-intro-cover img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
+/* ID selector required to beat Pressbooks Aldine theme's `#content img { height: auto }` */
+#pbsgIntroScreen .pbsg-intro-cover img {
   height: 100%;
+  width: auto;
+  max-width: 100%;
   display: block;
   border-radius: 0;
   object-fit: cover;
@@ -1050,10 +1050,11 @@ body.pbsg-standalone .pbsg-wrap{
   .pbsg-intro-cover {
     width: 100%;
     height: 180px;
+    min-height: 0;
     max-width: none;
   }
 
-  .pbsg-intro-cover img {
+  #pbsgIntroScreen .pbsg-intro-cover img {
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -1572,8 +1573,9 @@ body.tutorial-active #colophon {
 
 
 /* ==========================================
-   Inline Branch Quiz Styling
-   Match the main tutorial quiz look
+   Inline Branch Quiz — H5P Iframe Container
+   Branch sub-questions render as H5P iframes,
+   matching the main quiz visual style exactly.
    ========================================== */
 
 .pbsg-branch-quiz-host {
@@ -1588,143 +1590,24 @@ body.tutorial-active #colophon {
   padding: 0;
 }
 
-.pbsg-branch-inline-question {
-  font-family: var(--pbsg-admin-font);
-  font-size: 14px;
-  color: #6b7280;
+.pbsg-branch-h5p-iframe {
+  width: 100%;
+  min-height: 360px;
+  border: 1px solid var(--pbsg-border, #e0e0e0);
+  border-radius: 6px;
   background: #fff;
-  padding: 10px 8px 0 8px;
-  box-sizing: border-box;
+  display: block;
 }
 
-.pbsg-branch-inline-question h3 {
-  margin: 0 0 16px 0;
-  font-size: 15px;
-  font-weight: 500;
-  line-height: 1.4;
-  color: #6b7280;
-}
-
-.pbsg-branch-inline-answers {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.pbsg-branch-inline-answer {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 46px;
-  padding: 8px 12px 8px 42px;
-  margin: 0;
-  border: 1px solid var(--pbsg-border);
-  border-radius: 4px;
-  background: #cfcfcf;
-  color: #6b7280;
-  cursor: pointer;
-  box-sizing: border-box;
-}
-
-.pbsg-branch-inline-answer input[type="radio"],
-.pbsg-branch-inline-answer input[type="checkbox"] {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  margin: 0;
-  flex: 0 0 auto;
-}
-
-.pbsg-branch-inline-answer span {
-  font-size: 14px;
-  line-height: 1.4;
-  color: #6b7280;
-}
-
-.pbsg-branch-inline-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-#pbsgBranchCheck {
-  min-height: 34px;
-  padding: 6px 12px;
+/* Defensive error state when h5p_id is missing — shouldn't happen post-deployment */
+.pbsg-branch-error {
+  padding: 16px;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  color: #856404;
   font-size: 13px;
-  border-radius: 4px;
-  background: #f6f7f7;
-  color: #1d2327;
-  border: 1px solid #ccd0d4;
-  box-shadow: none;
-  font-family: var(--pbsg-admin-font);
-  font-weight: 400;
-  cursor: pointer;
-  text-transform: none;
-}
-
-#pbsgBranchCheck:hover {
-  background: #f0f0f1;
-  border-color: #999;
-  color: #1d2327;
-}
-
-.pbsg-branch-feedback {
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.pbsg-branch-feedback.is-correct {
-  color: #2d6a4f;
-}
-
-.pbsg-branch-feedback.is-wrong {
-  color: #b42318;
-}
-
-.pbsg-branch-inline-blanks textarea {
-  width: 100%;
-  min-height: 120px;
-  padding: 10px 12px;
-  border: 1px solid var(--pbsg-border);
-  border-radius: 4px;
-  font-family: var(--pbsg-admin-font);
-  font-size: 14px;
-  line-height: 1.5;
-  color: #6b7280;
-  box-sizing: border-box;
-  resize: vertical;
-}
-
-
-.pbsg-branch-feedback {
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.pbsg-branch-feedback.is-correct {
-  color: #2d6a4f;
-}
-
-.pbsg-branch-feedback.is-wrong {
-  color: #b42318;
-}
-
-.pbsg-branch-inline-blanks textarea {
-  width: 100%;
-  min-height: 120px;
-  padding: 10px 12px;
-  border: 1px solid var(--pbsg-border);
-  border-radius: 4px;
-  font-family: var(--pbsg-admin-font);
-  font-size: 14px;
-  line-height: 1.5;
-  color: #6b7280;
-  box-sizing: border-box;
-  resize: vertical;
+  text-align: center;
 }
 
 .pbsg-left .pbsg-iframe-wrap {
