@@ -24,10 +24,19 @@ wp_enqueue_style(
     '0.4.0'
 );
 
+// Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
+wp_enqueue_script(
+  'pbsg_icons_js',
+  plugin_dir_url( dirname( __FILE__ ) ) . 'assets/pbsg-icons.js',
+  array(),
+  filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/pbsg-icons.js' ),
+  true
+);
+
 wp_enqueue_script(
   'pbsg-split-guide',
   plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.js',
-  array(),
+  array( 'pbsg_icons_js' ),
   filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide.js' ),
   true
 );
@@ -230,13 +239,13 @@ $s['branch'] = $branch;
           <div class="pbsg-intro-meta">
             <?php if ($intro_duration): ?>
               <span class="pbsg-intro-duration">
-                &#x23F1; <?php echo esc_html($intro_duration); ?>
+                <?php echo pbsg_icon('stopwatch'); ?> <?php echo esc_html($intro_duration); ?>
               </span>
             <?php endif; ?>
 
             <?php if ($step_count > 0): ?>
               <span class="pbsg-intro-steps-count">
-                &#x1F4CB; <?php echo $step_count; ?> Page<?php echo $step_count !== 1 ? 's' : ''; ?>
+                <?php echo pbsg_icon('clipboard'); ?> <?php echo $step_count; ?> Page<?php echo $step_count !== 1 ? 's' : ''; ?>
               </span>
             <?php endif; ?>
           </div>
@@ -287,8 +296,8 @@ $s['branch'] = $branch;
     <!-- Menu button -->
     <div class="pbsg-menu-wrap">
       <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
-        <span class="pbsg-menu-icon">☰</span>
-        <span class="pbsg-menu-arrow">▾</span>
+        <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
+        <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
         <span class="pbsg-menu-text">Menu</span>
       </button>
 
@@ -338,7 +347,7 @@ $s['branch'] = $branch;
 
         <div class="pbsg-nav-center">
           <span id="pbsgProgress" class="pbsg-progress"></span>
-          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">Correct/Attempted 0/0 ✓</span>
+          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">Correct/Attempted 0/0 <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
         </div>
 
         <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext">Next</button>
@@ -366,7 +375,7 @@ $s['branch'] = $branch;
     <div class="pbsg-banner">
       <div class="pbsg-banner-text">
         <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
-        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window ↗</a>
+        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window <?php echo pbsg_icon('arrow-up-right'); ?></a>
       </div>
       <div class="pbsg-banner-actions">
         <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>  

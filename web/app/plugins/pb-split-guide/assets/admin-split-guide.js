@@ -10,23 +10,30 @@ jQuery(function ($) {
   }
 
   /**
-   * Return an appropriate emoji icon for a filename based on its extension.
+   * Shortcut: render a Marginalia SVG icon by name.
+   * Falls back to empty string if PBSG_ICONS is not loaded.
+   */
+  const icon = (name, extra) =>
+    (typeof PBSG_ICONS !== 'undefined') ? PBSG_ICONS.render(name, extra) : '';
+
+  /**
+   * Return an appropriate SVG icon for a filename based on its extension.
    */
   function filePreviewIcon(filename) {
     const ext = String(filename || '').split('.').pop().toLowerCase();
     const map = {
-      pdf: '&#x1F4D1;',                                          // 📑
-      doc: '&#x1F4DD;', docx: '&#x1F4DD;',                      // 📝
-      xls: '&#x1F4CA;', xlsx: '&#x1F4CA;', csv: '&#x1F4CA;',   // 📊
-      ppt: '&#x1F4BD;', pptx: '&#x1F4BD;',                      // 💽
-      jpg: '&#x1F5BC;', jpeg: '&#x1F5BC;', png: '&#x1F5BC;',
-      gif: '&#x1F5BC;', webp: '&#x1F5BC;', svg: '&#x1F5BC;',   // 🖼
-      mp4: '&#x1F3AC;', mov: '&#x1F3AC;', avi: '&#x1F3AC;',
-      webm: '&#x1F3AC;', mkv: '&#x1F3AC;',                      // 🎬
-      mp3: '&#x1F3B5;', wav: '&#x1F3B5;', ogg: '&#x1F3B5;',    // 🎵
-      zip: '&#x1F4E6;', rar: '&#x1F4E6;', gz: '&#x1F4E6;',     // 📦
+      pdf:  'document-multi',
+      doc:  'document',   docx: 'document',
+      xls:  'chart-bar',  xlsx: 'chart-bar',  csv:  'chart-bar',
+      ppt:  'disk',       pptx: 'disk',
+      jpg:  'image',      jpeg: 'image',      png:  'image',
+      gif:  'image',      webp: 'image',      svg:  'image',
+      mp4:  'video',      mov:  'video',      avi:  'video',
+      webm: 'video',      mkv:  'video',
+      mp3:  'audio',      wav:  'audio',      ogg:  'audio',
+      zip:  'package',    rar:  'package',    gz:   'package',
     };
-    return map[ext] || '&#x1F4C4;';  // default 📄
+    return icon(map[ext] || 'document-page');
   }
 
   /**
@@ -277,20 +284,53 @@ function branchSummary(s) {
     let body = '';
 
     if (type === 'blanks') {
+      const sentence = q.sentence || '';
+      const caseSens = q.case_sensitive !== undefined ? q.case_sensitive : false;
+      const typos = q.accept_typos !== undefined ? q.accept_typos : false;
+      const preview = blanksPreview(sentence);
+      const cnt = (sentence.match(/\*[^*]+\*/g) || []).length;
+      const caseRiskVisible = caseSens && cnt > 0 && blanksCaseSensitiveRiskyAnswers(sentence);
+
       body = `
         <div class="pbsg-field">
           <label class="pbsg-field-label">Sentence</label>
-          <textarea class="pbsg-branch-blanks-sentence" data-step-idx="${stepIdx}" data-qidx="${qIdx}" rows="3" placeholder="Example: The capital of Canada is *Ottawa*.">${esc(q.sentence || '')}</textarea>
+          <textarea class="pbsg-branch-blanks-sentence" data-step-idx="${stepIdx}" data-qidx="${qIdx}" rows="3" placeholder="Wrap answer words with *asterisks*...">${esc(sentence)}</textarea>
+          <div class="pbsg-field-hint">
+            Wrap answer words with <code>*asterisks*</code> &mdash; they become blank fields.<br>
+            Use <code>/</code> for alternatives: <code>*colour/color*</code><br>
+            Use <code>:</code> to add a hint: <code>*Norway:Scandinavian country*</code>
+          </div>
         </div>
-        <div class="pbsg-field" style="display:flex; gap:18px; flex-wrap:wrap;">
-          <label>
-            <input type="checkbox" class="pbsg-branch-blanks-case" data-step-idx="${stepIdx}" data-qidx="${qIdx}" ${q.case_sensitive ? 'checked' : ''} />
-            Case sensitive
-          </label>
-          <label>
-            <input type="checkbox" class="pbsg-branch-blanks-typos" data-step-idx="${stepIdx}" data-qidx="${qIdx}" ${q.accept_typos ? 'checked' : ''} />
-            Accept minor spelling errors
-          </label>
+        <div class="pbsg-field">
+          <label class="pbsg-field-label">Preview</label>
+          <div class="pbsg-blanks-preview pbsg-branch-blanks-preview" data-step-idx="${stepIdx}" data-qidx="${qIdx}">${preview}</div>
+          <div class="pbsg-branch-blanks-validation pbsg-validation-msg ${cnt > 0 ? 'pbsg-validation-msg--ok' : 'pbsg-validation-msg--error'}">
+            ${cnt > 0
+              ? '&#x2713; ' + cnt + ' blank' + (cnt !== 1 ? 's' : '') + ' detected'
+              : '&#x26A0; No blanks detected &mdash; wrap words with *asterisks*'}
+          </div>
+        </div>
+        <div class="pbsg-field">
+          <label class="pbsg-field-label">Answer Validation</label>
+          <div class="pbsg-blanks-options">
+            <label class="pbsg-toggle-option${caseSens ? ' pbsg-toggle-option--active' : ''}">
+              <input type="checkbox" class="pbsg-branch-blanks-case" data-step-idx="${stepIdx}" data-qidx="${qIdx}" ${caseSens ? 'checked' : ''} />
+              <div>
+                <div class="pbsg-toggle-title">Case sensitive</div>
+                <div class="pbsg-toggle-desc">&ldquo;Norway&rdquo; &#x2260; &ldquo;norway&rdquo; &mdash; students must match exact capitalization</div>
+              </div>
+            </label>
+            <label class="pbsg-toggle-option${typos ? ' pbsg-toggle-option--active' : ''}">
+              <input type="checkbox" class="pbsg-branch-blanks-typos" data-step-idx="${stepIdx}" data-qidx="${qIdx}" ${typos ? 'checked' : ''} />
+              <div>
+                <div class="pbsg-toggle-title">Accept minor spelling errors</div>
+                <div class="pbsg-toggle-desc">Words 3&ndash;9 chars: 1 typo allowed &middot; 10+ chars: 2 typos allowed</div>
+              </div>
+            </label>
+          </div>
+          <div class="pbsg-branch-blanks-case-risk-msg" data-step-idx="${stepIdx}" data-qidx="${qIdx}" style="display:${caseRiskVisible ? 'block' : 'none'}; margin-top:10px; padding:8px; background:#fcf3f3; border:1px solid #e8b4b4; border-radius:4px; font-size:12px; color:#5c1a1a;">
+            <strong>Case sensitivity:</strong> At least one wrapped answer mixes uppercase and lowercase. With Case sensitive enabled, grading requires an exact character match &mdash; students may be marked wrong if capitalization differs.
+          </div>
         </div>
       `;
     } else if (type === 'singlechoice') {
@@ -401,7 +441,7 @@ function branchSummary(s) {
           <div class="pbsg-field-hint">This shared tutorial resource applies to all sub-quiz questions.</div>
         </div>
         ${(branch.tutorial_url || '') ? `<div class="pbsg-resource-preview">
-          <span class="pbsg-preview-icon">${isYT ? '&#x25B6;&#xFE0F;' : '&#x1F310;'}</span>
+          <span class="pbsg-preview-icon">${isYT ? icon('play') : icon('globe')}</span>
           ${isYT ? 'YouTube video will be embedded in the right pane' : 'Page will load in the right pane iframe'}
         </div>` : ''}
       `;
@@ -409,7 +449,7 @@ function branchSummary(s) {
       const fn = branch.tutorial_file_name || (branch.tutorial_attachment_id ? 'Attachment #' + branch.tutorial_attachment_id : '');
       content = fn
         ? `<div class="pbsg-file-info">
-            <span class="pbsg-file-icon">&#x1F4C4;</span>
+            <span class="pbsg-file-icon">${icon('document-page')}</span>
             <div>
               <div class="pbsg-file-name">${esc(fn)}</div>
               <div class="pbsg-file-meta">Uploaded</div>
@@ -420,7 +460,7 @@ function branchSummary(s) {
             <span class="pbsg-preview-icon">${filePreviewIcon(fn)}</span>${filePreviewLabel(fn)}
           </div>`
         : `<div class="pbsg-branch-upload-zone" data-step-idx="${stepIdx}">
-            <span class="pbsg-upload-icon">&#x2B06;&#xFE0F;</span>
+            <span class="pbsg-upload-icon">${icon('arrow-up')}</span>
             <div>Drag &amp; drop a file here, or click to browse</div>
             ${PBSG_ADMIN.maxUploadLabel ? `<div class="pbsg-upload-size-hint">Max file size: ${esc(PBSG_ADMIN.maxUploadLabel)}</div>` : ''}
           </div>`;
@@ -430,11 +470,11 @@ function branchSummary(s) {
       <div class="pbsg-branch-resource-type-toggle" data-step-idx="${stepIdx}">
         <label class="${!isFile ? 'active' : ''}">
           <input type="radio" name="pbsg_branch_res_type_${stepIdx}" value="url" ${!isFile ? 'checked' : ''} />
-          <span>&#x1F517; URL</span>
+          <span>${icon('link')} URL</span>
         </label>
         <label class="${isFile ? 'active' : ''}">
           <input type="radio" name="pbsg_branch_res_type_${stepIdx}" value="file" ${isFile ? 'checked' : ''} />
-          <span>&#x1F4C4; Upload File</span>
+          <span>${icon('document-page')} Upload File</span>
         </label>
       </div>
       ${content}
@@ -456,7 +496,7 @@ function branchSummary(s) {
         <div class="pbsg-field-hint">This resource applies only to this sub-question.</div>
       </div>
       ${(q.tutorial_url || '') ? `<div class="pbsg-resource-preview">
-        <span class="pbsg-preview-icon">${isYT ? '&#x25B6;&#xFE0F;' : '&#x1F310;'}</span>
+        <span class="pbsg-preview-icon">${isYT ? icon('play') : icon('globe')}</span>
         ${isYT ? 'YouTube video will be embedded in the right pane' : 'Page will load in the right pane iframe'}
       </div>` : ''}
     `;
@@ -464,7 +504,7 @@ function branchSummary(s) {
     const fn = q.tutorial_file_name || (q.tutorial_attachment_id ? 'Attachment #' + q.tutorial_attachment_id : '');
     content = fn
       ? `<div class="pbsg-file-info">
-          <span class="pbsg-file-icon">&#x1F4C4;</span>
+          <span class="pbsg-file-icon">${icon('document-page')}</span>
           <div>
             <div class="pbsg-file-name">${esc(fn)}</div>
             <div class="pbsg-file-meta">Uploaded</div>
@@ -475,7 +515,7 @@ function branchSummary(s) {
           <span class="pbsg-preview-icon">${filePreviewIcon(fn)}</span>${filePreviewLabel(fn)}
         </div>`
       : `<div class="pbsg-branch-q-upload-zone" data-step-idx="${stepIdx}" data-qidx="${qIdx}">
-          <span class="pbsg-upload-icon">&#x2B06;&#xFE0F;</span>
+          <span class="pbsg-upload-icon">${icon('arrow-up')}</span>
           <div>Drag &amp; drop a file here, or click to browse</div>
           ${PBSG_ADMIN.maxUploadLabel ? `<div class="pbsg-upload-size-hint">Max file size: ${esc(PBSG_ADMIN.maxUploadLabel)}</div>` : ''}
         </div>`;
@@ -485,11 +525,11 @@ function branchSummary(s) {
     <div class="pbsg-branch-q-resource-type-toggle" data-step-idx="${stepIdx}" data-qidx="${qIdx}">
       <label class="${!isFile ? 'active' : ''}">
         <input type="radio" name="pbsg_branch_q_res_type_${stepIdx}_${qIdx}" value="url" ${!isFile ? 'checked' : ''} />
-        <span>&#x1F517; URL</span>
+        <span>${icon('link')} URL</span>
       </label>
       <label class="${isFile ? 'active' : ''}">
         <input type="radio" name="pbsg_branch_q_res_type_${stepIdx}_${qIdx}" value="file" ${isFile ? 'checked' : ''} />
-        <span>&#x1F4C4; Upload File</span>
+        <span>${icon('document-page')} Upload File</span>
       </label>
     </div>
     ${content}
@@ -611,7 +651,7 @@ function branchSummary(s) {
   $(document).on('click', '#pbsg-intro-toggle', function () {
     const $body = $('#pbsg-intro-body'), $chev = $('#pbsg-intro-chevron');
     $body.toggle();
-    $chev.html($body.is(':visible') ? '&#x25BC;' : '&#x25B6;');
+    $chev.html(icon($body.is(':visible') ? 'chevron-down' : 'chevron-right'));
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -625,7 +665,7 @@ function branchSummary(s) {
   $(document).on('click', '#pbsg-add-objective', function () {
     $('#pbsg-objectives-list').append(`
       <div class="pbsg-objective-row">
-        <span class="pbsg-objective-check">&#x2713;</span>
+        <span class="pbsg-objective-check">${icon('check', 'pbsg-icon--ok')}</span>
         <input type="text" class="pbsg-objective-input" placeholder="Learning objective..." />
         <button type="button" class="pbsg-objective-remove" title="Remove">&times;</button>
       </div>`);
@@ -659,38 +699,38 @@ function branchSummary(s) {
       const hasRes = s.tutorial_type === 'url' || s.tutorial_type === 'file';
 
       const quizBadge = hasQuiz ? `<span class="pbsg-badge pbsg-badge--info">${qt ? esc(quizName(qt)) : 'H5P #' + s.h5p_id}</span>` : '';
-      const resBadge = hasRes ? `<span class="pbsg-badge pbsg-badge--ok">Resource &#x2713;</span>` : '';
+      const resBadge = hasRes ? `<span class="pbsg-badge pbsg-badge--ok">Resource ${icon('check')}</span>` : '';
 
       $c.append(`
         <div class="pbsg-step-card" data-idx="${idx}" id="pbsg-step-${idx}">
           <div class="pbsg-step-header">
-            <span class="pbsg-drag-handle" title="Drag to reorder">&#x2807;</span>
+            <span class="pbsg-drag-handle" title="Drag to reorder">${icon('drag-handle')}</span>
             <span class="pbsg-step-number">${num}</span>
             <input class="pbsg-step-title-input" type="text" value="${esc(s.title)}" placeholder="Page title (optional)" data-idx="${idx}" />
             <div class="pbsg-step-badges">
               ${quizBadge}${resBadge}
             </div>
             <div class="pbsg-step-header-actions">
-              <span class="pbsg-step-chevron" data-idx="${idx}" title="Collapse">&#x25BC;</span>
+              <span class="pbsg-step-chevron" data-idx="${idx}" title="Collapse">${icon('chevron-down')}</span>
               <button type="button" class="pbsg-btn-ghost pbsg-remove-step" data-idx="${idx}" title="Remove step">&times;</button>
             </div>
           </div>
           <div class="pbsg-step-body" data-idx="${idx}">
             <div class="pbsg-panel pbsg-panel-quiz" data-idx="${idx}">
               <div class="pbsg-panel-label">
-                <span class="pbsg-panel-icon">&#x1F9E9;</span> Quiz Question
+                <span class="pbsg-panel-icon">${icon('puzzle')}</span> Quiz Question
               </div>
               ${renderQuizPanel(s, idx)}
             </div>
             <div class="pbsg-panel" data-idx="${idx}">
               <div class="pbsg-panel-label">
-                <span class="pbsg-panel-icon">&#x1F4D6;</span> Tutorial Resource
+                <span class="pbsg-panel-icon">${icon('book-open')}</span> Tutorial Resource
               </div>
               ${renderResourcePanel(s, idx)}
             </div>
              <div class="pbsg-panel pbsg-panel-branch" data-idx="${idx}">
               <div class="pbsg-branch-panel-head">
-                <span class="pbsg-panel-icon">&#x1F500;</span>
+                <span class="pbsg-panel-icon">${icon('shuffle')}</span>
                 <strong class="pbsg-branch-panel-title">Branch</strong>
                 <span class="pbsg-branch-summary">${esc(branchSummary(s))}</span>
                 <div class="pbsg-branch-head-actions">
@@ -746,7 +786,7 @@ function branchSummary(s) {
         titleRow = `<div class="pbsg-h5p-title-row pbsg-h5p-title-row--locked" data-idx="${idx}" data-h5p-id="${s.h5p_id}">
           <span class="pbsg-h5p-title-label">H5P Name:</span>
           <span class="pbsg-h5p-title-text">${esc(title)}</span>
-          <span class="pbsg-h5p-lock-icon pbsg-h5p-lock-toggle" data-idx="${idx}" data-h5p-id="${s.h5p_id}" data-original-title="${esc(title)}" title="Click to unlock and edit name">&#x1F512;</span>
+          <span class="pbsg-h5p-lock-icon pbsg-h5p-lock-toggle" data-idx="${idx}" data-h5p-id="${s.h5p_id}" data-original-title="${esc(title)}" title="Click to unlock and edit name">${icon('lock-closed')}</span>
         </div>
         <div class="pbsg-h5p-title-status" data-idx="${idx}"></div>`;
       } else {
@@ -758,7 +798,7 @@ function branchSummary(s) {
 
       return `<div class="pbsg-linked-h5p" data-h5p-owner="${isOwner}" data-h5p-author="${esc(authorName)}" data-h5p-usage="${usageCount}">
         <div class="pbsg-linked-h5p-info">
-          <span class="pbsg-linked-icon">&#x1F517;</span>
+          <span class="pbsg-linked-icon">${icon('link')}</span>
           <span>Linked to <strong>H5P #${s.h5p_id}</strong></span>
         </div>
         ${titleRow}
@@ -777,7 +817,7 @@ function branchSummary(s) {
     if (s.h5p_cleared && !s.quiz && !s.h5p_id) {
       return `<div class="pbsg-linked-h5p">
         <div class="pbsg-linked-h5p-info">
-          <span class="pbsg-linked-icon">&#x1F517;</span>
+          <span class="pbsg-linked-icon">${icon('link')}</span>
           <span><strong>No H5P quiz linked</strong></span>
         </div>
         <div class="pbsg-linked-h5p-actions">
@@ -793,15 +833,15 @@ function branchSummary(s) {
     return `
       <div class="pbsg-quiz-type-selector" data-idx="${idx}">
         <button type="button" class="pbsg-quiz-type-btn${qt === 'multichoice' ? ' active' : ''}" data-type="multichoice" data-idx="${idx}">
-          <span class="pbsg-type-icon">&#x2611;</span>Multiple Selection</button>
+          <span class="pbsg-type-icon">${icon('checkbox-multi')}</span>Multiple Selection</button>
         <button type="button" class="pbsg-quiz-type-btn${qt === 'blanks' ? ' active' : ''}" data-type="blanks" data-idx="${idx}">
-          <span class="pbsg-type-icon">&#x270F;&#xFE0F;</span>Fill in Blanks</button>
+          <span class="pbsg-type-icon">${icon('pencil')}</span>Fill in Blanks</button>
         <button type="button" class="pbsg-quiz-type-btn${qt === 'singlechoice' ? ' active' : ''}" data-type="singlechoice" data-idx="${idx}">
-          <span class="pbsg-type-icon">&#x25C9;</span>Single Selection</button>
+          <span class="pbsg-type-icon">${icon('radio')}</span>Single Selection</button>
       </div>
       <div class="pbsg-quiz-form" data-idx="${idx}">${renderQuizForm(qt, s.quiz || {}, idx)}</div>
       <div class="pbsg-existing-h5p-link">
-        <span>&#x1F4A1;</span>
+        <span>${icon('lightbulb')}</span>
         <span>Or <a href="#" class="pbsg-use-existing-h5p" data-idx="${idx}">use an existing H5P quiz</a> instead</span>
       </div>`;
   }
@@ -824,7 +864,7 @@ function branchSummary(s) {
       rows += `<div class="${rowClass}">
         <input type="checkbox" class="pbsg-answer-check" data-idx="${idx}" data-aidx="${ai}" ${cor ? 'checked' : ''} />
         <input type="text" class="pbsg-answer-input" data-idx="${idx}" data-aidx="${ai}" value="${esc(a.text)}" placeholder="Answer option..." />
-        ${cor ? `<span class="pbsg-answer-correct-label">&#x2713; Correct</span>` : ''}
+        ${cor ? `<span class="pbsg-answer-correct-label">${icon('check', 'pbsg-icon--ok')} Correct</span>` : ''}
         <button type="button" class="pbsg-answer-remove" data-idx="${idx}" data-aidx="${ai}" title="Remove">&times;</button>
       </div>`;
     });
@@ -899,8 +939,8 @@ function branchSummary(s) {
         <label class="pbsg-field-label">Preview</label>
         <div class="pbsg-blanks-preview" data-idx="${idx}">${preview}</div>
         ${cnt > 0
-          ? `<div class="pbsg-validation-msg pbsg-validation-msg--ok">&#x2713; ${cnt} blank${cnt !== 1 ? 's' : ''} detected</div>`
-          : `<div class="pbsg-validation-msg pbsg-validation-msg--error">&#x26A0; No blanks detected &mdash; wrap words with *asterisks*</div>`}
+          ? `<div class="pbsg-validation-msg pbsg-validation-msg--ok">${icon('check', 'pbsg-icon--ok')} ${cnt} blank${cnt !== 1 ? 's' : ''} detected</div>`
+          : `<div class="pbsg-validation-msg pbsg-validation-msg--error">${icon('warning', 'pbsg-icon--warn')} No blanks detected &mdash; wrap words with *asterisks*</div>`}
       </div>
       <div class="pbsg-field">
         <label class="pbsg-field-label">Answer Validation</label>
@@ -934,7 +974,7 @@ function branchSummary(s) {
       if (ci > -1) { display = inner.substring(0, ci); hint = inner.substring(ci + 1); }
       const first = display.split('/')[0];
       const hasAlts = display.indexOf('/') > -1;
-      const hintHtml = hint ? ` <span class="pbsg-hint-icon" title="Hint: ${esc(hint)}">&#x1F4A1;</span>` : '';
+      const hintHtml = hint ? ` <span class="pbsg-hint-icon" title="Hint: ${esc(hint)}">${icon('lightbulb')}</span>` : '';
       const altTitle = hasAlts ? ` title="Also accepts: ${esc(display.split('/').slice(1).join(', '))}"` : '';
       return `<span class="pbsg-blank-slot"${altTitle}>${esc(first)}${hintHtml}</span>`;
     });
@@ -962,7 +1002,7 @@ function branchSummary(s) {
       <div class="pbsg-field">
         <label class="pbsg-field-label">Correct Answer</label>
         <div class="pbsg-sc-correct-row">
-          <span class="pbsg-sc-icon">&#x2713;</span>
+          <span class="pbsg-sc-icon">${icon('check', 'pbsg-icon--ok')}</span>
           <input type="text" class="pbsg-sc-correct-input" data-idx="${idx}" value="${esc(correct)}" placeholder="The correct answer..." />
         </div>
       </div>
@@ -988,14 +1028,14 @@ function branchSummary(s) {
           <div class="pbsg-field-hint">YouTube links are auto-embedded. Library database URLs open in an iframe.</div>
         </div>
         ${s.tutorial_url ? `<div class="pbsg-resource-preview">
-          <span class="pbsg-preview-icon">${isYT ? '&#x25B6;&#xFE0F;' : '&#x1F310;'}</span>
+          <span class="pbsg-preview-icon">${isYT ? icon('play') : icon('globe')}</span>
           ${isYT ? 'YouTube video will be embedded in the right pane' : 'Page will load in the right pane iframe'}
         </div>` : ''}`;
     } else {
       const fn = s.tutorial_file_name || (s.tutorial_attachment_id ? 'Attachment #' + s.tutorial_attachment_id : '');
       content = fn
         ? `<div class="pbsg-file-info">
-            <span class="pbsg-file-icon">&#x1F4C4;</span>
+            <span class="pbsg-file-icon">${icon('document-page')}</span>
             <div>
               <div class="pbsg-file-name">${esc(fn)}</div>
               <div class="pbsg-file-meta">Uploaded</div>
@@ -1006,7 +1046,7 @@ function branchSummary(s) {
             <span class="pbsg-preview-icon">${filePreviewIcon(fn)}</span>${filePreviewLabel(fn)}
           </div>`
         : `<div class="pbsg-upload-zone" data-idx="${idx}">
-            <span class="pbsg-upload-icon">&#x2B06;&#xFE0F;</span>
+            <span class="pbsg-upload-icon">${icon('arrow-up')}</span>
             <div>Drag &amp; drop a file here, or click to browse</div>
             ${PBSG_ADMIN.maxUploadLabel ? `<div class="pbsg-upload-size-hint">Max file size: ${esc(PBSG_ADMIN.maxUploadLabel)}</div>` : ''}
           </div>`;
@@ -1016,11 +1056,11 @@ function branchSummary(s) {
       <div class="pbsg-resource-type-toggle" data-idx="${idx}">
         <label class="${!isFile ? 'active' : ''}">
           <input type="radio" name="pbsg_res_type_${idx}" value="url" ${!isFile ? 'checked' : ''} />
-          <span>&#x1F517; URL</span>
+          <span>${icon('link')} URL</span>
         </label>
         <label class="${isFile ? 'active' : ''}">
           <input type="radio" name="pbsg_res_type_${idx}" value="file" ${isFile ? 'checked' : ''} />
-          <span>&#x1F4C4; Upload File</span>
+          <span>${icon('document-page')} Upload File</span>
         </label>
       </div>
       ${content}`;
@@ -1147,10 +1187,10 @@ function branchSummary(s) {
     const $vm = $card.find('.pbsg-validation-msg');
     if (cnt > 0) {
       $vm.removeClass('pbsg-validation-msg--error').addClass('pbsg-validation-msg--ok')
-        .html('&#x2713; ' + cnt + ' blank' + (cnt !== 1 ? 's' : '') + ' detected');
+        .html(icon('check', 'pbsg-icon--ok') + ' ' + cnt + ' blank' + (cnt !== 1 ? 's' : '') + ' detected');
     } else {
       $vm.removeClass('pbsg-validation-msg--ok').addClass('pbsg-validation-msg--error')
-        .html('&#x26A0; No blanks detected &mdash; wrap words with *asterisks*');
+        .html(icon('warning', 'pbsg-icon--warn') + ' No blanks detected &mdash; wrap words with *asterisks*');
     }
     syncQuiz(idx);
     updateBlanksCaseRiskUI(idx);
@@ -1837,6 +1877,46 @@ function syncBranchResourceMode(stepIdx, value) {
     }.bind(this));
   });
 
+  // ── Sub-quiz blanks: live preview + validation ──
+  $(document).on('input', '.pbsg-branch-blanks-sentence', function () {
+    const $textarea = $(this);
+    const $card = $textarea.closest('.pbsg-branch-question-card');
+    const sentence = $textarea.val();
+    const cnt = (sentence.match(/\*[^*]+\*/g) || []).length;
+
+    $card.find('.pbsg-branch-blanks-preview').html(blanksPreview(sentence));
+
+    const $msg = $card.find('.pbsg-branch-blanks-validation');
+    if (cnt > 0) {
+      $msg.attr('class', 'pbsg-branch-blanks-validation pbsg-validation-msg pbsg-validation-msg--ok')
+          .html('&#x2713; ' + cnt + ' blank' + (cnt !== 1 ? 's' : '') + ' detected');
+    } else {
+      $msg.attr('class', 'pbsg-branch-blanks-validation pbsg-validation-msg pbsg-validation-msg--error')
+          .html('&#x26A0; No blanks detected &mdash; wrap words with *asterisks*');
+    }
+
+    const caseOn = $card.find('.pbsg-branch-blanks-case').is(':checked');
+    const risky = caseOn && cnt > 0 && blanksCaseSensitiveRiskyAnswers(sentence);
+    $card.find('.pbsg-branch-blanks-case-risk-msg').toggle(risky);
+  });
+
+  // ── Sub-quiz blanks: case-sensitivity toggle live update ──
+  $(document).on('change', '.pbsg-branch-blanks-case', function () {
+    const $checkbox = $(this);
+    const $card = $checkbox.closest('.pbsg-branch-question-card');
+    const sentence = $card.find('.pbsg-branch-blanks-sentence').val() || '';
+    const cnt = (sentence.match(/\*[^*]+\*/g) || []).length;
+    const risky = $checkbox.is(':checked') && cnt > 0 && blanksCaseSensitiveRiskyAnswers(sentence);
+    $card.find('.pbsg-branch-blanks-case-risk-msg').toggle(risky);
+    $checkbox.closest('.pbsg-toggle-option').toggleClass('pbsg-toggle-option--active', $checkbox.is(':checked'));
+  });
+
+  // ── Sub-quiz blanks: typos toggle active-class update ──
+  $(document).on('change', '.pbsg-branch-blanks-typos', function () {
+    const $checkbox = $(this);
+    $checkbox.closest('.pbsg-toggle-option').toggleClass('pbsg-toggle-option--active', $checkbox.is(':checked'));
+  });
+
   $(document).on('input', '.pbsg-branch-sc-question', function () {
     const stepIdx = parseInt($(this).data('step-idx'), 10);
     const qIdx = parseInt($(this).data('qidx'), 10);
@@ -2316,7 +2396,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       // Insert warning banner if not already present
       if (!$card.find('.pbsg-ownership-warning').length) {
         const warning = `<div class="pbsg-ownership-warning">
-          <div class="pbsg-ownership-warning__title">&#9888; Cannot edit this quiz</div>
+          <div class="pbsg-ownership-warning__title">${icon('warning', 'pbsg-icon--warn')} Cannot edit this quiz</div>
           <div class="pbsg-ownership-warning__body">This H5P is owned by <strong>${esc(authorName)}</strong>${usageText}. Contact the owner to make changes.</div>
           <div class="pbsg-ownership-warning__action">
             <a href="#" class="pbsg-use-as-template" data-idx="${idx}" data-h5p-id="${h5pId}">Use as Template</a>
@@ -2427,7 +2507,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       $row.find('.pbsg-h5p-title-text').replaceWith(
         `<input type="text" class="pbsg-h5p-title-input" value="${esc(currentTitle)}" data-idx="${idx}" data-h5p-id="${h5pId}" data-original="${esc(currentTitle)}">`
       );
-      $(this).html('&#x1F513;'); // unlocked
+      $(this).html(icon('lock-open')); // unlocked
       $row.find('.pbsg-h5p-title-input').focus().select();
     }
   });
@@ -2445,7 +2525,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     if (titleSaveTimer) clearTimeout(titleSaveTimer);
 
     if (current !== original && current !== '') {
-      $status.attr('class', 'pbsg-h5p-title-status pbsg-h5p-title-status--unsaved').text('\u26A0 Unsaved changes');
+      $status.attr('class', 'pbsg-h5p-title-status pbsg-h5p-title-status--unsaved').html(icon('warning', 'pbsg-icon--warn') + ' Unsaved changes');
 
       // Start 1.5s debounce
       titleSaveTimer = setTimeout(function () {
@@ -2507,11 +2587,11 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
 
         // Visual: saved state
         $row.removeClass('pbsg-h5p-title-row--unlocked').addClass('pbsg-h5p-title-row--saved');
-        $status.attr('class', 'pbsg-h5p-title-status pbsg-h5p-title-status--saved').text('\u2713 Saved');
+        $status.attr('class', 'pbsg-h5p-title-status pbsg-h5p-title-status--saved').html(icon('check', 'pbsg-icon--ok') + ' Saved');
 
         // Replace input with static text
         $input.replaceWith(`<span class="pbsg-h5p-title-text">${esc(newTitle)}</span>`);
-        $row.find('.pbsg-h5p-lock-icon').html('&#x1F512;').data('original-title', newTitle);
+        $row.find('.pbsg-h5p-lock-icon').html(icon('lock-closed')).data('original-title', newTitle);
 
         // Fade back to locked state after 2s
         setTimeout(function () {
@@ -2538,7 +2618,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
 
     $row.removeClass('pbsg-h5p-title-row--unlocked pbsg-h5p-title-row--saved').addClass('pbsg-h5p-title-row--locked');
     $input.replaceWith(`<span class="pbsg-h5p-title-text">${esc(originalTitle)}</span>`);
-    $row.find('.pbsg-h5p-lock-icon').html('&#x1F512;');
+    $row.find('.pbsg-h5p-lock-icon').html(icon('lock-closed'));
     $status.attr('class', 'pbsg-h5p-title-status').text('');
   }
 
@@ -2630,7 +2710,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-layout-body');
     var $chevron = $('#pbsg-layout-chevron');
     $body.toggle();
-    $chevron.html($body.is(':visible') ? '&#x25BC;' : '&#x25B6;');
+    $chevron.html(icon($body.is(':visible') ? 'chevron-down' : 'chevron-right'));
   });
 
   // Slider ↔ preview ↔ hidden field
@@ -2851,7 +2931,19 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-benchmark-body');
     var $chevron = $('#pbsg-benchmark-chevron');
     $body.toggle();
-    $chevron.html($body.is(':visible') ? '&#x25BC;' : '&#x25B6;');
+    $chevron.html(icon($body.is(':visible') ? 'chevron-down' : 'chevron-right'));
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Close Tutorial Behavior Section
+  // ═══════════════════════════════════════════════════════════
+
+  // Collapsible toggle (delegated — matches intro section pattern)
+  $(document).on('click', '#pbsg-close-url-toggle', function () {
+    var $body = $('#pbsg-close-url-body');
+    var $chevron = $('#pbsg-close-url-chevron');
+    $body.toggle();
+    $chevron.html(icon($body.is(':visible') ? 'chevron-down' : 'chevron-right'));
   });
 
   // Use-site-defaults checkbox toggles controls
@@ -2863,14 +2955,11 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var useDefault = $(this).is(':checked');
 
     if (useDefault) {
-      // Reset all sliders to site default values
-      var defaults = window.PBSG_ADMIN.benchmarkDefaults || {};
+      // Reset all sliders to site default values read from DOM data attributes
       $('#pbsg_benchmark_controls .pbsg-slider-wrap').each(function () {
-        var keyLow  = $(this).attr('data-key-low');
-        var keyHigh = $(this).attr('data-key-high');
-        var low  = defaults[keyLow]  || 0;
-        var high = defaults[keyHigh] || 0;
-        if (this.pbsgSliderSetValues) {
+        var low  = parseInt($(this).attr('data-default-low'), 10);
+        var high = parseInt($(this).attr('data-default-high'), 10);
+        if (!isNaN(low) && !isNaN(high) && this.pbsgSliderSetValues) {
           this.pbsgSliderSetValues(low, high);
         }
       });

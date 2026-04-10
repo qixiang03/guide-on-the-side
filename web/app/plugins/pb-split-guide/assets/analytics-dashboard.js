@@ -21,6 +21,11 @@
     const config = pbsgAnalytics;
     const $wrap  = $( '#pbsg-dashboard-content' );
 
+    // Shortcut: render a Marginalia SVG icon by name.
+    // Returns an empty string if PBSG_ICONS hasn't been enqueued.
+    const icon = ( name, extra ) =>
+        ( typeof PBSG_ICONS !== 'undefined' ) ? PBSG_ICONS.render( name, extra ) : '';
+
     // Compare view state
     let compareIds = [];
 
@@ -166,7 +171,7 @@
         html += '<div class="pbsg-card">';
         html += '<div class="pbsg-card-header">';
         html += 'All Tutorials';
-        html += '<a class="pbsg-card-action" href="' + getExportUrl( 'overview' ) + '">↓ Export CSV</a>';
+        html += '<a class="pbsg-card-action" href="' + getExportUrl( 'overview' ) + '">' + icon( 'arrow-down' ) + ' Export CSV</a>';
         html += '</div>';
         html += renderTutorialTable( tutorials, trend );
         html += '</div>';
@@ -184,7 +189,7 @@
 
         // Needs attention
         html += '<div class="pbsg-card">';
-        html += '<div class="pbsg-card-header">⚠ Needs Attention</div>';
+        html += '<div class="pbsg-card-header">' + icon( 'warning', 'pbsg-icon--warn' ) + ' Needs Attention</div>';
         html += renderNeedsAttention( tutorials );
         html += '</div>';
 
@@ -259,7 +264,7 @@
             html += '<div class="pbsg-card">';
             html += '<div class="pbsg-card-header">';
             html += 'Quiz Questions <span class="pbsg-alltime-badge">all-time</span>';
-            html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">↓ Export CSV</a>';
+            html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">' + icon( 'arrow-down' ) + ' Export CSV</a>';
             html += '</div>';
             html += renderQuestionsTable( questions, stats.tutorial_page_id, bench );
             html += '</div>';
@@ -484,7 +489,7 @@
         } );
 
         if ( ! flagged.length ) {
-            return '<p style="color:#888;font-size:14px;padding:10px 0;">All tutorials are performing within acceptable thresholds. 👍</p>';
+            return '<p style="color:#888;font-size:14px;padding:10px 0;">All tutorials are performing within acceptable thresholds. ' + icon( 'thumbs-up', 'pbsg-icon--ok' ) + '</p>';
         }
 
         let html = '';
@@ -506,7 +511,7 @@
             html += escapeHtml( t.tutorial_name || 'Tutorial' ) + '</a>';
             html += '<div class="pbsg-attention-reason">' + reasons.join( ' · ' ) + '</div>';
             html += '</div>';
-            html += '<span class="pbsg-badge red">⚠</span>';
+            html += '<span class="pbsg-badge red">' + icon( 'warning' ) + '</span>';
             html += '</div>';
         } );
 
@@ -841,10 +846,10 @@
 
             if ( tData ) {
                 html += '<div class="col-tutorial col-filled" data-col="' + i + '">';
-                html += '<button type="button" class="pbsg-col-remove" data-col="' + i + '" title="Remove">✕</button>';
+                html += '<button type="button" class="pbsg-col-remove" data-col="' + i + '" title="Remove">' + icon( 'close' ) + '</button>';
                 html += '<div class="col-name">' + escapeHtml( tData.name ) + '</div>';
                 html += '<div class="col-meta">' + escapeHtml( tData.meta ) + '</div>';
-                html += '<button type="button" class="pbsg-col-change-btn" data-col="' + i + '">Change ▾</button>';
+                html += '<button type="button" class="pbsg-col-change-btn" data-col="' + i + '">Change ' + icon( 'chevron-down' ) + '</button>';
                 html += '<select aria-label="Tutorial Select" class="col-swap-select pbsg-compare-select" data-col="' + i + '">';
                 html += buildTutorialOptions( i, tid );
                 html += '</select>';
@@ -998,7 +1003,7 @@
             const dateTo   = $( '#pbsg-date-to' ).val();
             if ( dateFrom ) exportUrl += '&date_from=' + encodeURIComponent( dateFrom );
             if ( dateTo )   exportUrl += '&date_to=' + encodeURIComponent( dateTo );
-            html += '<a href="' + exportUrl + '" class="button pbsg-btn pbsg-btn-primary pbsg-btn-sm">↓ Export Comparison CSV</a>';
+            html += '<a href="' + exportUrl + '" class="button pbsg-btn pbsg-btn-primary pbsg-btn-sm">' + icon( 'arrow-down' ) + ' Export Comparison CSV</a>';
             html += '</div>';
         }
 

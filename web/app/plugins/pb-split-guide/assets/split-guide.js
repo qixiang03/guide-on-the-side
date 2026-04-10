@@ -851,7 +851,12 @@ function updateRunningScore() {
   const correct = passedQuizStepsCount();
   const attempted = attemptedQuizStepsCount();
 
-  runningScoreEl.textContent = `Correct/Attempted ${correct}/${attempted} ✓`;
+  // Use innerHTML so the Marginalia check icon renders as inline SVG.
+  // Numeric values are safe (produced by Number coercion above).
+  const checkIcon = (typeof PBSG_ICONS !== 'undefined')
+    ? PBSG_ICONS.render('check', 'pbsg-icon--ok')
+    : '';
+  runningScoreEl.innerHTML = `Correct/Attempted ${correct}/${attempted} ${checkIcon}`;
 }
 
 function resetTutorialToStart(){

@@ -318,7 +318,7 @@ final class PBSG_H5P_Factory
     private static function build_blanks_params(array $quiz): array
     {
         $sentence = $quiz['sentence'] ?? '';
-        $questions = [$sentence];
+        $questions = ['<p>' . $sentence . '</p>'];
 
         return [
             'questions'       => $questions,
