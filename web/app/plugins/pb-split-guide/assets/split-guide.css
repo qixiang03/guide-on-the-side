@@ -896,16 +896,17 @@ body.pbsg-standalone .pbsg-wrap{
 }
 
 .pbsg-intro-cover {
-  flex: 0 0 auto;
-  height: 440px;
-  max-width: 60%;
+  flex: 0 0 55%;
+  min-height: 440px;
   margin: 0;
+  position: relative;
 }
 
 .pbsg-intro-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  width: auto;
-  max-width: 100%;
   display: block;
   border-radius: 0;
   object-fit: cover;
