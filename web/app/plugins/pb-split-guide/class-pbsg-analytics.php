@@ -842,7 +842,14 @@ class PBSG_Analytics {
             $filename = 'comparison-' . implode( '-', $tut_names ) . '-' . $date_from . '-to-' . $date_to . '.csv';
             self::send_csv_headers( $filename );
 
-            fputcsv( $output, array( 'Metric', 'Tutorial 1', 'Tutorial 2', 'Tutorial 3' ) );
+            $col_count = count( $tuts );
+
+            // Build header with actual tutorial names
+            $header = array( 'Metric' );
+            foreach ( $tuts as $t ) {
+                $header[] = $t['name'];
+            }
+            fputcsv( $output, $header );
 
             $metrics = array(
                 array( 'Views', 'views' ),
@@ -855,17 +862,10 @@ class PBSG_Analytics {
                 array( 'Give-up Rate (%)', 'giveup_rate' ),
             );
 
-            // Tutorial names header
-            $name_row = array( 'Tutorial' );
-            for ( $i = 0; $i < 3; $i++ ) {
-                $name_row[] = isset( $tuts[ $i ] ) ? $tuts[ $i ]['name'] : '';
-            }
-            fputcsv( $output, $name_row );
-
             foreach ( $metrics as $m ) {
                 $row = array( $m[0] );
-                for ( $i = 0; $i < 3; $i++ ) {
-                    $row[] = isset( $tuts[ $i ] ) ? $tuts[ $i ][ $m[1] ] : '';
+                for ( $i = 0; $i < $col_count; $i++ ) {
+                    $row[] = $tuts[ $i ][ $m[1] ];
                 }
                 fputcsv( $output, $row );
             }

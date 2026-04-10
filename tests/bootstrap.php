@@ -55,6 +55,7 @@ $plugin_dir = $root_dir . '/web/app/plugins/pb-split-guide/';
 require_once $plugin_dir . 'includes/class-pbsg-roles.php';
 require_once $plugin_dir . 'includes/class-pbsg-admin-menu-filter.php';
 require_once $plugin_dir . 'includes/class-pbsg-librarian-manager.php';
+require_once $plugin_dir . 'includes/class-pbsg-h5p-usage-map.php';
 require_once $plugin_dir . 'accessibility-dashboard/class-pbsg-accessibility-dashboard.php';
 
 echo "UPEI Project Test Bootstrap: Initialized successfully.\n";

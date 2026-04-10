@@ -39,7 +39,6 @@ class PBSGBenchmarkTest extends TestCase
             'correct_rate_green', 'correct_rate_amber',
             'giveup_low', 'giveup_high',
             'retries_low', 'retries_high',
-            'attention_completion', 'attention_score',
         ];
 
         foreach ($expected_keys as $key) {
@@ -50,7 +49,7 @@ class PBSGBenchmarkTest extends TestCase
             );
         }
 
-        $this->assertCount(12, PB_Split_Guide_Plugin::BENCHMARK_FALLBACKS);
+        $this->assertCount(10, PB_Split_Guide_Plugin::BENCHMARK_FALLBACKS);
     }
 
     public function test_benchmark_fallback_values_are_sensible(): void
@@ -104,7 +103,6 @@ class PBSGBenchmarkTest extends TestCase
         // Set a site-wide option that overrides some values
         $site_defaults = PB_Split_Guide_Plugin::BENCHMARK_FALLBACKS;
         $site_defaults['completion_rate_green'] = 80;
-        $site_defaults['attention_completion']  = 45;
 
         WPStubs::$returns['get_option_' . PB_Split_Guide_Plugin::OPTION_BENCHMARK_DEFAULTS] =
             json_encode($site_defaults);
@@ -112,7 +110,6 @@ class PBSGBenchmarkTest extends TestCase
         $result = PB_Split_Guide_Plugin::resolve_benchmarks(0);
 
         $this->assertSame(80, $result['completion_rate_green']);
-        $this->assertSame(45, $result['attention_completion']);
         // Other values should still match fallbacks
         $this->assertSame(
             PB_Split_Guide_Plugin::BENCHMARK_FALLBACKS['score_green'],
@@ -129,7 +126,7 @@ class PBSGBenchmarkTest extends TestCase
             json_encode($site_defaults);
 
         // Per-tutorial override: completion_rate_green = 55 (it's a hard tutorial)
-        $per_tutorial = ['completion_rate_green' => 55, 'attention_completion' => 30];
+        $per_tutorial = ['completion_rate_green' => 55];
         WPStubs::$returns['get_post_meta'] = [
             PB_Split_Guide_Plugin::META_BENCHMARKS => json_encode($per_tutorial),
         ];
@@ -138,7 +135,6 @@ class PBSGBenchmarkTest extends TestCase
 
         // Per-tutorial wins over site default
         $this->assertSame(55, $result['completion_rate_green']);
-        $this->assertSame(30, $result['attention_completion']);
 
         // Non-overridden keys still use site or hardcoded fallback
         $this->assertSame(
@@ -271,8 +267,8 @@ class PBSGBenchmarkTest extends TestCase
         $input  = json_encode(['completion_rate_green' => 80]); // Only one key
         $result = json_decode($plugin->sanitize_benchmark_defaults($input), true);
 
-        // All 12 keys must be present
-        $this->assertCount(12, $result);
+        // All 10 keys must be present
+        $this->assertCount(10, $result);
         $this->assertSame(80, $result['completion_rate_green']);
         // Missing keys filled with fallback
         $this->assertSame(
@@ -324,7 +320,7 @@ class PBSGBenchmarkTest extends TestCase
         $result = json_decode($plugin->sanitize_benchmark_defaults($input), true);
 
         $this->assertArrayNotHasKey('unknown_key', $result);
-        $this->assertCount(12, $result);
+        $this->assertCount(10, $result);
     }
 
     /* ===================================================================
@@ -377,7 +373,7 @@ class PBSGBenchmarkTest extends TestCase
 
         $result = PB_Split_Guide_Plugin::resolve_benchmarks(42);
 
-        $this->assertCount(12, $result);
+        $this->assertCount(10, $result);
         foreach (array_keys(PB_Split_Guide_Plugin::BENCHMARK_FALLBACKS) as $key) {
             $this->assertArrayHasKey($key, $result);
         }
