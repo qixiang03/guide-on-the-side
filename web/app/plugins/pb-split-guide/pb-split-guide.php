@@ -1846,6 +1846,78 @@ class PB_Split_Guide_Plugin {
     <?php
   }
 
+  /**
+   * Translate a branch sub-question's source fields into the quiz schema
+   * that PBSG_H5P_Factory::create()/update() understands.
+   *
+   * Returns null for unsupported types so the caller can skip H5P creation.
+   *
+   * @param array $bq Branch question data (from branch.questions[]).
+   * @return array|null Quiz schema or null if type unsupported.
+   */
+  private static function branch_question_to_quiz(array $bq): ?array {
+    $type = $bq['type'] ?? '';
+    if (!in_array($type, ['multichoice', 'singlechoice', 'blanks'], true)) {
+      return null;
+    }
+
+    if ($type === 'multichoice') {
+      return [
+        'type'     => 'multichoice',
+        'question' => $bq['question'] ?? '',
+        'answers'  => array_values(array_map(function ($a) {
+          return [
+            'text'    => $a['text'] ?? '',
+            'correct' => !empty($a['correct']),
+          ];
+        }, (array) ($bq['answers'] ?? []))),
+      ];
+    }
+
+    if ($type === 'singlechoice') {
+      return [
+        'type'           => 'singlechoice',
+        'question'       => $bq['question'] ?? '',
+        'correct_answer' => $bq['correct_answer'] ?? '',
+        'wrong_answers'  => array_values((array) ($bq['wrong_answers'] ?? [])),
+      ];
+    }
+
+    if ($type === 'blanks') {
+      return [
+        'type'           => 'blanks',
+        'sentence'       => $bq['sentence'] ?? '',
+        'case_sensitive' => !empty($bq['case_sensitive']),
+        'accept_typos'   => !empty($bq['accept_typos']),
+      ];
+    }
+
+    return null;
+  }
+
+  /**
+   * Look up the H5P library machine name for an existing H5P content row.
+   * Used to detect when a branch question's type has changed and the linked
+   * H5P content row needs to be replaced rather than updated in place.
+   *
+   * @param int $h5p_id H5P content ID.
+   * @return string|null Library machine name (e.g. 'H5P.MultiChoice'), or null if not found.
+   */
+  private static function get_h5p_library_name(int $h5p_id): ?string {
+    if ($h5p_id <= 0) {
+      return null;
+    }
+    global $wpdb;
+    $row = $wpdb->get_var($wpdb->prepare(
+      "SELECT l.name
+       FROM {$wpdb->prefix}h5p_contents c
+       JOIN {$wpdb->prefix}h5p_libraries l ON c.library_id = l.id
+       WHERE c.id = %d",
+      $h5p_id
+    ));
+    return $row ?: null;
+  }
+
   public function save_meta($post_id, $post) {
     if (!isset($_POST['pbsg_nonce']) || !wp_verify_nonce($_POST['pbsg_nonce'], 'pbsg_save_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
