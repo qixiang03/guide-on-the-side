@@ -22,6 +22,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-h5p-factory.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-template-manager.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-export-import.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-h5p-usage-map.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-icons.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
@@ -703,11 +704,11 @@ class PB_Split_Guide_Plugin {
 
         <div id="pbsg-intro-toggle" class="pbsg-section-header">
           <div class="pbsg-section-header-left">
-            <span class="pbsg-section-icon">&#x1F4DD;</span>
+            <span class="pbsg-section-icon"><?php echo pbsg_icon('document'); ?></span>
             <span class="pbsg-section-title">Tutorial Introduction</span>
             <span class="pbsg-badge pbsg-badge--info">What students see before starting</span>
           </div>
-          <span id="pbsg-intro-chevron" class="pbsg-chevron">&#x25BC;</span>
+          <span id="pbsg-intro-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-down'); ?></span>
         </div>
 
         <div id="pbsg-intro-body" class="pbsg-intro-body">
@@ -731,7 +732,7 @@ class PB_Split_Guide_Plugin {
                   <?php if (!empty($intro_objectives)): ?>
                     <?php foreach ($intro_objectives as $obj): ?>
                       <div class="pbsg-objective-row">
-                        <span class="pbsg-objective-check">&#x2713;</span>
+                        <span class="pbsg-objective-check"><?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
                         <input type="text" class="pbsg-objective-input" value="<?php echo esc_attr($obj); ?>" />
                         <button type="button" class="pbsg-objective-remove" title="Remove">&times;</button>
                       </div>
@@ -803,11 +804,11 @@ class PB_Split_Guide_Plugin {
 
         <div id="pbsg-layout-toggle" class="pbsg-section-header">
           <div class="pbsg-section-header-left">
-            <span class="pbsg-section-icon">&#x2194;</span>
+            <span class="pbsg-section-icon"><?php echo pbsg_icon('arrow-horizontal'); ?></span>
             <span class="pbsg-section-title">Layout Settings</span>
             <span class="pbsg-badge pbsg-badge--info">Per-guide customisation</span>
           </div>
-          <span id="pbsg-layout-chevron" class="pbsg-chevron">&#x25B6;</span>
+          <span id="pbsg-layout-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-right'); ?></span>
         </div>
 
         <div id="pbsg-layout-body" class="pbsg-intro-body" style="display:none;">
@@ -906,11 +907,11 @@ class PB_Split_Guide_Plugin {
 
         <div id="pbsg-benchmark-toggle" class="pbsg-section-header">
           <div class="pbsg-section-header-left">
-            <span class="pbsg-section-icon">&#x1F4CA;</span>
+            <span class="pbsg-section-icon"><?php echo pbsg_icon('chart-bar'); ?></span>
             <span class="pbsg-section-title">Benchmark Settings</span>
             <span class="pbsg-badge pbsg-badge--info">Performance thresholds for analytics</span>
           </div>
-          <span id="pbsg-benchmark-chevron" class="pbsg-chevron">&#x25B6;</span>
+          <span id="pbsg-benchmark-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-right'); ?></span>
         </div>
 
         <div id="pbsg-benchmark-body" class="pbsg-intro-body" style="display:none;">
@@ -944,7 +945,9 @@ class PB_Split_Guide_Plugin {
                   Badge colours for tutorial completion rate.
                 </div>
                 <div class="pbsg-slider-wrap" data-min="0" data-max="100" data-inverse="0"
-                     data-key-low="completion_rate_amber" data-key-high="completion_rate_green">
+                     data-key-low="completion_rate_amber" data-key-high="completion_rate_green"
+                     data-default-low="<?php echo esc_attr( $site_benchmarks['completion_rate_amber'] ); ?>"
+                     data-default-high="<?php echo esc_attr( $site_benchmarks['completion_rate_green'] ); ?>">
                   <div class="pbsg-slider-track">
                     <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
                     <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
@@ -984,7 +987,9 @@ class PB_Split_Guide_Plugin {
                   Badge colours for average quiz score.
                 </div>
                 <div class="pbsg-slider-wrap" data-min="0" data-max="100" data-inverse="0"
-                     data-key-low="score_amber" data-key-high="score_green">
+                     data-key-low="score_amber" data-key-high="score_green"
+                     data-default-low="<?php echo esc_attr( $site_benchmarks['score_amber'] ); ?>"
+                     data-default-high="<?php echo esc_attr( $site_benchmarks['score_green'] ); ?>">
                   <div class="pbsg-slider-track">
                     <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
                     <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
@@ -1024,7 +1029,9 @@ class PB_Split_Guide_Plugin {
                   Badge colours for per-question correct rate.
                 </div>
                 <div class="pbsg-slider-wrap" data-min="0" data-max="100" data-inverse="0"
-                     data-key-low="correct_rate_amber" data-key-high="correct_rate_green">
+                     data-key-low="correct_rate_amber" data-key-high="correct_rate_green"
+                     data-default-low="<?php echo esc_attr( $site_benchmarks['correct_rate_amber'] ); ?>"
+                     data-default-high="<?php echo esc_attr( $site_benchmarks['correct_rate_green'] ); ?>">
                   <div class="pbsg-slider-track">
                     <div class="pbsg-slider-seg pbsg-slider-seg--red"></div>
                     <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
@@ -1064,7 +1071,9 @@ class PB_Split_Guide_Plugin {
                   Lower is better — high give-ups get flagged.
                 </div>
                 <div class="pbsg-slider-wrap" data-min="0" data-max="15" data-inverse="1"
-                     data-key-low="giveup_low" data-key-high="giveup_high">
+                     data-key-low="giveup_low" data-key-high="giveup_high"
+                     data-default-low="<?php echo esc_attr( $site_benchmarks['giveup_low'] ); ?>"
+                     data-default-high="<?php echo esc_attr( $site_benchmarks['giveup_high'] ); ?>">
                   <div class="pbsg-slider-track">
                     <div class="pbsg-slider-seg pbsg-slider-seg--green"></div>
                     <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
@@ -1104,7 +1113,9 @@ class PB_Split_Guide_Plugin {
                   Lower is better — high retries get flagged.
                 </div>
                 <div class="pbsg-slider-wrap" data-min="0" data-max="13" data-inverse="1"
-                     data-key-low="retries_low" data-key-high="retries_high">
+                     data-key-low="retries_low" data-key-high="retries_high"
+                     data-default-low="<?php echo esc_attr( $site_benchmarks['retries_low'] ); ?>"
+                     data-default-high="<?php echo esc_attr( $site_benchmarks['retries_high'] ); ?>">
                   <div class="pbsg-slider-track">
                     <div class="pbsg-slider-seg pbsg-slider-seg--green"></div>
                     <div class="pbsg-slider-seg pbsg-slider-seg--amber"></div>
@@ -1151,6 +1162,41 @@ class PB_Split_Guide_Plugin {
         </div>
       </div>
 
+      <!-- ══════════ Close Tutorial Behavior Section ══════════ -->
+      <div id="pbsg-close-url-section" class="pbsg-intro-section">
+
+        <div id="pbsg-close-url-toggle" class="pbsg-section-header">
+          <div class="pbsg-section-header-left">
+            <span class="pbsg-section-icon"><?php echo pbsg_icon('arrow-up-right'); ?></span>
+            <span class="pbsg-section-title">Close Tutorial Behaviour</span>
+            <span class="pbsg-badge pbsg-badge--info">Where students go when they exit</span>
+          </div>
+          <span id="pbsg-close-url-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-right'); ?></span>
+        </div>
+
+        <div id="pbsg-close-url-body" class="pbsg-intro-body" style="display:none;">
+
+          <div class="pbsg-field">
+            <label for="pbsg_close_tutorial_url" class="pbsg-field-label">Close Tutorial URL</label>
+
+            <input
+              type="text"
+              id="pbsg_close_tutorial_url"
+              name="pbsg_close_tutorial_url"
+              value="<?php echo esc_attr($close_tutorial_url); ?>"
+              class="pbsg-input"
+              placeholder="https://library.upei.ca/"
+            />
+
+            <ul class="pbsg-description pbsg-close-url-states">
+              <li><?php esc_html_e('Leave empty — closes the current tab when students exit', 'pb-split-guide'); ?></li>
+              <li><?php esc_html_e('Add a URL — redirects students to the provided link instead', 'pb-split-guide'); ?></li>
+            </ul>
+          </div>
+
+        </div>
+      </div>
+
       <!-- ══════════ Steps Section ══════════ -->
       <div id="pbsg-steps-container" class="pbsg-steps-container">
         <!-- Steps are rendered by JS -->
@@ -1162,34 +1208,6 @@ class PB_Split_Guide_Plugin {
           Add Quiz Step
         </button>
       </div>
-
-      <div class="pbsg-section pbsg-close-url-section">
-
-  <div class="pbsg-section-header">
-    <h3>Close Tutorial Behavior</h3>
-  </div>
-
-    <div class="pbsg-section-body">
-
-      <div class="pbsg-field">
-        <label class="pbsg-label">Close Tutorial URL</label>
-
-        <input
-          type="text"
-          name="pbsg_close_tutorial_url"
-          value="<?php echo esc_attr($close_tutorial_url); ?>"
-          class="pbsg-input"
-          placeholder="Leave empty to close the current tab"
-        />
-
-        <p class="pbsg-description">
-          If empty, the tutorial will close the current tab.  
-          If a URL is provided, users will be redirected instead.
-        </p>
-      </div>
-
-    </div>
-  </div>
 
       <div class="pbsg-template-save-row" style="margin-top:24px; text-align:right;">
         <button type="button" class="button" id="pbsg-save-as-template">Save All as Template</button>
@@ -1239,27 +1257,81 @@ class PB_Split_Guide_Plugin {
    * Shows current owner and a "Transfer" button if the user can transfer.
    */
   public function render_owner_metabox($post) {
-    $owner = get_userdata((int) $post->post_author);
-    $owner_name = $owner ? $owner->display_name : __('Unknown', 'pb-split-guide');
-    $is_admin = PBSG_Roles::is_admin();
-    $is_owner = (int) $post->post_author === get_current_user_id();
+    $owner        = get_userdata((int) $post->post_author);
+    $owner_name   = $owner ? $owner->display_name : __('Unknown', 'pb-split-guide');
+    $is_admin     = PBSG_Roles::is_admin();
+    $is_owner     = (int) $post->post_author === get_current_user_id();
     $can_transfer = $is_admin || ($is_owner && self::is_transfer_enabled());
+
+    // ── Shared identity data (used by every state) ───────────────────────
+    // Human-readable role label for the owner (first role).
+    $owner_role_label = '';
+    if ($owner && !empty($owner->roles)) {
+      global $wp_roles;
+      $role_slug = reset($owner->roles);
+      if (isset($wp_roles->role_names[$role_slug])) {
+        $owner_role_label = translate_user_role($wp_roles->role_names[$role_slug]);
+      } else {
+        $owner_role_label = ucfirst(str_replace('_', ' ', $role_slug));
+      }
+    }
+
+    $avatar_html = $owner
+      ? get_avatar(
+          $owner->ID,
+          40,
+          '',
+          $owner_name,
+          array('class' => 'pbsg-owner-card__avatar')
+        )
+      : '';
+
+    // Non-owner, non-admin state shows a "Contact the owner" mailto link
+    // instead of the Transfer Ownership button.
+    $owner_email       = $owner && !empty($owner->user_email) ? $owner->user_email : '';
+    $mailto_subject    = sprintf(
+      /* translators: %s: tutorial title */
+      __('Question about tutorial: %s', 'pb-split-guide'),
+      get_the_title($post->ID)
+    );
+    $show_you_badge    = $is_owner && !$is_admin;
+    $show_contact_link = (!$is_owner && !$is_admin && $owner_email);
     ?>
-    <div class="pbsg-owner-metabox">
-      <p style="margin:0 0 8px;">
-        <strong><?php esc_html_e('Owner:', 'pb-split-guide'); ?></strong>
-        <?php echo esc_html($owner_name); ?>
-        <?php if ($is_owner && !$is_admin) : ?>
-          <span class="pbsg-owner-badge pbsg-owner-badge--self" style="margin-left:6px;">You</span>
+    <div class="pbsg-owner-metabox pbsg-owner-metabox--card">
+      <div class="pbsg-owner-card">
+        <?php if ($avatar_html) : ?>
+          <div class="pbsg-owner-card__avatar-wrap"><?php echo $avatar_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- get_avatar() returns escaped HTML ?></div>
+        <?php else : ?>
+          <div class="pbsg-owner-card__avatar-wrap pbsg-owner-card__avatar-wrap--placeholder" aria-hidden="true">
+            <?php echo pbsg_icon('document-page'); ?>
+          </div>
         <?php endif; ?>
-      </p>
+        <div class="pbsg-owner-card__info">
+          <div class="pbsg-owner-card__name-row">
+            <span class="pbsg-owner-card__name"><?php echo esc_html($owner_name); ?></span>
+            <?php if ($show_you_badge) : ?>
+              <span class="pbsg-owner-badge pbsg-owner-badge--self"><?php esc_html_e('You', 'pb-split-guide'); ?></span>
+            <?php endif; ?>
+          </div>
+          <?php if ($owner_role_label) : ?>
+            <span class="pbsg-owner-card__role"><?php echo esc_html($owner_role_label); ?></span>
+          <?php endif; ?>
+        </div>
+      </div>
+
       <?php if ($can_transfer) : ?>
-        <button type="button" class="button pbsg-transfer-single"
+        <button type="button"
+                class="button pbsg-transfer-single pbsg-owner-metabox__action"
                 data-post-id="<?php echo esc_attr($post->ID); ?>"
-                data-post-title="<?php echo esc_attr(get_the_title($post->ID)); ?>"
-                style="width:100%;">
+                data-post-title="<?php echo esc_attr(get_the_title($post->ID)); ?>">
           <?php esc_html_e('Transfer Ownership', 'pb-split-guide'); ?>
         </button>
+      <?php elseif ($show_contact_link) : ?>
+        <a class="pbsg-owner-contact"
+           href="mailto:<?php echo esc_attr($owner_email); ?>?subject=<?php echo esc_attr(rawurlencode($mailto_subject)); ?>">
+          <?php echo pbsg_icon('link'); ?>
+          <span><?php esc_html_e('Contact the owner', 'pb-split-guide'); ?></span>
+        </a>
       <?php endif; ?>
     </div>
     <?php
@@ -1394,7 +1466,7 @@ class PB_Split_Guide_Plugin {
           background: #fff; border: 1px solid #E0E0E0; border-radius: 8px;
           padding: 24px; max-width: 720px; margin-bottom: 24px;
         ">
-          <h2 style="margin-top:0; font-size:18px;">&#x2194; Default Panel Layout</h2>
+          <h2 style="margin-top:0; font-size:18px; display:flex; align-items:center; gap:8px;"><?php echo pbsg_icon('arrow-horizontal'); ?> Default Panel Layout</h2>
           <p class="description" style="margin-bottom: 16px;">
             Sets the default left/right ratio for all new tutorials. Librarians can override this per guide.
           </p>
@@ -1440,7 +1512,7 @@ class PB_Split_Guide_Plugin {
           background: #fff; border: 1px solid #E0E0E0; border-radius: 8px;
           padding: 24px; max-width: 720px; margin-bottom: 24px;
         ">
-          <h2 style="margin-top:0; font-size:18px;">&#x1F4CA; Default Performance Benchmarks</h2>
+          <h2 style="margin-top:0; font-size:18px; display:flex; align-items:center; gap:8px;"><?php echo pbsg_icon('chart-bar'); ?> Default Performance Benchmarks</h2>
           <p class="description" style="margin-bottom: 16px;">
             These thresholds determine badge colours on the analytics dashboard.
             Tutorials with any metric in the <strong style="color:#D93025;">red</strong> zone are automatically flagged as &ldquo;Needs Attention&rdquo; on the Overview tab.
@@ -1671,7 +1743,7 @@ class PB_Split_Guide_Plugin {
           background: #fff; border: 1px solid #E0E0E0; border-radius: 8px;
           padding: 24px; max-width: 720px; margin-bottom: 24px;
         ">
-          <h2 style="margin-top:0; font-size:18px;">&#x1F512; Permissions</h2>
+          <h2 style="margin-top:0; font-size:18px; display:flex; align-items:center; gap:8px;"><?php echo pbsg_icon('lock-closed'); ?> Permissions</h2>
           <p class="description" style="margin-bottom: 16px;">
             Control collaboration between librarians. Administrators always have full access regardless of these settings.
           </p>
@@ -2050,11 +2122,20 @@ class PB_Split_Guide_Plugin {
       true
     );
 
+    // Icon set — must load before admin-split-guide.js so PBSG_ICONS.render() is available.
+    wp_enqueue_script(
+      'pbsg_icons_js',
+      plugin_dir_url(__FILE__) . 'assets/pbsg-icons.js',
+      [],
+      '1.0.0',
+      true
+    );
+
     wp_enqueue_script(
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
-      ['jquery', 'thickbox'],
-      '0.7.1',
+      ['jquery', 'thickbox', 'pbsg_icons_js'],
+      '0.7.2',
       true
     );
 
@@ -2062,7 +2143,7 @@ class PB_Split_Guide_Plugin {
       'pbsg-admin',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
       [],
-      '2.1.1'  // bumped to force cache bust
+      '2.1.2'  // bumped to force cache bust
     );
 
     $current_template = get_post_meta(get_the_ID(), '_wp_page_template', true);
@@ -2149,9 +2230,16 @@ class PB_Split_Guide_Plugin {
       '2.1.2'
     );
     wp_enqueue_script(
+      'pbsg_icons_js',
+      plugin_dir_url(__FILE__) . 'assets/pbsg-icons.js',
+      [],
+      '1.0.0',
+      true
+    );
+    wp_enqueue_script(
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
-      ['jquery'],
+      ['jquery', 'pbsg_icons_js'],
       '0.7.2',
       true
     );
@@ -2170,7 +2258,7 @@ class PB_Split_Guide_Plugin {
       'pbsg-admin-cross-edit',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.css',
       [],
-      '0.6.0'
+      '0.7.1'
     );
     wp_enqueue_script(
       'pbsg-admin-cross-edit',
