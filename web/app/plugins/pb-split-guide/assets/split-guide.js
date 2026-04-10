@@ -1463,114 +1463,64 @@ function renderInlineBranchQuestion(q) {
 
   showBranchQuizHost();
 
-  const type = q.type || '';
-  let html = '';
-
-  if (type === 'multichoice') {
-    const answers = Array.isArray(q.answers) ? q.answers : [];
-    html = `
-      <div class="pbsg-branch-inline-question">
-        <h3>${escapeHtml(q.question || '')}</h3>
-        <div class="pbsg-branch-inline-answers">
-          ${answers.map((a, idx) => `
-            <label class="pbsg-branch-inline-answer">
-              <input type="checkbox" name="pbsgBranchAnswer" value="${idx}">
-              <span>${escapeHtml(a.text || '')}</span>
-            </label>
-          `).join('')}
-        </div>
-        <div class="pbsg-branch-inline-actions">
-          <button type="button" id="pbsgBranchCheck">Check</button>
-        </div>
-        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
-      </div>
-    `;
-  } else if (type === 'singlechoice') {
-    const wrongs = Array.isArray(q.wrong_answers) ? q.wrong_answers : [];
-    const choices = [q.correct_answer || '', ...wrongs].filter(Boolean);
-
-    html = `
-      <div class="pbsg-branch-inline-question">
-        <h3>${escapeHtml(q.question || '')}</h3>
-        <div class="pbsg-branch-inline-answers">
-          ${choices.map((choice, idx) => `
-            <label class="pbsg-branch-inline-answer">
-              <input type="radio" name="pbsgBranchAnswer" value="${idx}">
-              <span>${escapeHtml(choice)}</span>
-            </label>
-          `).join('')}
-        </div>
-        <div class="pbsg-branch-inline-actions">
-          <button type="button" id="pbsgBranchCheck">Check</button>
-        </div>
-        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
-      </div>
-    `;
-
-    branchQuizHost.innerHTML = html;
-    bindInlineBranchCheck(q, choices);
+  if (!q.h5p_id || q.h5p_id <= 0) {
+    // Defensive — should never happen post-deployment because save_meta always creates h5p_id
+    branchQuizHost.innerHTML = '<div class="pbsg-branch-error">This branch question is not configured. Please re-save the tutorial.</div>';
+    lockNext(false);
     return;
-  } else if (type === 'blanks') {
-    html = `
-      <div class="pbsg-branch-inline-question">
-        <h3>Fill in the blank</h3>
-        <div class="pbsg-branch-inline-blanks">
-          <textarea id="pbsgBranchBlanksInput" rows="4">${escapeHtml(q.sentence || '')}</textarea>
-        </div>
-        <div class="pbsg-branch-inline-actions">
-          <button type="button" id="pbsgBranchCheck">Check</button>
-        </div>
-        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
-      </div>
-    `;
   }
 
-  branchQuizHost.innerHTML = html;
-  bindInlineBranchCheck(q);
+  const iframeSrc = h5pUrl(q.h5p_id);
+
+  branchQuizHost.innerHTML = `
+    <iframe
+      id="pbsgBranchH5PFrame"
+      src="${iframeSrc}"
+      class="pbsg-branch-h5p-iframe"
+      allowfullscreen
+      frameborder="0">
+    </iframe>
+  `;
+
+  // Lock Next until the student passes the H5P question
+  lockNext(true);
+
+  const iframe = document.getElementById('pbsgBranchH5PFrame');
+  if (iframe) {
+    iframe.addEventListener('load', () => {
+      attachBranchH5PxAPI(iframe);
+    });
+  }
 }
 
-function bindInlineBranchCheck(q, singleChoices = []) {
-  const checkBtn = document.getElementById('pbsgBranchCheck');
-  const feedback = document.getElementById('pbsgBranchFeedback');
+function attachBranchH5PxAPI(iframe) {
+  try {
+    const win = iframe.contentWindow;
+    if (!win || !win.H5P || !win.H5P.externalDispatcher) {
+      // H5P not yet ready — retry once after a short delay
+      setTimeout(() => attachBranchH5PxAPI(iframe), 200);
+      return;
+    }
 
-  if (!checkBtn || !feedback) return;
+    win.H5P.externalDispatcher.on('xAPI', (event) => {
+      const verb = (event && event.data && event.data.statement && event.data.statement.verb && event.data.statement.verb.id) || '';
+      const result = event && event.data && event.data.statement && event.data.statement.result;
 
-  checkBtn.onclick = () => {
-    let correct = false;
-
-    if (q.type === 'multichoice') {
-      const selected = Array.from(document.querySelectorAll('input[name="pbsgBranchAnswer"]:checked'))
-        .map(el => parseInt(el.value, 10))
-        .sort();
-
-      const correctIdx = (q.answers || [])
-        .map((a, idx) => a.correct ? idx : -1)
-        .filter(idx => idx >= 0)
-        .sort();
-
-      correct = JSON.stringify(selected) === JSON.stringify(correctIdx);
-    } else if (q.type === 'singlechoice') {
-      const selected = document.querySelector('input[name="pbsgBranchAnswer"]:checked');
-      if (selected) {
-        const idx = parseInt(selected.value, 10);
-        correct = singleChoices[idx] === (q.correct_answer || '');
+      // 'answered' verb fires when student clicks Check
+      if (verb.endsWith('/answered') && result && result.score) {
+        const passed = result.score.scaled >= 1.0;
+        if (passed) {
+          lockNext(false);
+        } else {
+          lockNext(true);
+        }
       }
-    } else if (q.type === 'blanks') {
-      const input = document.getElementById('pbsgBranchBlanksInput');
-      const value = (input?.value || '').trim();
-      correct = value.length > 0;
-    }
-
-    if (correct) {
-      feedback.textContent = 'Correct.';
-      feedback.className = 'pbsg-branch-feedback is-correct';
-      lockNext(false);
-    } else {
-      feedback.textContent = 'Try again.';
-      feedback.className = 'pbsg-branch-feedback is-wrong';
-      lockNext(true);
-    }
-  };
+    });
+  } catch (e) {
+    // Cross-origin or H5P-not-ready — fall back to allowing Next so the student isn't stuck
+    console.warn('Branch H5P xAPI listener failed:', e);
+    lockNext(false);
+  }
 }
 
 function buildBranchTutorialStep(branch) {
@@ -1661,13 +1611,20 @@ function renderBranchStep() {
   const mainNumber = branchParentIndex + 1;
   const branchCurrent = branchStepIndex + 1;
 
-  const pageText = `Page: ${mainNumber}${letter} of ${branchTotal}`;
+  // Total tutorial pages — used as the denominator so the student sees their
+  // overall position in the tutorial (e.g. "Page: 2A of 10") rather than just
+  // their position within the branch detour.
+  const totalPages = Array.isArray(steps) ? steps.length : 0;
+  const pageText = `Page: ${mainNumber}${letter} of ${totalPages}`;
 
   if (progressEl) progressEl.textContent = pageText;
   updateRunningScore();
   if (progressLabelEl) progressLabelEl.textContent = pageText;
 
-  const pct = branchTotal ? (branchCurrent / branchTotal) * 100 : 0;
+  // Progress bar fill based on parent step position in the overall tutorial,
+  // not the local branch position. The bar stays at the parent step's position
+  // throughout the branch detour so the student sees they haven't lost ground.
+  const pct = totalPages ? ((branchParentIndex + 1) / totalPages) * 100 : 0;
   if (progressFillEl) progressFillEl.style.width = pct.toFixed(2) + '%';
 
 
