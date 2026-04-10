@@ -73,6 +73,10 @@ jQuery(function ($) {
   let _savedSnapshot = '';   // JSON string of last-saved state
   let _isDirty = false;
 
+  /** @type {Object<number, {title: string, user_id: number, author_name: string, is_owner: boolean, usage_count: number}>} */
+  let h5pMetaCache = {};
+  let titleSaveTimer = null;
+
   /** Take a snapshot of the current form state (steps JSON + intro fields). */
   function currentSnapshot() {
     const parts = [
@@ -730,11 +734,34 @@ function branchSummary(s) {
   // ─── Quiz Panel ────────────────────────────────────────
   function renderQuizPanel(s, idx) {
     if (s.h5p_id > 0 && !s.quiz) {
-      return `<div class="pbsg-linked-h5p">
+      const meta = h5pMetaCache[s.h5p_id] || {};
+      const isOwner = meta.is_owner !== false;
+      const title = meta.title || ('H5P #' + s.h5p_id);
+      const authorName = meta.author_name || 'Unknown user';
+      const usageCount = meta.usage_count || 0;
+
+      // Title row: owners get lock icon, non-owners see read-only text
+      let titleRow = '';
+      if (isOwner) {
+        titleRow = `<div class="pbsg-h5p-title-row pbsg-h5p-title-row--locked" data-idx="${idx}" data-h5p-id="${s.h5p_id}">
+          <span class="pbsg-h5p-title-label">H5P Name:</span>
+          <span class="pbsg-h5p-title-text">${esc(title)}</span>
+          <span class="pbsg-h5p-lock-icon pbsg-h5p-lock-toggle" data-idx="${idx}" data-h5p-id="${s.h5p_id}" data-original-title="${esc(title)}" title="Click to unlock and edit name">&#x1F512;</span>
+        </div>
+        <div class="pbsg-h5p-title-status" data-idx="${idx}"></div>`;
+      } else {
+        titleRow = `<div class="pbsg-h5p-title-row pbsg-h5p-title-row--locked">
+          <span class="pbsg-h5p-title-label" style="color:#bbb;">H5P Name:</span>
+          <span class="pbsg-h5p-title-text" style="color:#aaa;">${esc(title)}</span>
+        </div>`;
+      }
+
+      return `<div class="pbsg-linked-h5p" data-h5p-owner="${isOwner}" data-h5p-author="${esc(authorName)}" data-h5p-usage="${usageCount}">
         <div class="pbsg-linked-h5p-info">
           <span class="pbsg-linked-icon">&#x1F517;</span>
           <span>Linked to <strong>H5P #${s.h5p_id}</strong></span>
         </div>
+        ${titleRow}
         <div class="pbsg-linked-h5p-actions">
           <a href="#" class="pbsg-create-inline-from-linked" data-idx="${idx}">Create new</a>
           <span class="pbsg-sep">|</span>
@@ -2087,18 +2114,75 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     pickIdx = parseInt($(this).data('idx'), 10);
     if (isNaN(pickIdx)) return;
     $.post(PBSG_ADMIN.ajaxUrl, { action: 'pbsg_list_h5p', nonce: PBSG_ADMIN.nonce })
-      .done(function (res) { if (res && res.success) openPicker(res.data.items || []); else alert(res && res.data ? res.data.message : 'Could not load H5P items.'); })
+      .done(function (res) {
+        if (res && res.success) {
+          // Cache metadata for card rendering
+          (res.data.items || []).forEach(function (item) {
+            h5pMetaCache[item.id] = item;
+          });
+          openPicker(res.data.items || []);
+        } else {
+          alert(res && res.data ? res.data.message : 'Could not load H5P items.');
+        }
+      })
       .fail(function () { alert('Request failed while loading H5P items.'); });
   });
 
   function openPicker(items) {
-    const opts = items.map(i => `<option value="${i.id}">${esc(i.title)} (ID: ${i.id})</option>`).join('');
-    if (!$('#pbsg-h5p-inline').length) $('body').append('<div id="pbsg-h5p-inline" style="display:none;"></div>');
-    $('#pbsg-h5p-inline').html(`<div style="padding:14px;"><h2 style="margin-top:0;">Select an H5P quiz</h2><p>Pick a quiz to link to this step.</p>
-      <select id="pbsg-h5p-select" style="width:100%;max-width:520px;"><option value="">— Select H5P —</option>${opts}</select>
-      <div style="margin-top:12px;display:flex;gap:8px;"><button type="button" class="button button-primary" id="pbsg-h5p-insert">Insert</button><button type="button" class="button" id="pbsg-h5p-cancel">Cancel</button></div></div>`);
-    tb_show('Select H5P', '#TB_inline?inlineId=pbsg-h5p-inline&width=640&height=280');
+    const opts = items.map(function (i) {
+      return `<option value="${i.id}" data-author="${esc(i.author_name)}" data-owner="${i.is_owner}" data-usage="${i.usage_count}">${esc(i.title)} (#${i.id})</option>`;
+    }).join('');
+
+    if (!$('#pbsg-h5p-inline').length) {
+      $('body').append('<div id="pbsg-h5p-inline" style="display:none;"></div>');
+    }
+
+    $('#pbsg-h5p-inline').html(`<div style="padding:14px;">
+      <h2 style="margin-top:0;">Select an H5P quiz</h2>
+      <p>Pick a quiz to link to this step, or use one as a template.</p>
+      <select id="pbsg-h5p-select" style="width:100%;max-width:520px;">
+        <option value="">&mdash; Select H5P &mdash;</option>
+        ${opts}
+      </select>
+      <div id="pbsg-h5p-picker-info" class="pbsg-h5p-picker-info" style="display:none;margin-top:12px;"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button type="button" class="button button-primary" id="pbsg-h5p-insert">Insert</button>
+        <button type="button" class="button" id="pbsg-h5p-template" style="border-color:var(--pbsg-green,#517E1B);color:var(--pbsg-green,#517E1B);font-weight:600;">Use as Template</button>
+        <button type="button" class="button" id="pbsg-h5p-cancel">Cancel</button>
+      </div>
+      <div class="pbsg-h5p-picker-help">
+        <strong>Insert</strong> links to the original H5P (shared &mdash; edits affect all tutorials using it).<br>
+        <strong>Use as Template</strong> creates your own copy with a new ID &mdash; safe to edit freely.
+      </div>
+    </div>`);
+
+    tb_show('Select H5P', '#TB_inline?inlineId=pbsg-h5p-inline&width=640&height=400');
+
+    // Show info panel on selection change
+    $('#pbsg-h5p-select').on('change', function () {
+      const $opt = $(this).find(':selected');
+      const id = parseInt($opt.val(), 10);
+      const $info = $('#pbsg-h5p-picker-info');
+
+      if (!id) {
+        $info.hide();
+        return;
+      }
+
+      const meta = h5pMetaCache[id] || {};
+      const usageBadge = (meta.usage_count || 0) >= 2
+        ? '<span class="pbsg-h5p-badge pbsg-h5p-badge--usage-high">' + (meta.usage_count || 0) + ' tutorials</span>'
+        : '<span class="pbsg-h5p-badge pbsg-h5p-badge--usage">' + (meta.usage_count || 0) + ' tutorial' + ((meta.usage_count || 0) !== 1 ? 's' : '') + '</span>';
+
+      $info.html(`<div class="pbsg-h5p-picker-info__row">
+        <span>Owner: <strong>${esc(meta.author_name || 'Unknown')}</strong></span>
+        ${usageBadge}
+      </div>`).show();
+    });
+
     $('#pbsg-h5p-cancel').on('click', tb_remove);
+
+    // Insert: link to original (existing behavior)
     $('#pbsg-h5p-insert').on('click', function () {
       const id = parseInt($('#pbsg-h5p-select').val(), 10);
       if (!id || pickIdx === null) return;
@@ -2111,6 +2195,55 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
         renderStepCards();
       }
       tb_remove();
+    });
+
+    // Use as Template: duplicate then link
+    $('#pbsg-h5p-template').on('click', function () {
+      const id = parseInt($('#pbsg-h5p-select').val(), 10);
+      if (!id || pickIdx === null) return;
+
+      const $btn = $(this);
+      $btn.prop('disabled', true).text('Duplicating...');
+
+      $.post(PBSG_ADMIN.ajaxUrl, {
+        action: 'pbsg_duplicate_h5p',
+        nonce: PBSG_ADMIN.nonce,
+        h5p_id: id,
+        post_title: PBSG_ADMIN.postTitle,
+        step_index: pickIdx + 1
+      }).done(function (res) {
+        if (res && res.success) {
+          const newId = res.data.h5p_id;
+          const newTitle = res.data.title;
+
+          // Update cache with new entry
+          h5pMetaCache[newId] = {
+            id: newId,
+            title: newTitle,
+            user_id: PBSG_ADMIN.currentUserId,
+            author_name: 'You',
+            is_owner: true,
+            usage_count: 0
+          };
+
+          const steps = getSteps().map(norm);
+          if (steps[pickIdx]) {
+            steps[pickIdx].h5p_id = newId;
+            steps[pickIdx].quiz = null;
+            steps[pickIdx].h5p_cleared = false;
+            steps[pickIdx]._editing_h5p = false;
+            setSteps(steps);
+            renderStepCards();
+          }
+          tb_remove();
+        } else {
+          alert(res && res.data ? res.data.message : 'Failed to duplicate H5P content.');
+          $btn.prop('disabled', false).text('Use as Template');
+        }
+      }).fail(function () {
+        alert('Request failed while duplicating H5P content.');
+        $btn.prop('disabled', false).text('Use as Template');
+      });
     });
   }
 
@@ -2159,14 +2292,46 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   });
   
 
-  // Issue 5: Edit H5P — fetch existing content and populate inline form
   $(document).on('click', '.pbsg-edit-h5p', function (e) {
     e.preventDefault();
     const idx = parseInt($(this).data('idx'), 10);
     const h5pId = parseInt($(this).data('h5p-id'), 10);
     if (isNaN(idx) || isNaN(h5pId)) return;
 
+    // If already disabled by ownership warning, do nothing
+    if ($(this).hasClass('pbsg-edit-h5p--disabled')) return;
+
     const $card = $(`#pbsg-step-${idx}`);
+    const $linked = $card.find('.pbsg-linked-h5p');
+    const isOwner = $linked.data('h5p-owner');
+
+    // Non-owner: show warning instead of editing
+    if (isOwner === false) {
+      const authorName = $linked.data('h5p-author') || 'Unknown user';
+      const usageCount = $linked.data('h5p-usage') || 0;
+      const usageText = usageCount > 0
+        ? ` and used in <strong>${usageCount} other tutorial${usageCount > 1 ? 's' : ''}</strong>`
+        : '';
+
+      // Insert warning banner if not already present
+      if (!$card.find('.pbsg-ownership-warning').length) {
+        const warning = `<div class="pbsg-ownership-warning">
+          <div class="pbsg-ownership-warning__title">&#9888; Cannot edit this quiz</div>
+          <div class="pbsg-ownership-warning__body">This H5P is owned by <strong>${esc(authorName)}</strong>${usageText}. Contact the owner to make changes.</div>
+          <div class="pbsg-ownership-warning__action">
+            <a href="#" class="pbsg-use-as-template" data-idx="${idx}" data-h5p-id="${h5pId}">Use as Template</a>
+            <span class="pbsg-ownership-warning__hint">&mdash; creates your own copy to edit freely</span>
+          </div>
+        </div>`;
+        $linked.find('.pbsg-linked-h5p-actions').before(warning);
+      }
+
+      // Grey out the Edit H5P link
+      $(this).addClass('pbsg-edit-h5p--disabled');
+      return;
+    }
+
+    // Owner: proceed with inline editing (existing logic)
     $card.find('.pbsg-linked-h5p').html('<p style="text-align:center; color:#646970;">Loading quiz data...</p>');
 
     $.post(PBSG_ADMIN.ajaxUrl, {
@@ -2185,18 +2350,207 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       const steps = getSteps().map(norm);
       if (!steps[idx]) return;
 
-      // Populate the inline form with existing content
       steps[idx].quiz = quiz;
-      // Keep h5p_id so save_meta knows to UPDATE, not CREATE
       steps[idx]._editing_h5p = true;
       setSteps(steps);
-      // Expand the card if collapsed
       collapsedSteps.delete(idx);
       renderStepCards();
     }).fail(function () {
       alert('Failed to fetch H5P content.');
       renderStepCards();
     });
+  });
+
+  // ── Use as Template from ownership warning ──
+  $(document).on('click', '.pbsg-use-as-template', function (e) {
+    e.preventDefault();
+    const idx = parseInt($(this).data('idx'), 10);
+    const h5pId = parseInt($(this).data('h5p-id'), 10);
+    if (isNaN(idx) || isNaN(h5pId)) return;
+
+    const $link = $(this);
+    $link.text('Duplicating...').css('pointer-events', 'none');
+
+    $.post(PBSG_ADMIN.ajaxUrl, {
+      action: 'pbsg_duplicate_h5p',
+      nonce: PBSG_ADMIN.nonce,
+      h5p_id: h5pId,
+      post_title: PBSG_ADMIN.postTitle,
+      step_index: idx + 1
+    }).done(function (res) {
+      if (res && res.success) {
+        const newId = res.data.h5p_id;
+        const newTitle = res.data.title;
+
+        h5pMetaCache[newId] = {
+          id: newId,
+          title: newTitle,
+          user_id: PBSG_ADMIN.currentUserId,
+          author_name: 'You',
+          is_owner: true,
+          usage_count: 0
+        };
+
+        const steps = getSteps().map(norm);
+        if (steps[idx]) {
+          steps[idx].h5p_id = newId;
+          steps[idx].quiz = null;
+          steps[idx].h5p_cleared = false;
+          steps[idx]._editing_h5p = false;
+          setSteps(steps);
+          renderStepCards();
+        }
+      } else {
+        alert(res && res.data ? res.data.message : 'Failed to duplicate H5P content.');
+        $link.text('Use as Template').css('pointer-events', '');
+      }
+    }).fail(function () {
+      alert('Request failed while duplicating H5P content.');
+      $link.text('Use as Template').css('pointer-events', '');
+    });
+  });
+
+  // ── H5P title lock/unlock toggle ──
+  $(document).on('click', '.pbsg-h5p-lock-toggle', function (e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const idx = parseInt($(this).data('idx'), 10);
+    const h5pId = parseInt($(this).data('h5p-id'), 10);
+    const $row = $(this).closest('.pbsg-h5p-title-row');
+    const $status = $row.siblings('.pbsg-h5p-title-status[data-idx="' + idx + '"]');
+
+    if ($row.hasClass('pbsg-h5p-title-row--locked')) {
+      // Unlock: switch to editable input
+      const currentTitle = $(this).data('original-title');
+      $row.removeClass('pbsg-h5p-title-row--locked').addClass('pbsg-h5p-title-row--unlocked');
+      $row.find('.pbsg-h5p-title-text').replaceWith(
+        `<input type="text" class="pbsg-h5p-title-input" value="${esc(currentTitle)}" data-idx="${idx}" data-h5p-id="${h5pId}" data-original="${esc(currentTitle)}">`
+      );
+      $(this).html('&#x1F513;'); // unlocked
+      $row.find('.pbsg-h5p-title-input').focus().select();
+    }
+  });
+
+  // ── H5P title input: debounced auto-save ──
+  $(document).on('input', '.pbsg-h5p-title-input', function () {
+    const $input = $(this);
+    const $row = $input.closest('.pbsg-h5p-title-row');
+    const idx = parseInt($input.data('idx'), 10);
+    const $status = $row.siblings('.pbsg-h5p-title-status[data-idx="' + idx + '"]');
+    const original = $input.data('original');
+    const current = $input.val().trim();
+
+    // Clear any pending save
+    if (titleSaveTimer) clearTimeout(titleSaveTimer);
+
+    if (current !== original && current !== '') {
+      $status.attr('class', 'pbsg-h5p-title-status pbsg-h5p-title-status--unsaved').text('\u26A0 Unsaved changes');
+
+      // Start 1.5s debounce
+      titleSaveTimer = setTimeout(function () {
+        saveTitleAndRelock($input);
+      }, 1500);
+    } else {
+      $status.attr('class', 'pbsg-h5p-title-status').text('');
+    }
+  });
+
+  // ── H5P title: blur = save (if changed), Escape = cancel ──
+  $(document).on('blur', '.pbsg-h5p-title-input', function () {
+    const $input = $(this);
+    const original = $input.data('original');
+    const current = $input.val().trim();
+
+    if (titleSaveTimer) clearTimeout(titleSaveTimer);
+
+    if (current !== original && current !== '') {
+      saveTitleAndRelock($input);
+    } else {
+      relockTitle($input, original);
+    }
+  });
+
+  $(document).on('keydown', '.pbsg-h5p-title-input', function (e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      if (titleSaveTimer) clearTimeout(titleSaveTimer);
+      const $input = $(this);
+      relockTitle($input, $input.data('original'));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      $(this).trigger('blur');
+    }
+  });
+
+  /**
+   * Save the H5P title via AJAX, then re-lock the field with visual confirmation.
+   */
+  function saveTitleAndRelock($input) {
+    const h5pId = parseInt($input.data('h5p-id'), 10);
+    const newTitle = $input.val().trim();
+    const idx = parseInt($input.data('idx'), 10);
+    const $row = $input.closest('.pbsg-h5p-title-row');
+    const $status = $row.siblings('.pbsg-h5p-title-status[data-idx="' + idx + '"]');
+
+    $.post(PBSG_ADMIN.ajaxUrl, {
+      action: 'pbsg_rename_h5p',
+      nonce: PBSG_ADMIN.nonce,
+      h5p_id: h5pId,
+      title: newTitle
+    }).done(function (res) {
+      if (res && res.success) {
+        // Update cache
+        if (h5pMetaCache[h5pId]) {
+          h5pMetaCache[h5pId].title = newTitle;
+        }
+
+        // Visual: saved state
+        $row.removeClass('pbsg-h5p-title-row--unlocked').addClass('pbsg-h5p-title-row--saved');
+        $status.attr('class', 'pbsg-h5p-title-status pbsg-h5p-title-status--saved').text('\u2713 Saved');
+
+        // Replace input with static text
+        $input.replaceWith(`<span class="pbsg-h5p-title-text">${esc(newTitle)}</span>`);
+        $row.find('.pbsg-h5p-lock-icon').html('&#x1F512;').data('original-title', newTitle);
+
+        // Fade back to locked state after 2s
+        setTimeout(function () {
+          $row.removeClass('pbsg-h5p-title-row--saved').addClass('pbsg-h5p-title-row--locked');
+          $status.attr('class', 'pbsg-h5p-title-status').text('');
+        }, 2000);
+      } else {
+        alert(res && res.data ? res.data.message : 'Failed to rename H5P content.');
+        relockTitle($input, $input.data('original'));
+      }
+    }).fail(function () {
+      alert('Request failed while renaming H5P content.');
+      relockTitle($input, $input.data('original'));
+    });
+  }
+
+  /**
+   * Cancel editing and re-lock the title field with original value.
+   */
+  function relockTitle($input, originalTitle) {
+    const idx = parseInt($input.data('idx'), 10);
+    const $row = $input.closest('.pbsg-h5p-title-row');
+    const $status = $row.siblings('.pbsg-h5p-title-status[data-idx="' + idx + '"]');
+
+    $row.removeClass('pbsg-h5p-title-row--unlocked pbsg-h5p-title-row--saved').addClass('pbsg-h5p-title-row--locked');
+    $input.replaceWith(`<span class="pbsg-h5p-title-text">${esc(originalTitle)}</span>`);
+    $row.find('.pbsg-h5p-lock-icon').html('&#x1F512;');
+    $status.attr('class', 'pbsg-h5p-title-status').text('');
+  }
+
+  $(window).on('beforeunload.pbsgTitle', function () {
+    if ($('.pbsg-h5p-title-input').length > 0) {
+      const $input = $('.pbsg-h5p-title-input');
+      const original = $input.data('original');
+      const current = $input.val().trim();
+      if (current !== original && current !== '') {
+        return 'You have an unsaved H5P title change.';
+      }
+    }
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -2665,6 +3019,20 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   //  Init
   // ═══════════════════════════════════════════════════════════
   renderStepCards();
+
+    // Pre-load H5P metadata for ownership rendering
+    if (PBSG_ADMIN.h5pAvailable) {
+      $.post(PBSG_ADMIN.ajaxUrl, { action: 'pbsg_list_h5p', nonce: PBSG_ADMIN.nonce })
+        .done(function (res) {
+          if (res && res.success) {
+            (res.data.items || []).forEach(function (item) {
+              h5pMetaCache[item.id] = item;
+            });
+            // Re-render cards now that we have ownership data
+            renderStepCards();
+          }
+        });
+    }
 
   // Snapshot initial state AFTER rendering so we have a clean baseline
   // (use setTimeout to let WP finish any post-load mutations)
