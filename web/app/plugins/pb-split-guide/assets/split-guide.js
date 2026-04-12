@@ -8,6 +8,12 @@ const openLink = document.getElementById('pbsgOpenLink');
 const fallback = document.getElementById('pbsgTutorialFallback');
 const fallbackLink = document.getElementById('pbsgFallbackLink');
 
+// Temporary stubs — replaced by Task 5
+function closeTutorialPopup() {}
+function renderPopupFallbackCard(container, url) {
+  container.innerHTML = '<p style="text-align:center;padding:40px;color:#646970;">This site cannot be embedded. <a href="' + url + '" target="_blank">Open in new tab</a></p>';
+}
+
 const prevBtn = document.getElementById('pbsgPrev');
 const nextBtn = document.getElementById('pbsgNext');
 const learnMoreWrap = document.getElementById('pbsgLearnMoreWrap');
@@ -1315,6 +1321,22 @@ function renderTutorial(step, options = {}){
       return;
     }
 
+    // Image inline
+    if (mime.startsWith('image/') && !mime.includes('svg')) {
+      tutorialStage.innerHTML = `<img src="${t.file_url}" class="pbsg-inline-image" alt="">`;
+      fallback.style.display = 'none';
+      openLink.href = t.file_url;
+      return;
+    }
+
+    // Office documents via Google Docs Viewer
+    if (t.viewer_url) {
+      freshFrame.src = t.viewer_url;
+      fallback.style.display = 'none';
+      openLink.href = t.file_url;
+      return;
+    }
+
     // Other files fallback
     fallback.style.display = 'block';
     fallbackLink.href = t.file_url;
@@ -1324,9 +1346,21 @@ function renderTutorial(step, options = {}){
   }
 
   if (t.url) {
-    freshFrame.src = toEmbeddableUrl(t.url);
     openLink.href = t.url;
-    fallback.style.display = 'none';
+
+    if (t.embeddable !== false) {
+      // Tier 1: iframe (embeddable or unknown)
+      freshFrame.src = toEmbeddableUrl(t.url);
+      fallback.style.display = 'none';
+    } else if (t.viewer_url) {
+      // Tier 2: Google Docs Viewer (non-embeddable document URL)
+      freshFrame.src = t.viewer_url;
+      fallback.style.display = 'none';
+    } else {
+      // Tier 3: popup fallback (non-embeddable, non-document URL)
+      closeTutorialPopup();
+      renderPopupFallbackCard(tutorialStage, t.url);
+    }
   } else {
     freshFrame.src = '';
     fallback.style.display = 'none';
