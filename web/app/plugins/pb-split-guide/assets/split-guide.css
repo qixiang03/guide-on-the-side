@@ -26,8 +26,8 @@
   --pbsg-border: #dcdcde;
   --pbsg-text: #1d2327;
   --pbsg-muted: #646970;
-  --pbsg-primary: #b32d2e;
-  --pbsg-primary-hover: #8f2424;
+  --pbsg-primary: #8C2004;
+  --pbsg-primary-hover: #6f1a03;
   --pbsg-radius: 8px;
   --pbsg-radius-sm: 6px;
   --pbsg-shadow: 0 1px 1px rgba(0,0,0,.04);
@@ -236,30 +236,30 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
-  min-height: 40px !important;
-  padding: 8px 16px !important;
+  min-height: 38px !important;
+  padding: 9px 20px !important;
   background: #fff !important;
   color: var(--pbsg-primary) !important;
-  border: 1px solid var(--pbsg-primary) !important;
-  border-radius: 4px !important;
+  border: 1.5px solid var(--pbsg-primary) !important;
+  border-radius: 6px !important;
   box-shadow: none !important;
   font-family: var(--pbsg-admin-font) !important;
-  font-size: 16px !important;
-  font-weight: 400 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
   cursor: pointer !important;
   transition: all 0.15s ease !important;
 }
 
 .pbsg-menu-btn:hover{
-  background: #f6f7f7 !important;
+  background: #fdeeee !important;
   color: var(--pbsg-primary-hover) !important;
   border-color: var(--pbsg-primary-hover) !important;
 }
 
 
-.pbsg-menu-icon{ font-size: 16px !important; }
-.pbsg-menu-arrow{ font-size: 12px !important; margin-right: 0 !important; }
-.pbsg-menu-text{ font-size: 16px !important; }
+.pbsg-menu-icon{ font-size: 14px !important; }
+.pbsg-menu-arrow{ font-size: 10px !important; margin-right: 0 !important; }
+.pbsg-menu-text{ font-size: 14px !important; }
 
 .pbsg-menu-btn[aria-expanded="true"] .pbsg-menu-arrow{
   transform: rotate(180deg);
@@ -374,21 +374,21 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 #pbsgPrev,
 #pbsgNext {
   width: 100% !important;
-  min-height: 40px !important;
-  padding: 8px 16px !important;
+  min-height: 38px !important;
+  padding: 9px 20px !important;
   font-family: var(--pbsg-admin-font) !important;
-  font-size: 16px !important;
-  font-weight: 400 !important;
-  border-radius: 4px !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
   box-shadow: none !important;
   background: #fff !important;
   color: var(--pbsg-primary) !important;
-  border: 1px solid var(--pbsg-primary) !important;
+  border: 1.5px solid var(--pbsg-primary) !important;
 }
 
 #pbsgPrev:hover,
 #pbsgNext:hover{
-  background: #f6f7f7 !important;
+  background: #fdeeee !important;
   color: var(--pbsg-primary-hover) !important;
   border-color: var(--pbsg-primary-hover) !important;
 }
@@ -452,22 +452,22 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 40px !important;
-  padding: 8px 16px !important;
+  min-height: 38px !important;
+  padding: 9px 20px !important;
   background: #fff !important;
   color: var(--pbsg-primary) !important;
-  border: 1px solid var(--pbsg-primary) !important;
-  border-radius: 4px !important;
+  border: 1.5px solid var(--pbsg-primary) !important;
+  border-radius: 6px !important;
   cursor: pointer !important;
   font-family: var(--pbsg-admin-font) !important;
-  font-size: 16px !important;
-  font-weight: 400 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
   white-space: nowrap !important;
   box-shadow: none !important;
 }
 
 .pbsg-focus-btn:hover{
-  background: #f6f7f7 !important;
+  background: #fdeeee !important;
   color: var(--pbsg-primary-hover) !important;
   border-color: var(--pbsg-primary-hover) !important;
 }
@@ -865,23 +865,25 @@ body.pbsg-standalone .pbsg-wrap{
 }
 
 .pbsg-start-btn {
-  min-height: 40px !important;
-  padding: 8px 16px !important;
-  border: 1px solid var(--pbsg-primary) !important;
-  border-radius: 4px !important;
-  background: #fff !important;
-  color: var(--pbsg-primary) !important;
+  min-height: 38px !important;
+  padding: 10px 28px !important;
+  border: 1.5px solid var(--pbsg-primary) !important;
+  border-radius: 6px !important;
+  background: var(--pbsg-primary) !important;
+  color: #fff !important;
   font-family: var(--pbsg-admin-font) !important;
-  font-size: 16px !important;
-  font-weight: 400 !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
   cursor: pointer !important;
-  box-shadow: none !important;
+  box-shadow: 0 1px 3px rgba(140, 32, 4, 0.3) !important;
+  transition: all 0.15s ease !important;
 }
 
 .pbsg-start-btn:hover {
-  background: #f6f7f7 !important;
-  color: var(--pbsg-primary-hover) !important;
+  background: var(--pbsg-primary-hover) !important;
+  color: #fff !important;
   border-color: var(--pbsg-primary-hover) !important;
+  box-shadow: 0 2px 6px rgba(140, 32, 4, 0.4) !important;
   opacity: 1 !important;
 }
 
@@ -1093,36 +1095,41 @@ body.pbsg-standalone .pbsg-wrap{
   background:#fff;
   border: 1px solid var(--pbsg-border);
   border-radius: var(--pbsg-radius);
-  padding:40px;
+  padding: 36px 40px;
   box-shadow: var(--pbsg-shadow);
 }
 
 .pbsg-summary-title{
   text-align:center;
-  font-size:32px;
-  margin-bottom:20px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 8px;
 }
 
 .pbsg-attempt-summary ul{
-  margin:20px 0;
-  padding-left:20px;
+  margin: 20px 0;
+  padding-left: 20px;
 }
 
 .pbsg-attempt-summary li{
-  margin-bottom:10px;
-  font-size:18px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #333;
+  line-height: 1.6;
 }
 
 .pbsg-summary-actions{
-  margin-top:30px;
-  text-align:center;
+  margin-top: 28px;
+  text-align: center;
 }
 
 .pbsg-final-grade {
-  margin: 24px 0;
-  font-size: 36px;
-  font-weight: 600;
+  margin: 20px 0;
+  font-size: 28px;
+  font-weight: 700;
   text-align: center;
+  color: #222;
 }
 
 .pbsg-summary-actions {
@@ -1321,42 +1328,61 @@ body.tutorial-active #colophon {
   width: min(520px, 92vw);
   margin: 10vh auto 0;
   background: #fff;
-  border-radius: 16px;
-  padding: 28px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+  border: 1px solid var(--pbsg-border);
+  border-radius: var(--pbsg-radius);
+  padding: 32px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.15);
   z-index: 2;
 }
 
 .pbsg-cert-modal-dialog h3 {
-  margin: 0 0 12px;
-  font-size: 28px;
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #222;
 }
 
 .pbsg-cert-label {
   display: block;
-  margin: 18px 0 8px;
+  margin: 18px 0 6px;
+  font-size: 13px;
   font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .pbsg-cert-input {
-  width: 100%;
-  padding: 14px 16px;
-  font-size: 16px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  box-sizing: border-box;
+  width: 100% !important;
+  padding: 10px 14px !important;
+  font-size: 15px !important;
+  border: 1.5px solid #d0d0d0 !important;
+  border-radius: 6px !important;
+  box-sizing: border-box !important;
+  font-family: var(--pbsg-admin-font) !important;
+  color: #222 !important;
+  background: #fff !important;
+  transition: border-color 0.15s !important;
+  outline: none !important;
+}
+
+.pbsg-cert-input:focus {
+  outline: none !important;
+  border-color: var(--pbsg-primary) !important;
+  box-shadow: 0 0 0 2px rgba(140, 32, 4, 0.15) !important;
 }
 
 .pbsg-cert-error {
   margin-top: 10px;
-  color: #b42318;
-  font-size: 14px;
+  color: var(--pbsg-primary);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .pbsg-cert-modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
   margin-top: 24px;
   flex-wrap: wrap;
 }
@@ -1383,12 +1409,12 @@ body.tutorial-active #colophon {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  min-height: 40px !important;
-  padding: 8px 16px !important;
-  border-radius: 4px !important;
+  min-height: 38px !important;
+  padding: 9px 20px !important;
+  border-radius: 6px !important;
   font-family: var(--pbsg-admin-font) !important;
-  font-size: 16px !important;
-  font-weight: 400 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
   line-height: 1.2 !important;
   text-decoration: none !important;
   cursor: pointer !important;
@@ -1396,25 +1422,26 @@ body.tutorial-active #colophon {
   transition: all 0.15s ease !important;
 }
 
-/* Admin-like outlined red button */
+/* Outlined maroon button (secondary actions) */
 .pbsg-btn-outline {
   background: #fff !important;
   color: var(--pbsg-primary) !important;
-  border: 1px solid var(--pbsg-primary) !important;
+  border: 1.5px solid var(--pbsg-primary) !important;
 }
 
 .pbsg-btn-outline:hover,
 .pbsg-btn-outline:focus {
-  background: #f6f7f7 !important;
+  background: #fdeeee !important;
   color: var(--pbsg-primary-hover) !important;
   border-color: var(--pbsg-primary-hover) !important;
 }
 
-/* Admin-like filled red button */
+/* Filled maroon button (primary actions) */
 .pbsg-btn-primary {
   background: var(--pbsg-primary) !important;
   color: #fff !important;
-  border: 1px solid var(--pbsg-primary) !important;
+  border: 1.5px solid var(--pbsg-primary) !important;
+  box-shadow: 0 1px 3px rgba(140, 32, 4, 0.3) !important;
 }
 
 .pbsg-btn-primary:hover,
@@ -1422,6 +1449,7 @@ body.tutorial-active #colophon {
   background: var(--pbsg-primary-hover) !important;
   border-color: var(--pbsg-primary-hover) !important;
   color: #fff !important;
+  box-shadow: 0 2px 6px rgba(140, 32, 4, 0.4) !important;
 }
 
 /* Make wide action buttons look cleaner */
@@ -1448,21 +1476,21 @@ body.tutorial-active #colophon {
   align-items: center !important;
   justify-content: center !important;
   min-height: 34px !important;
-  padding: 6px 12px !important;
+  padding: 7px 16px !important;
   background: #fff !important;
   color: var(--pbsg-primary) !important;
-  border: 1px solid var(--pbsg-primary) !important;
-  border-radius: 4px !important;
+  border: 1.5px solid var(--pbsg-primary) !important;
+  border-radius: 6px !important;
   font-family: var(--pbsg-admin-font) !important;
   font-size: 13px !important;
-  font-weight: 400 !important;
+  font-weight: 600 !important;
   cursor: pointer !important;
   box-shadow: none !important;
   transition: all 0.15s ease !important;
 }
 
 .pbsg-learn-more-btn:hover {
-  background: #f6f7f7 !important;
+  background: #fdeeee !important;
   color: var(--pbsg-primary-hover) !important;
   border-color: var(--pbsg-primary-hover) !important;
 }

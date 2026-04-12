@@ -469,7 +469,7 @@ window.PBSG_CERT = {
 
     <?php if ($is_logged_in): ?>
       <div class="pbsg-summary-actions">
-        <button type="button" class="pbsg-btn-outline" id="pbsgSummaryCertDownload">
+        <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload">
           Generate Certificate
         </button>
 
@@ -505,7 +505,7 @@ window.PBSG_CERT = {
 
     <div class="pbsg-cert-modal-actions">
       <button type="button" class="pbsg-btn-outline" id="pbsgCertModalCancel">Cancel</button>
-      <button type="button" class="pbsg-btn-outline" id="pbsgCertModalGenerate">Generate</button>
+      <button type="button" class="pbsg-btn-primary" id="pbsgCertModalGenerate">Generate</button>
     </div>
   </div>
 </div>
