@@ -18,6 +18,19 @@ final class PBSG_H5P_Factory
     ];
 
     /**
+     * Public accessor for the library name corresponding to a quiz type.
+     * Used by the main plugin to detect when a branch question's type has
+     * changed (so the existing H5P content row needs to be replaced).
+     *
+     * @param string $type Quiz type ('multichoice', 'blanks', 'singlechoice').
+     * @return string|null H5P library machine name, or null for unknown types.
+     */
+    public static function get_library_for_type(string $type): ?string
+    {
+        return self::LIBRARY_MAP[$type] ?? null;
+    }
+
+    /**
      * H5P display options disable bitmask (Issue 7a).
      * DISABLE_DOWNLOAD=2 + DISABLE_COPYRIGHT=8 = 10
      * Turns OFF: download button, copyright button.

@@ -1846,6 +1846,78 @@ class PB_Split_Guide_Plugin {
     <?php
   }
 
+  /**
+   * Translate a branch sub-question's source fields into the quiz schema
+   * that PBSG_H5P_Factory::create()/update() understands.
+   *
+   * Returns null for unsupported types so the caller can skip H5P creation.
+   *
+   * @param array $bq Branch question data (from branch.questions[]).
+   * @return array|null Quiz schema or null if type unsupported.
+   */
+  private static function branch_question_to_quiz(array $bq): ?array {
+    $type = $bq['type'] ?? '';
+    if (!in_array($type, ['multichoice', 'singlechoice', 'blanks'], true)) {
+      return null;
+    }
+
+    if ($type === 'multichoice') {
+      return [
+        'type'     => 'multichoice',
+        'question' => $bq['question'] ?? '',
+        'answers'  => array_values(array_map(function ($a) {
+          return [
+            'text'    => $a['text'] ?? '',
+            'correct' => !empty($a['correct']),
+          ];
+        }, (array) ($bq['answers'] ?? []))),
+      ];
+    }
+
+    if ($type === 'singlechoice') {
+      return [
+        'type'           => 'singlechoice',
+        'question'       => $bq['question'] ?? '',
+        'correct_answer' => $bq['correct_answer'] ?? '',
+        'wrong_answers'  => array_values((array) ($bq['wrong_answers'] ?? [])),
+      ];
+    }
+
+    if ($type === 'blanks') {
+      return [
+        'type'           => 'blanks',
+        'sentence'       => $bq['sentence'] ?? '',
+        'case_sensitive' => !empty($bq['case_sensitive']),
+        'accept_typos'   => !empty($bq['accept_typos']),
+      ];
+    }
+
+    return null;
+  }
+
+  /**
+   * Look up the H5P library machine name for an existing H5P content row.
+   * Used to detect when a branch question's type has changed and the linked
+   * H5P content row needs to be replaced rather than updated in place.
+   *
+   * @param int $h5p_id H5P content ID.
+   * @return string|null Library machine name (e.g. 'H5P.MultiChoice'), or null if not found.
+   */
+  private static function get_h5p_library_name(int $h5p_id): ?string {
+    if ($h5p_id <= 0) {
+      return null;
+    }
+    global $wpdb;
+    $row = $wpdb->get_var($wpdb->prepare(
+      "SELECT l.name
+       FROM {$wpdb->prefix}h5p_contents c
+       JOIN {$wpdb->prefix}h5p_libraries l ON c.library_id = l.id
+       WHERE c.id = %d",
+      $h5p_id
+    ));
+    return $row ?: null;
+  }
+
   public function save_meta($post_id, $post) {
     if (!isset($_POST['pbsg_nonce']) || !wp_verify_nonce($_POST['pbsg_nonce'], 'pbsg_save_meta')) return;
     if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) return;
@@ -1887,6 +1959,52 @@ class PB_Split_Guide_Plugin {
           }
         }
       }
+
+      // Branch question H5P creation/update — mirrors the main quiz path above.
+      // Each branch sub-question becomes a real H5P content row so the student-side
+      // renderer can load it as an iframe (same UX as main quiz).
+      if (!empty($step['branch']['questions']) && is_array($step['branch']['questions']) && PBSG_H5P_Factory::is_h5p_available()) {
+        foreach ($step['branch']['questions'] as $qIdx => &$bq) {
+          $quiz = self::branch_question_to_quiz($bq);
+          if (!$quiz) {
+            // Unsupported type — strip the transient flag and skip
+            unset($bq['_editing_h5p']);
+            continue;
+          }
+
+          // Type-change defense: if H5P content already exists but its library
+          // no longer matches the current quiz type, orphan it and force a fresh create.
+          if (!empty($bq['h5p_id']) && $bq['h5p_id'] > 0) {
+            $current_library  = self::get_h5p_library_name((int) $bq['h5p_id']);
+            $expected_library = PBSG_H5P_Factory::get_library_for_type($quiz['type']);
+            if ($current_library && $expected_library && $current_library !== $expected_library) {
+              $bq['h5p_id'] = 0;
+            }
+          }
+
+          if (!empty($bq['_editing_h5p']) && !empty($bq['h5p_id']) && $bq['h5p_id'] > 0) {
+            // Update existing branch H5P content
+            $result = PBSG_H5P_Factory::update($bq['h5p_id'], $quiz);
+            if (is_wp_error($result)) {
+              $h5p_errors[] = sprintf('Step %d Branch Q%d (update): %s', $idx + 1, $qIdx + 1, $result->get_error_message());
+            }
+          } elseif (empty($bq['h5p_id']) || $bq['h5p_id'] === 0) {
+            // Create new branch H5P content
+            $branch_title = sprintf('%s - Step %d - Branch Q%d', $post_title, $idx + 1, $qIdx + 1);
+            $new_id = PBSG_H5P_Factory::create($quiz, $post_title, $idx + 1, $branch_title);
+            if (is_wp_error($new_id)) {
+              $h5p_errors[] = sprintf('Step %d Branch Q%d: %s', $idx + 1, $qIdx + 1, $new_id->get_error_message());
+            } else {
+              $bq['h5p_id'] = $new_id;
+            }
+          }
+
+          // Strip transient editing flag (keep h5p_id and source fields for re-editing)
+          unset($bq['_editing_h5p']);
+        }
+        unset($bq);
+      }
+
       // Strip transient data from stored JSON
       unset($step['quiz'], $step['_editing_h5p']);
     }
@@ -2027,7 +2145,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_split_guide_css',
       plugin_dir_url(__FILE__) . 'assets/split-guide.css',
       [],
-      '0.5.0'
+      '0.5.0.1'
     );
 
     // Only localize tracker data on published tutorials — prevents draft/preview pollution

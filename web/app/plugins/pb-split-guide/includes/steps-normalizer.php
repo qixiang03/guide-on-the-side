@@ -291,6 +291,13 @@ final class PBSG_Steps_Normalizer
                 }
             }
 
+            // Preserve the transient _editing_h5p flag so save_meta knows to
+            // call PBSG_H5P_Factory::update() instead of create(). This flag
+            // is stripped by save_meta after use — it never persists to the DB.
+            if (!empty($s['_editing_h5p'])) {
+                $clean_step['_editing_h5p'] = true;
+            }
+
             $clean[] = $clean_step;
         }
 

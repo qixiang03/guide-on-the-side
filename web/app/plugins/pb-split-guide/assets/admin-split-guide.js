@@ -1664,6 +1664,13 @@ function uploadBranchQuestionFileViaDrop(file, stepIdx, qIdx, $zone) {
     if (!branch.questions[qIdx]) return;
 
     updater(branch.questions[qIdx]);
+
+    // Mark for H5P update if this branch question already has linked H5P content.
+    // save_meta will call PBSG_H5P_Factory::update() instead of create() when this flag is set.
+    if (branch.questions[qIdx].h5p_id > 0) {
+      branch.questions[qIdx]._editing_h5p = true;
+    }
+
     setSteps(steps);
   }
 

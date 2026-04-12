@@ -73,6 +73,238 @@ function getOrCreateH5PFrameForStep(stepIndex) {
   return frame;
 }
 
+/**
+ * Returns the shared CSS string injected into every H5P iframe
+ * (both main quiz and branch sub-quiz) for consistent typography,
+ * button styling, and feedback callout rendering.
+ */
+function getH5PStyleCSS() {
+  return `
+          /* ── Base ─────────────────────────────────────────── */
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            font-size: 14px !important;
+            color: #333 !important;
+            background: #fff !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+          }
+
+          .h5p-container,
+          .h5p-content,
+          .h5p-question {
+            font-family: inherit !important;
+            box-sizing: border-box !important;
+            color: #333 !important;
+          }
+
+          .h5p-question {
+            padding: 18px 20px !important;
+            background: #fff !important;
+          }
+
+          /* ── "QUESTION" eyebrow + title ──────────────────── */
+          .h5p-question-text::before,
+          .h5p-question-introduction::before {
+            content: 'Question' !important;
+            display: block !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            color: #999 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.8px !important;
+            margin-bottom: 4px !important;
+          }
+
+          .h5p-question-text,
+          .h5p-question-introduction {
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            color: #222 !important;
+            line-height: 1.3 !important;
+            margin: 0 0 16px 0 !important;
+            padding: 0 !important;
+          }
+
+          /* ── MultiChoice options (default) ───────────────── */
+          .h5p-alternative-container {
+            background: #fff !important;
+            border: 1.5px solid #d0d0d0 !important;
+            border-radius: 6px !important;
+            padding: 12px 14px 12px 44px !important;
+            margin-bottom: 8px !important;
+            position: relative !important;
+            font-size: 14px !important;
+            color: #333 !important;
+            cursor: pointer !important;
+            transition: border-color 0.15s, background 0.15s !important;
+            box-sizing: border-box !important;
+          }
+
+          .h5p-alternative-container:hover {
+            border-color: #8C2004 !important;
+          }
+
+          .h5p-alternative-container .h5p-alternative-inner,
+          .h5p-alternative-container label,
+          .h5p-alternative-container .h5p-answer,
+          .h5p-alternative-container .h5p-answer-text {
+            position: relative !important;
+            z-index: 2 !important;
+            color: inherit !important;
+          }
+
+          .h5p-alternative-container input[type="radio"],
+          .h5p-alternative-container input[type="checkbox"] {
+            position: absolute !important;
+            left: 14px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            margin: 0 !important;
+            z-index: 3 !important;
+            width: 16px !important;
+            height: 16px !important;
+          }
+
+          /* ── MultiChoice options (wrong state) ───────────── */
+          .h5p-alternative-container.h5p-wrong,
+          .h5p-alternative-container.h5p-answer-wrong {
+            background: #fdeeee !important;
+            border: 1.5px solid #8C2004 !important;
+            color: #5c1a1a !important;
+            font-weight: 500 !important;
+          }
+
+          /* ── MultiChoice options (correct state) ─────────── */
+          .h5p-alternative-container.h5p-correct,
+          .h5p-alternative-container.h5p-answer-correct {
+            background: #e8f5e9 !important;
+            border: 1.5px solid #517E1B !important;
+            color: #1b5e20 !important;
+            font-weight: 500 !important;
+          }
+
+          /* ── Blanks input field ──────────────────────────── */
+          .h5p-blanks .h5p-input-wrapper input[type="text"],
+          .h5p-blanks input.h5p-text-input {
+            border: none !important;
+            border-bottom: 2px solid #8C2004 !important;
+            background: #f8f8f8 !important;
+            border-radius: 4px 4px 0 0 !important;
+            padding: 4px 8px !important;
+            font-size: 16px !important;
+            color: #222 !important;
+            font-weight: 500 !important;
+            min-width: 120px !important;
+            transition: border-color 0.15s, background 0.15s !important;
+          }
+
+          .h5p-blanks .h5p-input-wrapper input[type="text"]:focus {
+            outline: none !important;
+            background: #fff !important;
+            border-bottom-color: #517E1B !important;
+          }
+
+          .h5p-blanks .h5p-input-wrapper.h5p-wrong input[type="text"],
+          .h5p-blanks .h5p-input-wrapper.h5p-not-filled-out input[type="text"] {
+            background: #fdeeee !important;
+            border-bottom-color: #8C2004 !important;
+            color: #5c1a1a !important;
+          }
+
+          .h5p-blanks .h5p-input-wrapper.h5p-correct input[type="text"] {
+            background: #e8f5e9 !important;
+            border-bottom-color: #517E1B !important;
+            color: #1b5e20 !important;
+          }
+
+          /* ── Buttons (shared across MultiChoice, Blanks, etc.) ── */
+          .h5p-joubelui-button,
+          .h5p-question-check-answer {
+            min-height: 38px !important;
+            padding: 10px 24px !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            border-radius: 6px !important;
+            background: #8C2004 !important;
+            color: #fff !important;
+            border: 1.5px solid #8C2004 !important;
+            box-shadow: 0 1px 3px rgba(140, 32, 4, 0.3) !important;
+            cursor: pointer !important;
+            font-family: inherit !important;
+            text-transform: none !important;
+            transition: background 0.15s, box-shadow 0.15s !important;
+          }
+
+          .h5p-joubelui-button:hover,
+          .h5p-question-check-answer:hover {
+            background: #6f1a03 !important;
+            box-shadow: 0 2px 6px rgba(140, 32, 4, 0.4) !important;
+            color: #fff !important;
+          }
+
+          /* Retry is intentionally slightly smaller than Check (10px 24px) to
+             visually signal its secondary/ghost-button status */
+          .h5p-question-try-again,
+          .h5p-joubelui-button.h5p-question-try-again {
+            background: #fff !important;
+            color: #8C2004 !important;
+            border: 1.5px solid #8C2004 !important;
+            box-shadow: none !important;
+            padding: 9px 20px !important;
+          }
+
+          .h5p-question-try-again:hover,
+          .h5p-joubelui-button.h5p-question-try-again:hover {
+            background: #fdeeee !important;
+            color: #8C2004 !important;
+          }
+
+          /* Button container — push buttons right */
+          .h5p-question .h5p-question-buttons,
+          .h5p-actions,
+          .h5p-joubelui-button-container {
+            display: flex !important;
+            justify-content: flex-end !important;
+            gap: 10px !important;
+            margin-top: 14px !important;
+          }
+
+          /* ── Feedback callouts ───────────────────────────── */
+          .h5p-feedback {
+            font-size: 13px !important;
+            font-weight: 400 !important;
+            padding: 10px 14px !important;
+            margin-top: 14px !important;
+            border-radius: 4px !important;
+            border-left: 4px solid transparent !important;
+            line-height: 1.5 !important;
+          }
+
+          .h5p-feedback.h5p-feedback-correct,
+          .h5p-question-feedback.h5p-correct {
+            background: #e8f5e9 !important;
+            border-left-color: #517E1B !important;
+            color: #1b5e20 !important;
+          }
+
+          .h5p-feedback.h5p-feedback-incorrect,
+          .h5p-question-feedback.h5p-wrong {
+            background: #fdeeee !important;
+            border-left-color: #8C2004 !important;
+            color: #5c1a1a !important;
+          }
+
+          /* ── Score bar (keep H5P's default green, just resize) ── */
+          .h5p-question-score,
+          .h5p-joubelui-score-bar {
+            font-size: 12px !important;
+            color: #666 !important;
+            margin-top: 10px !important;
+          }
+  `;
+}
+
 function showStepH5PFrame(stepIndex, h5pId) {
   hideAllH5PFrames();
 
@@ -542,112 +774,7 @@ function attachH5PWatcher(stepIndex){
         const style = doc.createElement('style');
         style.id = 'pbsg-h5p-style';
 
-        style.textContent = `
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-            font-size: 14px !important;
-            color: #1d2327 !important;
-            background: #fff !important;
-            margin: 0 !important;
-            box-sizing: border-box !important;
-          }
-
-          .h5p-container,
-          .h5p-content,
-          .h5p-question {
-            font-family: inherit !important;
-            box-sizing: border-box !important;
-          }
-
-          .h5p-question:first-child,
-          .h5p-content > .h5p-question:first-child,
-          .h5p-multichoice,
-          .h5p-single-choice {
-            margin-top: 10px !important;
-            margin-left: 5px !important;
-          }
-
-          .h5p-content,
-          .h5p-question {
-            margin-top: 0px !important;
-            margin-left: 0px !important;
-          }
-
-          .h5p-question-text,
-          .h5p-question-introduction {
-            font-size: 15px !important;
-            font-weight: 500 !important;
-            color: #6b7280 !important; 
-          }
-
-          .h5p-content,
-          .h5p-question,
-          .h5p-question-text,
-          .h5p-question-introduction {
-            color: #6b7280 !important;
-            margin-top: 0 !important;
-            padding-top: 0 !important;
-          }
-
-          .h5p-alternative-container {
-            position: relative !important;
-            font-size: 14px !important;
-            border-radius: 4px !important;
-            padding: 8px 12px 8px 42px !important;
-            margin-bottom: 6px !important;
-            box-sizing: border-box !important;
-          }
-
-          .h5p-alternative-container .h5p-alternative-inner,
-          .h5p-alternative-container label,
-          .h5p-answer,
-          .h5p-answer-text {
-            position: relative !important;
-            z-index: 2 !important;
-          }
-
-          .h5p-alternative-container input[type="radio"],
-          .h5p-alternative-container input[type="checkbox"] {
-            position: absolute !important;
-            left: 12px !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            margin: 0 !important;
-            z-index: 3 !important;
-          }
-
-          .h5p-joubelui-button,
-          .h5p-question-check-answer,
-          .h5p-question-try-again,
-          .h5p-question-show-solution {
-            min-height: 34px !important;
-            padding: 6px 12px !important;
-            font-size: 13px !important;
-            border-radius: 4px !important;
-            background: #f6f7f7 !important;
-            color: #1d2327 !important;
-            border: 1px solid #ccd0d4 !important;
-            box-shadow: none !important;
-          }
-
-          .h5p-joubelui-button:hover {
-            background: #f0f0f1 !important;
-            border-color: #999 !important;
-          }
-
-          .h5p-feedback {
-            font-size: 13px !important;
-          }
-
-          /* Move Check button to the right */
-          .h5p-question .h5p-question-buttons,
-          .h5p-actions,
-          .h5p-joubelui-button-container {
-            display: flex !important;
-            justify-content: flex-end !important;
-          }
-        `;
-
+        style.textContent = getH5PStyleCSS();
         doc.head.appendChild(style);
       }
     } catch (e) {
@@ -1463,114 +1590,85 @@ function renderInlineBranchQuestion(q) {
 
   showBranchQuizHost();
 
-  const type = q.type || '';
-  let html = '';
-
-  if (type === 'multichoice') {
-    const answers = Array.isArray(q.answers) ? q.answers : [];
-    html = `
-      <div class="pbsg-branch-inline-question">
-        <h3>${escapeHtml(q.question || '')}</h3>
-        <div class="pbsg-branch-inline-answers">
-          ${answers.map((a, idx) => `
-            <label class="pbsg-branch-inline-answer">
-              <input type="checkbox" name="pbsgBranchAnswer" value="${idx}">
-              <span>${escapeHtml(a.text || '')}</span>
-            </label>
-          `).join('')}
-        </div>
-        <div class="pbsg-branch-inline-actions">
-          <button type="button" id="pbsgBranchCheck">Check</button>
-        </div>
-        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
-      </div>
-    `;
-  } else if (type === 'singlechoice') {
-    const wrongs = Array.isArray(q.wrong_answers) ? q.wrong_answers : [];
-    const choices = [q.correct_answer || '', ...wrongs].filter(Boolean);
-
-    html = `
-      <div class="pbsg-branch-inline-question">
-        <h3>${escapeHtml(q.question || '')}</h3>
-        <div class="pbsg-branch-inline-answers">
-          ${choices.map((choice, idx) => `
-            <label class="pbsg-branch-inline-answer">
-              <input type="radio" name="pbsgBranchAnswer" value="${idx}">
-              <span>${escapeHtml(choice)}</span>
-            </label>
-          `).join('')}
-        </div>
-        <div class="pbsg-branch-inline-actions">
-          <button type="button" id="pbsgBranchCheck">Check</button>
-        </div>
-        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
-      </div>
-    `;
-
-    branchQuizHost.innerHTML = html;
-    bindInlineBranchCheck(q, choices);
+  if (!q.h5p_id || q.h5p_id <= 0) {
+    // Defensive — should never happen post-deployment because save_meta always creates h5p_id
+    branchQuizHost.innerHTML = '<div class="pbsg-branch-error">This branch question is not configured. Please re-save the tutorial.</div>';
+    lockNext(false);
     return;
-  } else if (type === 'blanks') {
-    html = `
-      <div class="pbsg-branch-inline-question">
-        <h3>Fill in the blank</h3>
-        <div class="pbsg-branch-inline-blanks">
-          <textarea id="pbsgBranchBlanksInput" rows="4">${escapeHtml(q.sentence || '')}</textarea>
-        </div>
-        <div class="pbsg-branch-inline-actions">
-          <button type="button" id="pbsgBranchCheck">Check</button>
-        </div>
-        <div id="pbsgBranchFeedback" class="pbsg-branch-feedback"></div>
-      </div>
-    `;
   }
 
-  branchQuizHost.innerHTML = html;
-  bindInlineBranchCheck(q);
+  const iframeSrc = h5pUrl(q.h5p_id);
+
+  branchQuizHost.innerHTML = `
+    <iframe
+      id="pbsgBranchH5PFrame"
+      src="${iframeSrc}"
+      class="pbsg-branch-h5p-iframe"
+      allowfullscreen
+      frameborder="0">
+    </iframe>
+  `;
+
+  // Lock Next until the student passes the H5P question
+  lockNext(true);
+
+  const iframe = document.getElementById('pbsgBranchH5PFrame');
+  if (iframe) {
+    iframe.addEventListener('load', () => {
+      injectH5PStyle(iframe);
+      attachBranchH5PxAPI(iframe);
+    });
+  }
 }
 
-function bindInlineBranchCheck(q, singleChoices = []) {
-  const checkBtn = document.getElementById('pbsgBranchCheck');
-  const feedback = document.getElementById('pbsgBranchFeedback');
+/**
+ * Inject the shared quiz typography/hierarchy CSS into any H5P iframe.
+ * Used by both the main quiz path and branch sub-quiz path so both
+ * render with the same visual refresh.
+ */
+function injectH5PStyle(frame) {
+  try {
+    const doc = frame.contentDocument || frame.contentWindow.document;
+    if (!doc || !doc.head) return;
+    if (doc.getElementById('pbsg-h5p-style')) return; // already injected
 
-  if (!checkBtn || !feedback) return;
+    const style = doc.createElement('style');
+    style.id = 'pbsg-h5p-style';
+    style.textContent = getH5PStyleCSS();
+    doc.head.appendChild(style);
+  } catch (e) {
+    console.warn('Branch H5P style injection failed:', e);
+  }
+}
 
-  checkBtn.onclick = () => {
-    let correct = false;
+function attachBranchH5PxAPI(iframe) {
+  try {
+    const win = iframe.contentWindow;
+    if (!win || !win.H5P || !win.H5P.externalDispatcher) {
+      // H5P not yet ready — retry once after a short delay
+      setTimeout(() => attachBranchH5PxAPI(iframe), 200);
+      return;
+    }
 
-    if (q.type === 'multichoice') {
-      const selected = Array.from(document.querySelectorAll('input[name="pbsgBranchAnswer"]:checked'))
-        .map(el => parseInt(el.value, 10))
-        .sort();
+    win.H5P.externalDispatcher.on('xAPI', (event) => {
+      const verb = (event && event.data && event.data.statement && event.data.statement.verb && event.data.statement.verb.id) || '';
+      const result = event && event.data && event.data.statement && event.data.statement.result;
 
-      const correctIdx = (q.answers || [])
-        .map((a, idx) => a.correct ? idx : -1)
-        .filter(idx => idx >= 0)
-        .sort();
-
-      correct = JSON.stringify(selected) === JSON.stringify(correctIdx);
-    } else if (q.type === 'singlechoice') {
-      const selected = document.querySelector('input[name="pbsgBranchAnswer"]:checked');
-      if (selected) {
-        const idx = parseInt(selected.value, 10);
-        correct = singleChoices[idx] === (q.correct_answer || '');
+      // 'answered' verb fires when student clicks Check
+      if (verb.endsWith('/answered') && result && result.score) {
+        const passed = result.score.scaled >= 1.0;
+        if (passed) {
+          lockNext(false);
+        } else {
+          lockNext(true);
+        }
       }
-    } else if (q.type === 'blanks') {
-      const input = document.getElementById('pbsgBranchBlanksInput');
-      const value = (input?.value || '').trim();
-      correct = value.length > 0;
-    }
-
-    if (correct) {
-      feedback.textContent = 'Correct.';
-      feedback.className = 'pbsg-branch-feedback is-correct';
-      lockNext(false);
-    } else {
-      feedback.textContent = 'Try again.';
-      feedback.className = 'pbsg-branch-feedback is-wrong';
-      lockNext(true);
-    }
-  };
+    });
+  } catch (e) {
+    // Cross-origin or H5P-not-ready — fall back to allowing Next so the student isn't stuck
+    console.warn('Branch H5P xAPI listener failed:', e);
+    lockNext(false);
+  }
 }
 
 function buildBranchTutorialStep(branch) {
@@ -1661,13 +1759,20 @@ function renderBranchStep() {
   const mainNumber = branchParentIndex + 1;
   const branchCurrent = branchStepIndex + 1;
 
-  const pageText = `Page: ${mainNumber}${letter} of ${branchTotal}`;
+  // Total tutorial pages — used as the denominator so the student sees their
+  // overall position in the tutorial (e.g. "Page: 2A of 10") rather than just
+  // their position within the branch detour.
+  const totalPages = Array.isArray(steps) ? steps.length : 0;
+  const pageText = `Page: ${mainNumber}${letter} of ${totalPages}`;
 
   if (progressEl) progressEl.textContent = pageText;
   updateRunningScore();
   if (progressLabelEl) progressLabelEl.textContent = pageText;
 
-  const pct = branchTotal ? (branchCurrent / branchTotal) * 100 : 0;
+  // Progress bar fill based on parent step position in the overall tutorial,
+  // not the local branch position. The bar stays at the parent step's position
+  // throughout the branch detour so the student sees they haven't lost ground.
+  const pct = totalPages ? ((branchParentIndex + 1) / totalPages) * 100 : 0;
   if (progressFillEl) progressFillEl.style.width = pct.toFixed(2) + '%';
 
 

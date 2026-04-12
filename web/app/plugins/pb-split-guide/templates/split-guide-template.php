@@ -21,7 +21,7 @@ wp_enqueue_style(
     'pbsg_split_guide_css',
     plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.css',
     array(),
-    '0.4.0'
+    '0.5.0.1'
 );
 
 // Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
@@ -213,7 +213,7 @@ $s['branch'] = $branch;
   <?php if ($has_intro): ?>
     <div id="pbsgIntroScreen" class="pbsg-intro-screen">
       <?php if ($has_structured_intro): ?>
-        <div class="pbsg-intro-card pbsg-intro-card--structured">
+        <div class="pbsg-intro-card pbsg-intro-card--structured<?php echo $cover_image_url ? '' : ' pbsg-intro-card--no-cover'; ?>">
 
           <?php if ($cover_image_url): ?>
             <div class="pbsg-intro-cover">
@@ -221,46 +221,51 @@ $s['branch'] = $branch;
             </div>
           <?php endif; ?>
 
-          <?php if ($intro_description): ?>
-            <p class="pbsg-intro-description"><?php echo esc_html($intro_description); ?></p>
-          <?php endif; ?>
+          <div class="pbsg-intro-info">
+            <div class="pbsg-intro-eyebrow">Tutorial</div>
+            <h2 class="pbsg-intro-title"><?php echo esc_html(get_the_title($page_id)); ?></h2>
 
-          <?php if (!empty($intro_objectives)): ?>
-            <div class="pbsg-intro-objectives">
-              <h3>What You'll Learn</h3>
-              <ul>
-                <?php foreach ($intro_objectives as $obj): ?>
-                  <li><?php echo esc_html($obj); ?></li>
-                <?php endforeach; ?>
-              </ul>
-            </div>
-          <?php endif; ?>
-
-          <div class="pbsg-intro-meta">
-            <?php if ($intro_duration): ?>
-              <span class="pbsg-intro-duration">
-                <?php echo pbsg_icon('stopwatch'); ?> <?php echo esc_html($intro_duration); ?>
-              </span>
+            <?php if ($intro_description): ?>
+              <p class="pbsg-intro-description"><?php echo esc_html($intro_description); ?></p>
             <?php endif; ?>
 
-            <?php if ($step_count > 0): ?>
-              <span class="pbsg-intro-steps-count">
-                <?php echo pbsg_icon('clipboard'); ?> <?php echo $step_count; ?> Page<?php echo $step_count !== 1 ? 's' : ''; ?>
-              </span>
+            <?php if (!empty($intro_objectives)): ?>
+              <div class="pbsg-intro-objectives">
+                <h3>What You'll Learn</h3>
+                <ul>
+                  <?php foreach ($intro_objectives as $obj): ?>
+                    <li><?php echo esc_html($obj); ?></li>
+                  <?php endforeach; ?>
+                </ul>
+              </div>
             <?php endif; ?>
-          </div>
 
-          <?php if ($intro_prerequisites): ?>
-            <div class="pbsg-intro-prereqs">
-              <h4>Prerequisites</h4>
-              <p><?php echo esc_html($intro_prerequisites); ?></p>
+            <div class="pbsg-intro-meta">
+              <?php if ($intro_duration): ?>
+                <span class="pbsg-intro-duration">
+                  <?php echo pbsg_icon('stopwatch'); ?> <?php echo esc_html($intro_duration); ?>
+                </span>
+              <?php endif; ?>
+
+              <?php if ($step_count > 0): ?>
+                <span class="pbsg-intro-steps-count">
+                  <?php echo pbsg_icon('clipboard'); ?> <?php echo $step_count; ?> Page<?php echo $step_count !== 1 ? 's' : ''; ?>
+                </span>
+              <?php endif; ?>
             </div>
-          <?php endif; ?>
 
-          <div class="pbsg-intro-actions">
-            <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
-              Start Tutorial
-            </button>
+            <?php if ($intro_prerequisites): ?>
+              <div class="pbsg-intro-prereqs">
+                <h4>Prerequisites</h4>
+                <p><?php echo esc_html($intro_prerequisites); ?></p>
+              </div>
+            <?php endif; ?>
+
+            <div class="pbsg-intro-actions">
+              <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
+                Start Tutorial
+              </button>
+            </div>
           </div>
 
         </div>
@@ -464,7 +469,7 @@ window.PBSG_CERT = {
 
     <?php if ($is_logged_in): ?>
       <div class="pbsg-summary-actions">
-        <button type="button" class="pbsg-btn-outline" id="pbsgSummaryCertDownload">
+        <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload">
           Generate Certificate
         </button>
 
@@ -500,7 +505,7 @@ window.PBSG_CERT = {
 
     <div class="pbsg-cert-modal-actions">
       <button type="button" class="pbsg-btn-outline" id="pbsgCertModalCancel">Cancel</button>
-      <button type="button" class="pbsg-btn-outline" id="pbsgCertModalGenerate">Generate</button>
+      <button type="button" class="pbsg-btn-primary" id="pbsgCertModalGenerate">Generate</button>
     </div>
   </div>
 </div>
