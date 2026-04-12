@@ -2005,6 +2005,55 @@ class PB_Split_Guide_Plugin {
         unset($bq);
       }
 
+      // ── Embeddability check for URL-type tutorial resources ──
+      if (!empty($step['tutorial_type']) && $step['tutorial_type'] === 'url' && !empty($step['tutorial_url'])) {
+        $check_url = $step['tutorial_url'];
+        $step['embeddable'] = true; // optimistic default
+        $step['is_document_url'] = false;
+
+        // Check if URL path suggests a document
+        $url_path = strtolower(parse_url($check_url, PHP_URL_PATH) ?: '');
+        if (preg_match('/\.(pdf|docx?|xlsx?|pptx?|csv|tiff?)$/i', $url_path)) {
+          $step['is_document_url'] = true;
+        }
+
+        // HEAD request to check framing headers
+        $response = wp_remote_head($check_url, [
+          'timeout'     => 5,
+          'redirection' => 3,
+          'user-agent'  => 'Mozilla/5.0 (compatible; PBSplitGuide/1.0)',
+        ]);
+
+        if (!is_wp_error($response)) {
+          $headers = wp_remote_retrieve_headers($response);
+
+          // Check X-Frame-Options
+          $xfo = '';
+          if (isset($headers['x-frame-options'])) {
+            $xfo = strtolower($headers['x-frame-options']);
+          }
+          if ($xfo === 'deny' || $xfo === 'sameorigin') {
+            $step['embeddable'] = false;
+          }
+
+          // Check Content-Security-Policy frame-ancestors
+          $csp = '';
+          if (isset($headers['content-security-policy'])) {
+            $csp = strtolower($headers['content-security-policy']);
+          }
+          if (preg_match('/frame-ancestors\s/', $csp) && strpos($csp, '*') === false) {
+            $step['embeddable'] = false;
+          }
+
+          // Also detect document MIME from Content-Type header
+          $content_type = wp_remote_retrieve_header($response, 'content-type');
+          if ($content_type && preg_match('/(pdf|msword|officedocument|ms-excel|ms-powerpoint|csv)/i', $content_type)) {
+            $step['is_document_url'] = true;
+          }
+        }
+        // If HEAD fails (timeout, DNS error, etc.), keep optimistic defaults
+      }
+
       // Strip transient data from stored JSON
       unset($step['quiz'], $step['_editing_h5p']);
     }

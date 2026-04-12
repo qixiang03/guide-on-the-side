@@ -126,14 +126,17 @@ function getH5PStyleCSS() {
             padding: 0 !important;
           }
 
-          /* ── MultiChoice options (default) ───────────────── */
+          /* ── MultiChoice options (default) ─────────────────
+             H5P renders the radio/checkbox as a ::before pseudo-element
+             on .h5p-alternative-container, positioned via text-indent + padding-left.
+             We only override visual properties (colors, border, border-radius) and
+             leave H5P's native layout (text-indent, padding, line-height) untouched
+             so the radio circle stays aligned with the text. ──── */
           .h5p-alternative-container {
             background: #fff !important;
             border: 1.5px solid #d0d0d0 !important;
             border-radius: 6px !important;
-            padding: 12px 14px 12px 44px !important;
             margin-bottom: 8px !important;
-            position: relative !important;
             font-size: 14px !important;
             color: #333 !important;
             cursor: pointer !important;
@@ -145,25 +148,8 @@ function getH5PStyleCSS() {
             border-color: #8C2004 !important;
           }
 
-          .h5p-alternative-container .h5p-alternative-inner,
-          .h5p-alternative-container label,
-          .h5p-alternative-container .h5p-answer,
-          .h5p-alternative-container .h5p-answer-text {
-            position: relative !important;
-            z-index: 2 !important;
+          .h5p-alternative-container .h5p-alternative-inner {
             color: inherit !important;
-          }
-
-          .h5p-alternative-container input[type="radio"],
-          .h5p-alternative-container input[type="checkbox"] {
-            position: absolute !important;
-            left: 14px !important;
-            top: 50% !important;
-            transform: translateY(-50%) !important;
-            margin: 0 !important;
-            z-index: 3 !important;
-            width: 16px !important;
-            height: 16px !important;
           }
 
           /* ── MultiChoice options (wrong state) ───────────── */
