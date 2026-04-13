@@ -23,6 +23,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-template-manager.p
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-export-import.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-h5p-usage-map.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-icons.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-embed-check.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
@@ -794,7 +795,8 @@ class PB_Split_Guide_Plugin {
                 </label>
                 <input type="text" id="pbsg_header_note" name="pbsg_header_note"
                        value="<?php echo esc_attr($note); ?>"
-                       placeholder="Banner text shown to students" />
+                       placeholder="e.g. If the page does not load, open it in a new tab" />
+                <p class="description">Shown as a banner above the resource panel on every step.</p>
               </div>
             </div>
 
@@ -2010,51 +2012,9 @@ class PB_Split_Guide_Plugin {
 
       // ── Embeddability check for URL-type tutorial resources ──
       if (!empty($step['tutorial_type']) && $step['tutorial_type'] === 'url' && !empty($step['tutorial_url'])) {
-        $check_url = $step['tutorial_url'];
-        $step['embeddable'] = true; // optimistic default
-        $step['is_document_url'] = false;
-
-        // Check if URL path suggests a document
-        $url_path = strtolower(parse_url($check_url, PHP_URL_PATH) ?: '');
-        if (preg_match('/\.(pdf|docx?|xlsx?|pptx?|csv|tiff?)$/i', $url_path)) {
-          $step['is_document_url'] = true;
-        }
-
-        // HEAD request to check framing headers
-        $response = wp_remote_head($check_url, [
-          'timeout'     => 5,
-          'redirection' => 3,
-          'user-agent'  => 'Mozilla/5.0 (compatible; PBSplitGuide/1.0)',
-        ]);
-
-        if (!is_wp_error($response)) {
-          $headers = wp_remote_retrieve_headers($response);
-
-          // Check X-Frame-Options
-          $xfo = '';
-          if (isset($headers['x-frame-options'])) {
-            $xfo = strtolower($headers['x-frame-options']);
-          }
-          if ($xfo === 'deny' || $xfo === 'sameorigin') {
-            $step['embeddable'] = false;
-          }
-
-          // Check Content-Security-Policy frame-ancestors
-          $csp = '';
-          if (isset($headers['content-security-policy'])) {
-            $csp = strtolower($headers['content-security-policy']);
-          }
-          if (preg_match('/frame-ancestors\s/', $csp) && strpos($csp, '*') === false) {
-            $step['embeddable'] = false;
-          }
-
-          // Also detect document MIME from Content-Type header
-          $content_type = wp_remote_retrieve_header($response, 'content-type');
-          if ($content_type && preg_match('/(pdf|msword|officedocument|ms-excel|ms-powerpoint|csv)/i', $content_type)) {
-            $step['is_document_url'] = true;
-          }
-        }
-        // If HEAD fails (timeout, DNS error, etc.), keep optimistic defaults
+        $embed_result        = PBSG_Embed_Check::check($step['tutorial_url']);
+        $step['embeddable']      = $embed_result['embeddable'];
+        $step['is_document_url'] = $embed_result['is_document_url'];
       }
 
       // Strip transient data from stored JSON
