@@ -23,6 +23,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-template-manager.p
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-export-import.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-h5p-usage-map.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-icons.php';
+require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-embed-check.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics.php';
 require_once plugin_dir_path(__FILE__) . 'class-pbsg-analytics-dashboard.php';
 require_once plugin_dir_path(__FILE__) . 'includes/class-pbsg-certificate.php';
@@ -135,6 +136,7 @@ class PB_Split_Guide_Plugin {
     add_action('network_admin_footer', [$this, 'pbsg_hide_network_menu_js']);
 
     add_action('admin_menu', [$this, 'register_admin_menu']);
+    add_action('network_admin_menu', [$this, 'register_admin_menu']);
     add_action('admin_init', [$this, 'redirect_my_books_to_my_tutorials']);
     add_action('admin_bar_menu', [$this, 'change_my_books_admin_bar_link'], 999);
 
@@ -144,6 +146,7 @@ class PB_Split_Guide_Plugin {
     // Stretch Goal 5: Guide settings (layout + benchmarks)
     add_action('admin_init', [$this, 'register_guide_settings']);
     add_action('admin_menu', [$this, 'register_guide_settings_page']);
+    add_action('network_admin_menu', [$this, 'register_guide_settings_page']);
 
     // Template picker & export/import (Sprint 7 SG3 & SG4)
     // Priority 5 on admin_init fires BEFORE Pressbooks' redirect_away_from_bad_urls (priority 10),
@@ -151,6 +154,7 @@ class PB_Split_Guide_Plugin {
     // because 'page' is not in Pressbooks' list_post_types() whitelist.
     add_action('admin_init',                    [$this, 'maybe_redirect_to_template_picker'], 5);
     add_action('admin_menu',                    [$this, 'register_template_picker_page']);
+    add_action('network_admin_menu',            [$this, 'register_template_picker_page']);
     add_action('wp_ajax_pbsg_get_templates',    [$this, 'ajax_get_templates']);
     add_action('wp_ajax_pbsg_save_as_template', [$this, 'ajax_save_as_template']);
     add_action('wp_ajax_pbsg_create_from_template', [$this, 'ajax_create_from_template']);
@@ -791,7 +795,8 @@ class PB_Split_Guide_Plugin {
                 </label>
                 <input type="text" id="pbsg_header_note" name="pbsg_header_note"
                        value="<?php echo esc_attr($note); ?>"
-                       placeholder="Banner text shown to students" />
+                       placeholder="e.g. If the page does not load, open it in a new tab" />
+                <p class="description">Shown as a banner above the resource panel on every step.</p>
               </div>
             </div>
 
@@ -2003,6 +2008,13 @@ class PB_Split_Guide_Plugin {
           unset($bq['_editing_h5p']);
         }
         unset($bq);
+      }
+
+      // ── Embeddability check for URL-type tutorial resources ──
+      if (!empty($step['tutorial_type']) && $step['tutorial_type'] === 'url' && !empty($step['tutorial_url'])) {
+        $embed_result        = PBSG_Embed_Check::check($step['tutorial_url']);
+        $step['embeddable']      = $embed_result['embeddable'];
+        $step['is_document_url'] = $embed_result['is_document_url'];
       }
 
       // Strip transient data from stored JSON

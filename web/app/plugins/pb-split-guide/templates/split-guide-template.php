@@ -119,12 +119,40 @@ foreach ($steps as $s) {
     'type' => $tutorial_type,
     'url'  => $tutorial_url,
     'file_url' => '',
-    'mime' => ''
+    'mime' => '',
+    'embeddable' => isset($s['embeddable']) ? (bool) $s['embeddable'] : true,
+    'is_document_url' => isset($s['is_document_url']) ? (bool) $s['is_document_url'] : false,
+    'viewer_url' => '',
   ];
 
   if ($tutorial_type === 'file' && $tutorial_attachment_id > 0) {
     $tutorial['file_url'] = wp_get_attachment_url($tutorial_attachment_id);
     $tutorial['mime'] = get_post_mime_type($tutorial_attachment_id);
+
+    // Generate Google Docs Viewer URL for office-type uploads
+    $office_mimes = [
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/csv',
+    ];
+    if (in_array($tutorial['mime'], $office_mimes, true) && $tutorial['file_url']) {
+      $host = parse_url($tutorial['file_url'], PHP_URL_HOST) ?: '';
+      $is_local = in_array($host, ['localhost', '127.0.0.1'], true)
+                  || str_ends_with($host, '.test')
+                  || str_ends_with($host, '.local');
+      if (!$is_local) {
+        $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['file_url']) . '&embedded=true';
+      }
+    }
+  }
+
+  // For non-embeddable document URLs, generate Google Viewer URL
+  if ($tutorial_type === 'url' && !empty($tutorial['url']) && !$tutorial['embeddable'] && $tutorial['is_document_url']) {
+    $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
   }
 
   $s['tutorial'] = $tutorial;
@@ -380,7 +408,7 @@ $s['branch'] = $branch;
     <div class="pbsg-banner">
       <div class="pbsg-banner-text">
         <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
-        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window <?php echo pbsg_icon('arrow-up-right'); ?></a>
+        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new tab <?php echo pbsg_icon('arrow-up-right'); ?></a>
       </div>
       <div class="pbsg-banner-actions">
         <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>  

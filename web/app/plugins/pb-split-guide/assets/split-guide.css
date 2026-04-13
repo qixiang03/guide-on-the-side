@@ -1086,6 +1086,90 @@ body.pbsg-standalone .pbsg-wrap{
   }
 }
 
+/* ── Inline image (uploaded image files) ──────────────────── */
+.pbsg-inline-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+}
+
+/* ── Popup fallback card (non-embeddable URLs) ────────────── */
+.pbsg-popup-fallback-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 300px;
+  padding: 40px 32px;
+  text-align: center;
+  color: #333;
+  box-sizing: border-box;
+}
+
+.pbsg-popup-fallback-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  color: #646970;
+}
+
+.pbsg-popup-fallback-icon svg {
+  width: 48px;
+  height: 48px;
+}
+
+.pbsg-popup-fallback-msg {
+  font-size: 16px;
+  line-height: 1.5;
+  margin: 0 0 8px;
+  color: #333;
+}
+
+.pbsg-popup-fallback-hint {
+  font-size: 14px;
+  color: #646970;
+  margin: 0 0 24px;
+}
+
+.pbsg-popup-btn {
+  min-height: 44px;
+  padding: 10px 24px;
+  border: 2px solid var(--pbsg-primary, #517E1B);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--pbsg-primary, #517E1B);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  margin-bottom: 16px;
+}
+
+.pbsg-popup-btn:hover {
+  background: var(--pbsg-primary, #517E1B);
+  color: #fff;
+}
+
+.pbsg-popup-btn--front {
+  border-color: #646970;
+  color: #646970;
+}
+
+.pbsg-popup-btn--front:hover {
+  background: #646970;
+  color: #fff;
+}
+
+.pbsg-popup-fallback-link {
+  font-size: 13px;
+  color: #8C2004;
+  text-decoration: underline;
+}
+
 .pbsg-summary-screen {
   width: min(1000px, 92vw);
   margin: 40px auto;

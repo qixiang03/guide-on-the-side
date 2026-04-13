@@ -776,6 +776,39 @@ if (!function_exists('size_format')) {
     }
 }
 
+if (!function_exists('wp_remote_head')) {
+    function wp_remote_head(string $url, array $args = [])
+    {
+        WPStubs::record('wp_remote_head', [$url, $args]);
+        $override = WPStubs::returnFor('wp_remote_head', null);
+        if ($override !== null) {
+            return $override;
+        }
+        return new WP_Error('http_request_failed', 'Stubbed — no real HTTP in tests');
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_headers')) {
+    function wp_remote_retrieve_headers($response): array
+    {
+        if (is_wp_error($response)) {
+            return [];
+        }
+        return (array) ($response['headers'] ?? []);
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_header')) {
+    function wp_remote_retrieve_header($response, string $header): string
+    {
+        if (is_wp_error($response)) {
+            return '';
+        }
+        $headers = $response['headers'] ?? [];
+        return (string) ($headers[strtolower($header)] ?? '');
+    }
+}
+
 if (!function_exists('add_shortcode')) {
     function add_shortcode(string $tag, callable $callback): void
     {
@@ -912,3 +945,4 @@ if (!function_exists('wp_get_current_user')) {
         return $o;
     }
 }
+
