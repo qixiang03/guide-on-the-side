@@ -408,7 +408,7 @@ $s['branch'] = $branch;
     <div class="pbsg-banner">
       <div class="pbsg-banner-text">
         <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
-        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new window <?php echo pbsg_icon('arrow-up-right'); ?></a>
+        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new tab <?php echo pbsg_icon('arrow-up-right'); ?></a>
       </div>
       <div class="pbsg-banner-actions">
         <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>  

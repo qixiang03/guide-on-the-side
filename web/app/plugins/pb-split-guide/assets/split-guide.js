@@ -8,10 +8,181 @@ const openLink = document.getElementById('pbsgOpenLink');
 const fallback = document.getElementById('pbsgTutorialFallback');
 const fallbackLink = document.getElementById('pbsgFallbackLink');
 
-// Temporary stubs — replaced by Task 5
-function closeTutorialPopup() {}
+let tutorialPopup;
+let popupPollInterval = null;
+
+// ── Popup window fallback system ──
+
+let popupUrl = '';
+let popupFeatures = '';
+
+function isSafari() {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
+function bringPopupToFront() {
+  if (!popupUrl) return;
+
+  // No stored reference — open fresh
+  if (!tutorialPopup) {
+    openTutorialPopup(popupUrl);
+    return;
+  }
+
+  // ── Bring popup to front ─────────────────────────────────────────────
+  //
+  // Two scenarios based on the popup's .closed property:
+  //
+  // 1. closed === false  →  opener relationship intact (no COOP barrier).
+  //    .focus() works — brings the popup to front. Same technique that
+  //    Springshare/LibWizard uses.
+  //
+  // 2. closed === true   →  either the user genuinely closed the popup,
+  //    or the site sent Cross-Origin-Opener-Policy: same-origin which
+  //    severs the opener relationship (Chrome reports .closed = true and
+  //    silently ignores .focus()). In both cases, reopen.
+
+  var isClosed = false;
+  try { isClosed = tutorialPopup.closed; } catch (e) { isClosed = true; }
+
+  if (!isClosed) {
+    // Opener relationship intact — .focus() will bring popup to front
+    try { tutorialPopup.focus(); } catch (e) { openTutorialPopup(popupUrl); }
+  } else {
+    // Popup closed or COOP-severed — reopen
+    openTutorialPopup(popupUrl);
+  }
+}
+
+function openTutorialPopup(url) {
+  // Close any existing popup cleanly
+  if (tutorialPopup) {
+    try { tutorialPopup.close(); } catch (e) {}
+  }
+  tutorialPopup = null;
+  clearInterval(popupPollInterval);
+  popupPollInterval = null;
+
+  const stage = document.getElementById('pbsgTutorialStage');
+  const banner = document.querySelector('.pbsg-banner');
+  if (!stage) { window.open(url, '_blank'); return; }
+
+  const stageRect = stage.getBoundingClientRect();
+  const bannerRect = banner ? banner.getBoundingClientRect() : stageRect;
+
+  const chromeOffset = window.outerHeight - window.innerHeight;
+  const left = Math.round(window.screenX + stageRect.left);
+  const w    = Math.round(stageRect.width);
+  const h    = Math.round(stageRect.height);
+
+  // Positioning: Chrome and Safari interpret `top` differently.
+  // Chrome: positions the popup's OUTER edge (title bar starts at `top`)
+  // Safari: positions the popup's CONTENT area (title bar is ~70px ABOVE `top`)
+  // Target: popup chrome covers the banner, content aligns with the stage.
+  const bannerScreenTop = Math.round(window.screenY + chromeOffset + bannerRect.top);
+  const popupChromeEstimate = 90;
+  const top = isSafari() ? (bannerScreenTop + popupChromeEstimate) : bannerScreenTop;
+
+  // Store features string ONCE — reuse for re-targeting in bringPopupToFront
+  popupFeatures = 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top +
+    ',toolbar=no,menubar=no,location=yes,status=no,scrollbars=yes,resizable=yes';
+
+  tutorialPopup = window.open(url, 'pbsgTutorialWindow', popupFeatures);
+
+  if (!tutorialPopup) {
+    window.open(url, '_blank');
+    return;
+  }
+
+  popupUrl = url;
+
+  // Switch button to "Bring to Front" using onclick (OVERWRITES the initial handler)
+  const btn = document.getElementById('pbsgPopupBtn');
+  if (btn) {
+    btn.textContent = 'Bring Tutorial Window To Front';
+    btn.classList.add('pbsg-popup-btn--front');
+    btn.onclick = function() { bringPopupToFront(); };
+  }
+
+  // Hide "Reopen" link while popup is open
+  const reopenLink = document.getElementById('pbsgReopenLink');
+  if (reopenLink) reopenLink.style.display = 'none';
+
+  // Poll to show "Reopen" link if popup was closed.
+  // IMPORTANT: Do NOT null tutorialPopup here — .closed is unreliable for
+  // cross-origin popups in Chrome (returns true even when open). Nulling
+  // the reference was the root cause of "Bring to Front" doing nothing.
+  // bringPopupToFront() handles the "truly closed" case via try/catch on .focus().
+  clearInterval(popupPollInterval);
+  popupPollInterval = setInterval(function() {
+    try {
+      if (tutorialPopup && tutorialPopup.closed) {
+        // Only update UI — keep tutorialPopup reference intact
+        clearInterval(popupPollInterval);
+        popupPollInterval = null;
+        const link = document.getElementById('pbsgReopenLink');
+        if (link) link.style.display = 'inline';
+      }
+    } catch (e) {
+      // Cross-origin .closed access error — stop polling, keep reference
+      clearInterval(popupPollInterval);
+      popupPollInterval = null;
+    }
+  }, 2000);
+}
+
+function closeTutorialPopup() {
+  if (tutorialPopup) {
+    try { tutorialPopup.close(); } catch (e) {}
+  }
+  tutorialPopup = null;
+  // Keep popupUrl and popupFeatures — needed for re-opening if user closed accidentally
+  clearInterval(popupPollInterval);
+  popupPollInterval = null;
+}
+
 function renderPopupFallbackCard(container, url) {
-  container.innerHTML = '<p style="text-align:center;padding:40px;color:#646970;">This site cannot be embedded. <a href="' + url + '" target="_blank">Open in new tab</a></p>';
+  let domain = '';
+  try { domain = new URL(url).hostname; } catch(e) { domain = url; }
+
+  container.innerHTML = `
+    <div class="pbsg-popup-fallback-card">
+      <div class="pbsg-popup-fallback-icon">${typeof PBSG_ICONS !== 'undefined' && PBSG_ICONS ? PBSG_ICONS.render('arrow-up-right') : ''}</div>
+      <p class="pbsg-popup-fallback-msg"><strong>${domain}</strong> cannot be embedded inline.</p>
+      <p class="pbsg-popup-fallback-hint">Click below to open it alongside this guide.</p>
+      <button type="button" class="pbsg-popup-btn" id="pbsgPopupBtn">Open in a new window</button>
+      <a class="pbsg-popup-fallback-link" href="#" id="pbsgReopenLink" style="display:none">Reopen the window</a>
+    </div>
+  `;
+
+  // "Open in a new window" button — uses onclick (not addEventListener) so
+  // openTutorialPopup() can OVERWRITE it with bringPopupToFront(). No dual handlers.
+  const btn = document.getElementById('pbsgPopupBtn');
+  if (btn) {
+    btn.onclick = function() { openTutorialPopup(url); };
+  }
+
+  // "Reopen" link — same action, only visible after popup was closed
+  const reopenLink = document.getElementById('pbsgReopenLink');
+  if (reopenLink) {
+    reopenLink.onclick = function(e) { e.preventDefault(); openTutorialPopup(url); };
+  }
+
+  // If popup is already open (navigated back to this step), show "Bring to Front"
+  if (tutorialPopup) {
+    try {
+      if (!tutorialPopup.closed) {
+        if (btn) {
+          btn.textContent = 'Bring Tutorial Window To Front';
+          btn.classList.add('pbsg-popup-btn--front');
+          btn.onclick = function() { bringPopupToFront(); };
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Hide the old fallback bar
+  fallback.style.display = 'none';
 }
 
 const prevBtn = document.getElementById('pbsgPrev');
@@ -1274,6 +1445,8 @@ function renderTutorial(step, options = {}){
 
   currentTutorialSignature = nextSignature;
 
+  closeTutorialPopup();
+
   tutorialStage.innerHTML = `
     <iframe aria-label="Tutorial Frame" id="pbsgTutorialFrame" class="pbsg-iframe"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -1927,6 +2100,7 @@ function handleCloseTutorialAction() {
 }
 
 retakeBtn.onclick = () => {
+  closeTutorialPopup();
   handleCloseTutorialAction();
 };
 

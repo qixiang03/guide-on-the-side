@@ -135,6 +135,7 @@ class PB_Split_Guide_Plugin {
     add_action('network_admin_footer', [$this, 'pbsg_hide_network_menu_js']);
 
     add_action('admin_menu', [$this, 'register_admin_menu']);
+    add_action('network_admin_menu', [$this, 'register_admin_menu']);
     add_action('admin_init', [$this, 'redirect_my_books_to_my_tutorials']);
     add_action('admin_bar_menu', [$this, 'change_my_books_admin_bar_link'], 999);
 
@@ -144,6 +145,7 @@ class PB_Split_Guide_Plugin {
     // Stretch Goal 5: Guide settings (layout + benchmarks)
     add_action('admin_init', [$this, 'register_guide_settings']);
     add_action('admin_menu', [$this, 'register_guide_settings_page']);
+    add_action('network_admin_menu', [$this, 'register_guide_settings_page']);
 
     // Template picker & export/import (Sprint 7 SG3 & SG4)
     // Priority 5 on admin_init fires BEFORE Pressbooks' redirect_away_from_bad_urls (priority 10),
@@ -151,6 +153,7 @@ class PB_Split_Guide_Plugin {
     // because 'page' is not in Pressbooks' list_post_types() whitelist.
     add_action('admin_init',                    [$this, 'maybe_redirect_to_template_picker'], 5);
     add_action('admin_menu',                    [$this, 'register_template_picker_page']);
+    add_action('network_admin_menu',            [$this, 'register_template_picker_page']);
     add_action('wp_ajax_pbsg_get_templates',    [$this, 'ajax_get_templates']);
     add_action('wp_ajax_pbsg_save_as_template', [$this, 'ajax_save_as_template']);
     add_action('wp_ajax_pbsg_create_from_template', [$this, 'ajax_create_from_template']);
