@@ -106,7 +106,6 @@ $cancel_url   = admin_url( 'edit.php?post_type=page' );
 
   .pbsg-tpl-card .pbsg-tpl-cat {
     font-size: 11px;
-    color: #8c8f94;
     margin: 0;
   }
 </style>

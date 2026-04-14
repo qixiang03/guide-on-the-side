@@ -92,7 +92,6 @@
 .pbsg-metabox .pbsg-field input[type="url"],
 .pbsg-metabox .pbsg-field textarea,
 .pbsg-metabox .pbsg-field select {
-  width: 100% !important;
   padding: 8px 12px !important;
   border: 1px solid #E0E0E0 !important;
   border-radius: 4px !important;
@@ -171,6 +170,32 @@
   gap: 10px !important;
 }
 
+/* Reset button styling for headers */
+.pbsg-metabox .pbsg-section-header{
+  width: 100% !important;
+  text-align: left !important;
+  border: none !important;
+  border-bottom: 1px solid var(--pbsg-grey-list) !important;
+  font-family: inherit !important;
+  color: inherit !important;
+}
+
+.pbsg-metabox .pbsg-step-header {
+  text-align: left !important;
+  border: none !important;
+  border-bottom: 1px solid var(--pbsg-grey-list) !important;
+  font-family: inherit !important;
+  color: inherit !important;
+}
+
+/* Ensure focus states are visible for keyboard users */
+.pbsg-metabox .pbsg-section-header:focus-visible,
+.pbsg-metabox .pbsg-step-header:focus-visible {
+  outline: 2px solid var(--pbsg-green) !important;
+  outline-offset: -2px !important;
+  background-color: var(--pbsg-white) !important;
+}
+
 /* Override WP step header */
 .pbsg-metabox .pbsg-step-header {
   display: flex !important;
@@ -200,7 +225,6 @@
   background: #ffffff !important;
   font-size: 12px !important;
   font-weight: 600 !important;
-  color: #646970 !important;
   text-align: center !important;
   cursor: pointer !important;
   line-height: 1.3 !important;
@@ -210,17 +234,17 @@
 .pbsg-metabox .pbsg-quiz-type-btn.active {
   border-color: #517E1B !important;
   background: #e8f0dc !important;
-  color: #517E1B !important;
 }
 
 .pbsg-metabox .pbsg-quiz-type-btn:hover {
   border-color: #517E1B !important;
-  color: #517E1B !important;
 }
 
 /* Override WP step title input */
 .pbsg-metabox .pbsg-step-title-input {
-  flex: 1 !important;
+  flex: 1 1 auto !important;
+  width: auto !important; 
+  min-width: 50px !important;
   border: 1px solid transparent !important;
   border-radius: 4px !important;
   padding: 6px 10px !important;
@@ -375,7 +399,6 @@
 
 .pbsg-badge--info {
   background: var(--pbsg-green-light);
-  color: var(--pbsg-green);
 }
 
 .pbsg-badge--ok {
@@ -645,7 +668,9 @@
 }
 
 .pbsg-step-title-input {
-  flex: 1;
+  flex: 1 1 auto !important;
+  width: auto !important; 
+  min-width: 50px !important;
   border: 1px solid transparent;
   border-radius: var(--pbsg-radius-sm);
   padding: 6px 10px;
@@ -778,13 +803,11 @@
 
 .pbsg-quiz-type-btn:hover {
   border-color: var(--pbsg-green);
-  color: var(--pbsg-green);
 }
 
 .pbsg-quiz-type-btn.active {
   border-color: var(--pbsg-green);
   background: var(--pbsg-green-light);
-  color: var(--pbsg-green);
 }
 
 .pbsg-type-icon {
@@ -868,7 +891,6 @@
 .pbsg-answer-correct-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--pbsg-green);
   text-transform: uppercase;
   letter-spacing: .04em;
   white-space: nowrap;
@@ -1085,7 +1107,6 @@
 
 .pbsg-resource-type-toggle label.active {
   background: var(--pbsg-green-light);
-  color: var(--pbsg-green);
 }
 
 .pbsg-resource-preview {

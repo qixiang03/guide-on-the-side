@@ -706,14 +706,14 @@ class PB_Split_Guide_Plugin {
       <!-- ══════════ Tutorial Introduction Section ══════════ -->
       <div id="pbsg-intro-section" class="pbsg-intro-section">
 
-        <div id="pbsg-intro-toggle" class="pbsg-section-header">
+        <button type="button" id="pbsg-intro-toggle" class="pbsg-section-header" aria-expanded="true" aria-controls="pbsg-intro-body">
           <div class="pbsg-section-header-left">
             <span class="pbsg-section-icon"><?php echo pbsg_icon('document'); ?></span>
             <span class="pbsg-section-title">Tutorial Introduction</span>
             <span class="pbsg-badge pbsg-badge--info">What students see before starting</span>
           </div>
           <span id="pbsg-intro-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-down'); ?></span>
-        </div>
+        </button>
 
         <div id="pbsg-intro-body" class="pbsg-intro-body">
           <div class="pbsg-intro-grid">
@@ -807,14 +807,14 @@ class PB_Split_Guide_Plugin {
       <!-- ══════════ Layout Settings Section (Stretch Goal 5) ══════════ -->
       <div id="pbsg-layout-section" class="pbsg-intro-section">
 
-        <div id="pbsg-layout-toggle" class="pbsg-section-header">
+        <button type="button" id="pbsg-layout-toggle" class="pbsg-section-header" aria-expanded="false" aria-controls="pbsg-layout-body">
           <div class="pbsg-section-header-left">
             <span class="pbsg-section-icon"><?php echo pbsg_icon('arrow-horizontal'); ?></span>
             <span class="pbsg-section-title">Layout Settings</span>
             <span class="pbsg-badge pbsg-badge--info">Per-guide customisation</span>
           </div>
           <span id="pbsg-layout-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-right'); ?></span>
-        </div>
+        </button>
 
         <div id="pbsg-layout-body" class="pbsg-intro-body" style="display:none;">
 
@@ -910,14 +910,13 @@ class PB_Split_Guide_Plugin {
       ?>
       <div id="pbsg-benchmark-section" class="pbsg-intro-section">
 
-        <div id="pbsg-benchmark-toggle" class="pbsg-section-header">
-          <div class="pbsg-section-header-left">
+        <button type="button" id="pbsg-benchmark-toggle" class="pbsg-section-header" aria-expanded="false" aria-controls="pbsg-benchmark-body">          <div class="pbsg-section-header-left">
             <span class="pbsg-section-icon"><?php echo pbsg_icon('chart-bar'); ?></span>
             <span class="pbsg-section-title">Benchmark Settings</span>
             <span class="pbsg-badge pbsg-badge--info">Performance thresholds for analytics</span>
           </div>
           <span id="pbsg-benchmark-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-right'); ?></span>
-        </div>
+        </button>
 
         <div id="pbsg-benchmark-body" class="pbsg-intro-body" style="display:none;">
 
@@ -1170,14 +1169,13 @@ class PB_Split_Guide_Plugin {
       <!-- ══════════ Close Tutorial Behavior Section ══════════ -->
       <div id="pbsg-close-url-section" class="pbsg-intro-section">
 
-        <div id="pbsg-close-url-toggle" class="pbsg-section-header">
-          <div class="pbsg-section-header-left">
+        <button type="button" id="pbsg-close-url-toggle" class="pbsg-section-header" aria-expanded="false" aria-controls="pbsg-close-url-body">          <div class="pbsg-section-header-left">
             <span class="pbsg-section-icon"><?php echo pbsg_icon('arrow-up-right'); ?></span>
             <span class="pbsg-section-title">Close Tutorial Behaviour</span>
             <span class="pbsg-badge pbsg-badge--info">Where students go when they exit</span>
           </div>
           <span id="pbsg-close-url-chevron" class="pbsg-chevron"><?php echo pbsg_icon('chevron-right'); ?></span>
-        </div>
+        </button>
 
         <div id="pbsg-close-url-body" class="pbsg-intro-body" style="display:none;">
 

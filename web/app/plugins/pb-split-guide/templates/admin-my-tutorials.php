@@ -50,7 +50,7 @@ $import_nonce     = wp_create_nonce('pbsg_export_import');
       Upload a <code>.json</code> export file from another Guide on the Side server.
     </p>
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-      <input type="file" id="pbsg-import-file" accept=".json" />
+      <input type="file" aria-label="Import File" id="pbsg-import-file" accept=".json" />
       <button type="button" class="button button-primary" id="pbsg-import-btn">Import</button>
     </div>
     <p id="pbsg-import-status" style="margin:10px 0 0; display:none;"></p>
@@ -159,7 +159,7 @@ $import_nonce     = wp_create_nonce('pbsg_export_import');
 
           <div class="pbsg-admin-tutorial-thumb" style="position:relative;">
             <?php if ($transfer_enabled && $item['is_owner']) : ?>
-            <input type="checkbox" class="pbsg-tutorial-checkbox"
+            <input type="checkbox" aria-label="Select Tutorial Checkbox" class="pbsg-tutorial-checkbox"
                    value="<?php echo esc_attr($item['id']); ?>"
                    data-title="<?php echo esc_attr($item['title']); ?>"
                    style="position:absolute; top:8px; right:8px; z-index:2; width:18px; height:18px; cursor:pointer;" />
@@ -184,7 +184,7 @@ $import_nonce     = wp_create_nonce('pbsg_export_import');
                 <?php echo esc_html($item['owner_name']); ?>
               </span>
               <?php if ($item['status'] !== 'publish') : ?>
-                <span style="font-size:12px; color:#D4A017;">(<?php echo esc_html(ucfirst($item['status'])); ?>)</span>
+                <span style="font-size:12px;">(<?php echo esc_html(ucfirst($item['status'])); ?>)</span>
               <?php endif; ?>
             </div>
 
