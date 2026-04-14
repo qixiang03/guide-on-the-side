@@ -1,11 +1,17 @@
 # Guide on the Side — Technical Manual
 
-**Project:** Guide on the Side — Interactive Tutorial System for UPEI Library  
-**Plugin:** `pb-split-guide` (`web/app/plugins/pb-split-guide/`)  
-**Stack:** WordPress 6.9 · Pressbooks (multisite) · H5P · Lando (local) · nginx + Docker (staging)  
-**Last Updated:** April 2026 · Sprint 9
+**Project**: Guide on the Side - Interactive Tutorial System for UPEI Library  
+**Plugin**: `pb-split-guide` (`web/app/plugins/pb-split-guide/`)  
+**Stack**: WordPress 6.9 + Pressbooks (multisite) + H5P + Lando (local) + nginx + Docker (staging)  
+**Last Updated**: April 2026 - Sprint 9
 
-> **AI Disclosure:** This document was produced with assistance from Claude AI (Anthropic). Per course policy, all AI-assisted work must be disclosed.
+---
+
+## Overview
+
+This document is the technical reference for the `pb-split-guide` WordPress plugin — the custom plugin that powers UPEI Library's Guide on the Side interactive tutorial system. It is intended for developers and administrators who need to understand the system architecture, extend the plugin, or troubleshoot problems.
+
+For end-user instructions, see the User Workflow Guide. For deployment specifics, see `docs/DEPLOYMENT-STAGING.md`. For local environment setup, see `docs/DEV-SETUP-GUIDE.md`.
 
 ---
 
@@ -81,14 +87,25 @@ web/app/plugins/pb-split-guide/
 ├── class-pbsg-analytics-dashboard.php  # Admin analytics UI
 ├── composer.json                   # Plugin-level Composer (TCPDF)
 ├── vendor/                         # TCPDF and other plugin deps
+├── accessibility-dashboard/
+│   ├── class-pbsg-accessibility-dashboard.php  # Color schemes, profile fields, font enqueuing
+│   ├── assets/
+│   │   ├── accessibility-dashboard.js           # Accessibility settings JS
+│   │   └── accessibility-dashboard-profile.js   # Profile page JS
+│   └── styles/
+│       ├── admin-colors-upei.css                # UPEI Library admin color scheme
+│       └── admin-colors-colorblind.css          # Colorblind-friendly color scheme
 ├── assets/
 │   ├── admin-split-guide.js        # All admin-page JavaScript (steps editor, modals)
 │   ├── split-guide.js              # Frontend tutorial JS (navigation, H5P events)
 │   ├── split-guide-tracker.js      # Analytics event emitter (frontend)
 │   ├── split-guide.css             # Frontend styles
+│   ├── student-h5p-iframe.css      # Shared CSS injected into branch H5P iframes
+│   ├── pbsg-icons.js               # Frontend SVG icon helpers
 │   ├── admin/
 │   │   ├── admin-split-guide.css   # Admin metabox + modal styles
-│   │   └── admin-librarians.css/js # Librarian management page styles/scripts
+│   │   ├── admin-librarians.css/js # Librarian management page styles/scripts
+│   │   └── admin-cross-edit.css/js # Cross-edit toggle UI
 │   ├── analytics-dashboard.css/js  # Analytics dashboard styles/scripts
 │   └── images/
 │       └── logo.png                # Used on generated certificates
@@ -99,6 +116,9 @@ web/app/plugins/pb-split-guide/
 │   ├── class-pbsg-certificate.php  # PDF certificate generation via TCPDF
 │   ├── class-pbsg-export-import.php  # Tutorial JSON export/import
 │   ├── class-pbsg-h5p-factory.php  # Programmatic H5P content creation
+│   ├── class-pbsg-h5p-usage-map.php  # Transient-cached h5p_id → tutorial post ID index
+│   ├── class-pbsg-embed-check.php  # Server-side URL embeddability detection (HEAD request)
+│   ├── class-pbsg-icons.php        # SVG icon registry (24×24 monochrome set)
 │   ├── class-pbsg-template-manager.php  # Tutorial template CRUD
 │   └── class-pbsg-admin-menu-filter.php # Admin menu filtering/hiding
 └── templates/
@@ -123,6 +143,10 @@ web/app/plugins/pb-split-guide/
 | `PBSG_Template_Manager` | `includes/class-pbsg-template-manager.php` | CRUD for `pbsg_tutorial_templates` table; create-from-template with token replacement |
 | `PBSG_Steps_Normalizer` | `includes/steps-normalizer.php` | Pure PHP (no WP deps) step array validation — unit-testable |
 | `PBSG_Admin_Menu_Filter` | `includes/class-pbsg-admin-menu-filter.php` | Hides/filters admin menu items per role |
+| `Pressbooks_Accessibility_Enhancer` | `accessibility-dashboard/class-pbsg-accessibility-dashboard.php` | Registers UPEI Library and colorblind-friendly admin color schemes; adds font, shortcut, and accessibility fields to user profiles |
+| `PBSG_Embed_Check` | `includes/class-pbsg-embed-check.php` | Performs server-side HEAD request to detect if a URL is iframeable (X-Frame-Options / CSP); detects document types; generates Google Docs Viewer URLs for Office files |
+| `PBSG_H5P_Usage_Map` | `includes/class-pbsg-h5p-usage-map.php` | Builds and caches a transient index of h5p_id → tutorial post IDs; invalidated on `save_post_page` |
+| `PBSG_Icons` | `includes/class-pbsg-icons.php` | SVG icon registry; `PBSG_Icons::get($name)` / `pbsg_icon($name)` return inline `<svg>` elements that inherit color via `currentColor` |
 
 ### 2.3 Plugin Bootstrap (`pb-split-guide.php`)
 
@@ -153,7 +177,11 @@ Tutorials are **WordPress Pages** (`post_type = page`) with the `split-guide-tem
 | `_wp_page_template` | `string` | Must be `split-guide-template.php` to be treated as a tutorial |
 | `_pbsg_steps_json` | `string` (JSON) | Array of step objects (see below) |
 | `_pbsg_header_note` | `string` | Optional plain-text header note shown above the tutorial |
-| `_pbsg_cover_image_id` | `int` | Attachment ID of the cover image (shown on My Tutorials grid) |
+| `_pbsg_cover_image_id` | `int` | Attachment ID of the cover image (shown on My Tutorials grid and intro screen) |
+| `_pbsg_intro_description` | `string` | Short description shown on the structured intro card |
+| `_pbsg_intro_objectives` | `string` (JSON array) | "What You'll Learn" bullet list shown on the intro card |
+| `_pbsg_intro_duration` | `string` | Estimated duration label shown on the intro card |
+| `_pbsg_intro_prerequisites` | `string` | Prerequisites text shown on the intro card |
 
 **Step object shape** (one element of `_pbsg_steps_json` array):
 
@@ -167,6 +195,9 @@ Tutorials are **WordPress Pages** (`post_type = page`) with the `split-guide-tem
   "tutorial_file_name": "",
   "tutorial_file_url": "",
   "url": "https://example.com/resource",
+  "embeddable": true,
+  "is_document_url": false,
+  "viewer_url": "",
   "branch_mode": "none",
   "branch_trigger_attempts": 1,
   "branch_title": "",
@@ -180,6 +211,8 @@ Tutorials are **WordPress Pages** (`post_type = page`) with the `split-guide-tem
 ```
 
 `tutorial_type` is `"url"`, `"file"`, or `""` (no resource). `url` is a legacy mirror of `tutorial_url`. `branch_mode` is `"none"`, `"always"`, or `"on_fail"`.
+
+`embeddable` is set at save time by `PBSG_Embed_Check::check()`. `false` means the URL blocks iframing via `X-Frame-Options` or CSP. `is_document_url` is `true` for PDFs, Office files, and CSVs. `viewer_url` is a Google Docs Viewer URL for Office file types (empty for PDFs, local dev hosts, and non-office types).
 
 `PBSG_Steps_Normalizer::normalize()` is the canonical validator — run any step array through it before saving.
 
@@ -260,6 +293,14 @@ When a page with `_wp_page_template = split-guide-template.php` is loaded:
 5. Navigation buttons (Prev/Next), progress bar, step menu, and summary screen are rendered client-side by `assets/split-guide.js`
 
 H5P quizzes are embedded via `{site_url}/?action=h5p_embed&id={h5p_id}` in an iframe. The frontend JS listens for `H5P.externalDispatcher` `xAPI` events to detect correct/incorrect answers and trigger branching.
+
+**Intro screen:** If a tutorial has `_pbsg_cover_image_id` or any `_pbsg_intro_*` meta fields set, a structured two-column intro screen is shown before Step 1: cover image on the left, an info card on the right (title, description, "What You'll Learn" objectives, duration, prerequisites, and a Start Tutorial button). Falls back to rendering raw `post_content` if all structured fields are empty.
+
+**Resource rendering with embeddability flags:** Each URL-type step carries `embeddable`, `is_document_url`, and `viewer_url` flags (set at save time — see [Section 4.9](#49-embed-check--popup-fallback)). The student JS uses them to choose how to render the right pane:
+- `embeddable = true` → normal iframe
+- Office document (`viewer_url` set) → Google Docs Viewer iframe
+- Non-embeddable other → opens in a popup window
+- Uploaded image attachment → renders inline in the right pane (not as a download link)
 
 ### 4.2 Librarian Admin Interface
 
@@ -376,6 +417,39 @@ Allows librarians to create H5P quiz content directly from the tutorial editor w
 Uses H5P's internal `saveContent()` API. Content created here is identical to content created via the H5P native editor.
 
 **Display flags:** Download and copyright buttons are disabled (`DISABLE_FLAGS = 1`). The embed flag is intentionally **not** set — our frontend loads quizzes via the `h5p_embed` endpoint, which checks this bit.
+
+**Branch sub-questions:** Branch steps can include sub-questions that also become full H5P content items. During `save_meta()`, for each branch question: if no `h5p_id` exists a new H5P item is created; if `_editing_h5p` is set on an existing item it is updated. If the quiz type changes (e.g., `blanks` → `multichoice`) the old H5P item is orphaned and a fresh one is created. Titles follow the pattern `"{Tutorial Title} — Step N — Branch QM"`. Branch H5P iframes receive shared CSS injected from `student-h5p-iframe.css` at render time.
+
+**H5P.Blanks syntax:** The Fill-in-the-Blank inline builder supports:
+
+| Syntax | Meaning |
+|--------|---------|
+| `*word*` | Single blank — student must type `word` |
+| `*word1/word2*` | Alternatives — either answer accepted |
+| `*word:hint text*` | Blank with a hint shown in the H5P UI |
+
+The admin editor shows a live preview as the librarian types (blanks rendered as styled slots), a "X blanks detected" / "No blanks detected" validation indicator, and a case-sensitivity warning if any answer mixes upper/lowercase while case-sensitive grading is enabled. Typo tolerance applies automatically: 1 typo allowed for 3–9 character answers, 2 typos for 10+ character answers.
+
+### 4.9 Embed Check & Popup Fallback
+
+**File:** `includes/class-pbsg-embed-check.php` (since v0.7.0)
+
+When a librarian saves a tutorial, every URL-type step is tested for iframeability:
+
+1. `PBSG_Embed_Check::check($url)` fires a `wp_remote_head()` request (5s timeout, 3 redirect limit)
+2. Response headers are inspected for `X-Frame-Options: deny|sameorigin` or `Content-Security-Policy: frame-ancestors` restrictions
+3. The URL path extension and `Content-Type` header are checked to detect document files
+4. Results are stored as `embeddable` and `is_document_url` flags in the step JSON
+
+For document URLs, `viewer_url` is also set:
+
+| Document type | Behaviour |
+|---------------|-----------|
+| PDF | No viewer URL — browsers render natively |
+| Office (Word, Excel, PowerPoint, CSV) | `viewer_url` set to Google Docs Viewer (`https://docs.google.com/viewer?url=...`) |
+| Local dev hosts (`.test`, `.local`, `localhost`) | Viewer URL skipped — Google cannot fetch private addresses |
+
+The student JS reads these flags to choose a rendering strategy (see [Section 4.1](#41-tutorial-page-rendering)).
 
 ---
 
@@ -643,3 +717,9 @@ TCPDF must be installed: `cd web/app/plugins/pb-split-guide && lando composer re
 ### 9.6 Cross-Site Option Confusion
 
 A common debugging mistake: checking `wp_options` for settings that are actually in `wp_sitemeta` (network-wide) or `wp_39_options` (site 39). Always include `--url=` in WP-CLI commands to target the right site. H5P hub settings are split across both — `h5p_hub_is_enabled` is per-site, `h5p_content_type_cache_updated_at` is network-wide.
+
+---
+
+## AI Disclosure
+
+This document was produced with assistance from Claude AI (Anthropic). Per course policy, all AI-assisted work must be disclosed.
