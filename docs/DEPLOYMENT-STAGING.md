@@ -143,18 +143,21 @@ After a fresh `lando start` and database import, H5P requires additional configu
 # 1. Install pressbooks-book theme dependencies (required for /development/ subsite)
 lando composer install --working-dir=web/app/themes/pressbooks-book
 
-# 2. Fix H5P hub settings for the /development/ subsite
+# 2. Install pb-split-guide plugin dependencies (TCPDF for PDF certificate generation)
+lando composer install --working-dir=web/app/plugins/pb-split-guide
+
+# 3. Fix H5P hub settings for the /development/ subsite
 #    --skip-themes --skip-plugins required because McLuhan theme errors without its composer deps
 lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option update h5p_hub_is_enabled 1
 lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option update h5p_send_usage_statistics 1
 lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option update h5p_has_request_user_consent 1
 
-# 3. Add site UUID (workaround for broken H5P Hub registration endpoint)
+# 4. Add site UUID (workaround for broken H5P Hub registration endpoint)
 #    hub-api.h5p.org/v1/sites returns a broken 302 redirect — upstream H5P bug.
 #    Copy site 1's UUID to site 39 as a workaround.
 lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option add h5p_h5p_site_uuid 575494e6-7409-47ce-a3e9-3a2279aca75e
 
-# 4. Populate the H5P content type cache
+# 5. Populate the H5P content type cache
 lando wp --url=https://pressbooks.test/wp/ eval '
   $plugin = H5P_Plugin::get_instance();
   $core = $plugin->get_h5p_instance("core");
@@ -162,7 +165,7 @@ lando wp --url=https://pressbooks.test/wp/ eval '
   echo (bool)$result ? "SUCCESS" : "FAILED";
 '
 
-# 5. Flush object cache
+# 6. Flush object cache
 lando wp cache flush
 ```
 
@@ -385,6 +388,7 @@ docker system prune -a   \\\# Clean up (careful!)
 | 2026-02-17 | Daniel McGrath | Initial deployment staging documentation |
 | 2026-02-17 | Daniel McGrath | Added proxy\_cookie\_flags to fix login cookie issue |
 | 2026-04-14 | Daniel McGrath | Added H5P setup section and JSON-escaped sub\_filter fix (from Week 6/7 troubleshooting docs) |
+| 2026-04-14 | Daniel McGrath | Added plugin composer install step (TCPDF for certificate generation) |
 
 
 ## AI Disclosure
