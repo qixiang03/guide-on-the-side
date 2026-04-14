@@ -297,34 +297,37 @@ final class PBSGEmbedCheckTest extends TestCase
         $this->assertEmpty($url);
     }
 
-    public function test_viewer_url_skips_localhost(): void
+    public function test_viewer_url_includes_localhost(): void
     {
         $url = PBSG_Embed_Check::viewer_url(
             'http://localhost/uploads/report.docx',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         );
 
-        $this->assertEmpty($url);
+        $this->assertStringContainsString('docs.google.com/gview', $url);
+        $this->assertStringContainsString(rawurlencode('http://localhost/uploads/report.docx'), $url);
     }
 
-    public function test_viewer_url_skips_test_domain(): void
+    public function test_viewer_url_includes_test_domain(): void
     {
         $url = PBSG_Embed_Check::viewer_url(
             'http://pressbooks.test/uploads/report.docx',
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         );
 
-        $this->assertEmpty($url);
+        $this->assertStringContainsString('docs.google.com/gview', $url);
+        $this->assertStringContainsString(rawurlencode('http://pressbooks.test/uploads/report.docx'), $url);
     }
 
-    public function test_viewer_url_skips_local_domain(): void
+    public function test_viewer_url_includes_local_domain(): void
     {
         $url = PBSG_Embed_Check::viewer_url(
             'http://mysite.local/uploads/report.xlsx',
             'application/vnd.ms-excel'
         );
 
-        $this->assertEmpty($url);
+        $this->assertStringContainsString('docs.google.com/gview', $url);
+        $this->assertStringContainsString(rawurlencode('http://mysite.local/uploads/report.xlsx'), $url);
     }
 
     public function test_viewer_url_skips_non_office_mime(): void

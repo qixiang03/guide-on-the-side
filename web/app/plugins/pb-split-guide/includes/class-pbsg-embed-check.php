@@ -94,17 +94,28 @@ final class PBSG_Embed_Check {
     }
 
     /**
+     * Office file extensions that should use Google Docs Viewer.
+     * Used as a fallback when the server MIME detector returns a generic type
+     * (e.g. application/zip or application/octet-stream) for .docx/.xlsx/.pptx.
+     */
+    private const OFFICE_EXTENSIONS = '/\.(docx?|xlsx?|pptx?|csv)$/i';
+
+    /**
      * Generate a Google Docs Viewer URL for office-type files.
      *
-     * Returns empty string for non-office MIME types, PDF (browsers handle natively),
+     * Returns empty string for PDFs (browsers handle natively), non-office files,
      * and local development domains.
+     *
+     * Checks both MIME type and file extension so that servers whose PHP fileinfo
+     * extension returns application/zip or application/octet-stream for .docx/.xlsx
+     * still get the viewer URL.
      *
      * @param string $file_url The public URL of the file.
      * @param string $mime     The MIME type of the file.
      * @return string          Viewer URL, or empty string.
      */
     public static function viewer_url( string $file_url, string $mime ): string {
-        if ( empty( $file_url ) || empty( $mime ) ) {
+        if ( empty( $file_url ) ) {
             return '';
         }
 
@@ -113,14 +124,11 @@ final class PBSG_Embed_Check {
             return '';
         }
 
-        // Only office MIME types
-        if ( ! in_array( $mime, self::OFFICE_MIMES, true ) ) {
-            return '';
-        }
+        $url_path       = parse_url( $file_url, PHP_URL_PATH ) ?: '';
+        $is_office_mime = in_array( $mime, self::OFFICE_MIMES, true );
+        $is_office_ext  = (bool) preg_match( self::OFFICE_EXTENSIONS, $url_path );
 
-        // Skip local dev domains
-        $host = parse_url( $file_url, PHP_URL_HOST ) ?: '';
-        if ( self::is_local_host( $host ) ) {
+        if ( ! $is_office_mime && ! $is_office_ext ) {
             return '';
         }
 
