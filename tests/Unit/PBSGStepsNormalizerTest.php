@@ -254,4 +254,101 @@ final class PBSGStepsNormalizerTest extends TestCase
         $this->assertSame('url', $result[2]['tutorial_type']);
         $this->assertSame('Step 5', $result[3]['title']);
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  Issue: $has_per_question_resource undefined on line 203
+    // ═══════════════════════════════════════════════════════════
+
+    public function test_per_question_branch_resource_mode_preserves_branch(): void
+    {
+        $input = [
+            [
+                'title' => 'Main Step',
+                'tutorial_type' => 'url',
+                'tutorial_url' => 'https://example.com',
+                'h5p_id' => 1,
+                'branch' => [
+                    'mode' => 'mandatory',
+                    'resource_mode' => 'per_question',
+                    'trigger_attempts' => 1,
+                    'tutorial_type' => '',
+                    'tutorial_url' => '',
+                    'tutorial_attachment_id' => 0,
+                    'questions' => [
+                        [
+                            'type' => 'multichoice',
+                            'question' => 'Branch Q1?',
+                            'answers' => [
+                                ['text' => 'A', 'correct' => true],
+                                ['text' => 'B', 'correct' => false],
+                            ],
+                            'tutorial_type' => 'url',
+                            'tutorial_url' => 'https://example.com/resource-a',
+                            'tutorial_attachment_id' => 0,
+                        ],
+                        [
+                            'type' => 'multichoice',
+                            'question' => 'Branch Q2?',
+                            'answers' => [
+                                ['text' => 'C', 'correct' => true],
+                                ['text' => 'D', 'correct' => false],
+                            ],
+                            'tutorial_type' => 'url',
+                            'tutorial_url' => 'https://example.com/resource-b',
+                            'tutorial_attachment_id' => 0,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertNotNull($out[0]['branch'], 'Branch should be preserved for per_question mode');
+        $this->assertSame('per_question', $out[0]['branch']['resource_mode']);
+        $this->assertCount(2, $out[0]['branch']['questions']);
+        $this->assertSame('url', $out[0]['branch']['questions'][0]['tutorial_type']);
+        $this->assertSame('https://example.com/resource-a', $out[0]['branch']['questions'][0]['tutorial_url']);
+        $this->assertSame('url', $out[0]['branch']['questions'][1]['tutorial_type']);
+        $this->assertSame('https://example.com/resource-b', $out[0]['branch']['questions'][1]['tutorial_url']);
+    }
+
+    public function test_per_question_branch_without_any_resources_strips_branch(): void
+    {
+        $input = [
+            [
+                'title' => 'Main Step',
+                'tutorial_type' => 'url',
+                'tutorial_url' => 'https://example.com',
+                'h5p_id' => 1,
+                'branch' => [
+                    'mode' => 'mandatory',
+                    'resource_mode' => 'per_question',
+                    'trigger_attempts' => 1,
+                    'tutorial_type' => '',
+                    'tutorial_url' => '',
+                    'tutorial_attachment_id' => 0,
+                    'questions' => [
+                        [
+                            'type' => 'multichoice',
+                            'question' => 'Branch Q1?',
+                            'answers' => [
+                                ['text' => 'A', 'correct' => true],
+                                ['text' => 'B', 'correct' => false],
+                            ],
+                            'tutorial_type' => '',
+                            'tutorial_url' => '',
+                            'tutorial_attachment_id' => 0,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertNull($out[0]['branch'], 'Branch should be stripped when per_question has no resources');
+    }
 }

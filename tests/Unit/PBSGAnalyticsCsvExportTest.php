@@ -97,7 +97,7 @@ class PBSGAnalyticsCsvExportTest extends TestCase
             'Views',
             'Completions',
             'Completion Rate (%)',
-            'Avg Tutorial Score (%)',
+            'Avg Score (%)',
             'Avg Time (s)',
         ];
 
@@ -219,9 +219,8 @@ class PBSGAnalyticsCsvExportTest extends TestCase
     public function test_compare_csv_source_has_metric_column(): void
     {
         $this->assertStringContainsString("'Metric'", $this->sourceCode);
-        $this->assertStringContainsString("'Tutorial 1'", $this->sourceCode);
-        $this->assertStringContainsString("'Tutorial 2'", $this->sourceCode);
-        $this->assertStringContainsString("'Tutorial 3'", $this->sourceCode);
+        // Headers are now dynamic — built from actual tutorial names via $t['name']
+        $this->assertStringContainsString("\$t['name']", $this->sourceCode);
     }
 
     /**
@@ -234,7 +233,7 @@ class PBSGAnalyticsCsvExportTest extends TestCase
             'Completions',
             'Completion Rate (%)',
             'Avg Time (s)',
-            'Avg Tutorial Score (%)',
+            'Avg Score (%)',
             'First Attempt Rate (%)',
             'Avg Attempts',
             'Give-up Rate (%)',

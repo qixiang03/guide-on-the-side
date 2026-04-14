@@ -24,7 +24,7 @@ For each checkbox:
 
 ## Integration Layer (3rd-party friendly)
 
-- [ ] ✅/❌ Quiz embed slide loads without breaking layout/navigation (TC-07)
+- [ ] ✅/❌ Quiz embed slide loads without breaking layout/navigation (TC-06)
 
 ## Permissions & Stability
 
@@ -40,6 +40,23 @@ For each checkbox:
 - [ ] ✅/❌ Analytics dashboard loads and tabs work (TC-11)
 - [ ] ✅/❌ Tutorial completion is recorded for certificate (TC-12)
 - [ ] ✅/❌ Certificate PDF downloads after completion (TC-13)
+
+## Template Picker & Export / Import (Sprint 7 / pb-split-guide)
+
+- [ ] ✅/❌ Create new tutorial from template — draft + correct steps (TC-14)
+- [ ] ✅/❌ Save current tutorial as template — appears in list (TC-15)
+- [ ] ✅/❌ Export tutorial as JSON — download + valid package keys (TC-16)
+- [ ] ✅/❌ Import JSON — new draft + edit link; bad file shows error (TC-17)
+
+## Automated checks (CI / local — does not replace manual rows above)
+
+Run after significant changes to `web/app/plugins/pb-split-guide` or `tests/`:
+
+- [ ] ✅/❌ **PHPUnit (unit):** `./vendor/bin/phpunit tests/Unit` — includes `PBSGTemplateManagerTest`, `PBSGExportImportTest`, `PBSGH5PFactoryTest`, `PBSGPluginAjaxHandlersTest`, `PBSGAccessibilityEnhancerTest`, and existing PBSG\* suites.
+- [ ] ✅/❌ **PHPUnit (smoke):** `./vendor/bin/phpunit tests/Integration/PBSplitGuidePluginSmokeTest.php` — plugin wiring, template load, save_meta, enqueue, certificate init. _(Note: if full suite errors on subprocess deprecation noise, confirm at least in-process tests and `tests/Unit` pass.)_
+- [ ] ✅/❌ **Jest:** `npm test` — `tests/js/**/*.test.js` (tracker, admin-step-utils, analytics-badge-utils, compare-url, split-guide-menu).
+
+See also: `docs/TESTING_LOG.md` entry **012** and `tests/black-box-test-cases.md` **Reference — Automated coverage**.
 
 ---
 

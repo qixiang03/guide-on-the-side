@@ -74,11 +74,20 @@ class PBSG_Analytics_Dashboard {
             '1.3.0'
         );
 
+        // Icon set — must load before analytics-dashboard.js so PBSG_ICONS.render() is available.
+        wp_enqueue_script(
+            'pbsg_icons_js',
+            $plugin_url . 'assets/pbsg-icons.js',
+            array(),
+            '1.0.0',
+            true
+        );
+
         // Dashboard JS
         wp_enqueue_script(
             'pbsg-analytics-dashboard',
             $plugin_url . 'assets/analytics-dashboard.js',
-            array( 'jquery' ),
+            array( 'jquery', 'pbsg_icons_js' ),
             '1.3.0',
             true
         );
@@ -116,11 +125,11 @@ class PBSG_Analytics_Dashboard {
                 </div>
                 <div class="pbsg-header-right">
                     <button type="button" class="button pbsg-btn pbsg-btn-sm" id="pbsg-refresh-btn">
-                        ⟳ <?php esc_html_e( 'Refresh', 'pb-split-guide' ); ?>
+                        <?php echo pbsg_icon('refresh'); ?> <?php esc_html_e( 'Refresh', 'pb-split-guide' ); ?>
                     </button>
                     <a href="<?php echo esc_url( admin_url( 'admin-ajax.php?action=pbsg_export_csv&type=overview' ) ); ?>"
                        class="button pbsg-btn pbsg-btn-sm" id="pbsg-export-btn">
-                        ↓ <?php esc_html_e( 'Export CSV', 'pb-split-guide' ); ?>
+                        <?php echo pbsg_icon('arrow-down'); ?> <?php esc_html_e( 'Export CSV', 'pb-split-guide' ); ?>
                     </a>
                 </div>
             </div>
@@ -179,10 +188,11 @@ class PBSG_Analytics_Dashboard {
 
             <!-- Filter Bar -->
             <div class="pbsg-filter-bar" id="pbsg-filter-bar">
-                <label class="label" for="pbsg-date-from"><?php esc_html_e( 'Date Range', 'pb-split-guide' ); ?></label>
-                <input type="date" id="pbsg-date-from" value="<?php echo esc_attr( date( 'Y-m-d', strtotime( '-30 days' ) ) ); ?>">
-                <span class="span pbsg-filter-sep"><?php esc_html_e( 'to', 'pb-split-guide' ); ?></span>
-                <input type="date" id="pbsg-date-to" value="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
+                <label class="label" for="pbsg-date-from"><?php esc_html_e( 'Date Range', 'pb-split-guide' ); ?>
+                    <input type="date" id="pbsg-date-from" value="<?php echo esc_attr( date( 'Y-m-d', strtotime( '-30 days' ) ) ); ?>">
+                    <span class="span pbsg-filter-sep"><?php esc_html_e( 'to', 'pb-split-guide' ); ?></span>
+                    <input type="date" id="pbsg-date-to" value="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
+                </label>
 
                 <?php if ( in_array( $current_view, array( 'overview', 'tutorial', 'compare' ), true ) ) : ?>
                 <label for="pbsg-device-filter" class="pbsg-filter-device-label">
@@ -217,7 +227,7 @@ class PBSG_Analytics_Dashboard {
 
                 <!-- Empty State (shown when no data) -->
                 <div class="pbsg-empty-state" id="pbsg-empty-state" style="display:none;">
-                    <div class="pbsg-empty-icon">📊</div>
+                    <div class="pbsg-empty-icon"><?php echo pbsg_icon('chart-bar'); ?></div>
                     <h2><?php esc_html_e( 'No analytics data yet', 'pb-split-guide' ); ?></h2>
                     <p><?php esc_html_e( 'Data will appear here once students begin viewing tutorials. The tracker collects anonymous usage statistics automatically.', 'pb-split-guide' ); ?></p>
                 </div>

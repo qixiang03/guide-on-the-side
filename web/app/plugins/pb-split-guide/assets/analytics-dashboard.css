@@ -1,3 +1,17 @@
+/* ── Marginalia icon baseline (analytics) ──────────────────── */
+.pbsg-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+  stroke: currentColor;
+  fill: none;
+  overflow: visible;
+}
+.pbsg-empty-icon .pbsg-icon { width: 48px; height: 48px; color: #646970; }
+.pbsg-badge .pbsg-icon { width: 0.9em; height: 0.9em; }
+
 /**
  * Analytics Dashboard Styles — UPEI Library Design System
  *
@@ -391,10 +405,10 @@
     letter-spacing: 0.3px;
 }
 
-.pbsg-badge.green { background: #e8f5e2; color: var(--pbsg-secondary); }
-.pbsg-badge.amber { background: #fef3e0; color: var(--pbsg-amber); }
-.pbsg-badge.red   { background: #fde8e5; color: var(--pbsg-primary); }
-.pbsg-badge.blue  { background: #e3f0fa; color: var(--pbsg-blue); }
+.pbsg-badge.green { background: #e8f5e2; }
+.pbsg-badge.amber { background: #fef3e0; }
+.pbsg-badge.red   { background: #fde8e5; }
+.pbsg-badge.blue  { background: #e3f0fa; }
 
 /* =========================================================================
    SPARKLINES (CSS-only mini bar charts)
@@ -721,6 +735,13 @@
    ALL-TIME BADGE & DATE SCOPE LABEL
    ========================================================================= */
 
+.pbsg-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+}
+
 .pbsg-alltime-badge {
     display: inline-block;
     padding: 1px 7px;
@@ -731,9 +752,9 @@
     text-transform: uppercase;
     letter-spacing: 0.3px;
     background: #fef3e0;
-
     vertical-align: middle;
-    margin-left: 6px;
+    margin-left: 0;
+    flex-shrink: 0;
 }
 
 .pbsg-date-scope {
@@ -961,14 +982,11 @@
 }
 
 .pbsg-compare-section-title {
-    display: grid;
-    grid-template-columns: 200px repeat(var(--compare-cols, 3), 1fr);
     font-family: var(--pbsg-font-heading);
     font-size: 15px;
     font-weight: 700;
     padding: 12px 18px;
     background: #eef6e6;
-
     border-bottom: 1px solid var(--pbsg-border);
 }
 
@@ -1016,10 +1034,36 @@
     border-right: none;
 }
 
+/* --- Metric Values (large numbers in compare cells) --- */
+
+.metric-big {
+    font-family: var(--pbsg-font-heading);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--pbsg-text);
+}
+
+.metric-big.concern {
+    color: var(--pbsg-primary);
+}
+
+.metric-unit {
+    font-family: var(--pbsg-font-button);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #888;
+}
+
 /* --- Winner Highlight --- */
 
 .pbsg-compare-row .row-value.winner {
     background: #eef6e6;
+}
+
+.pbsg-compare-row .row-value.winner .metric-big {
+    color: var(--pbsg-secondary);
 }
 
 /* --- Mini Progress Bar --- */
@@ -1074,7 +1118,6 @@
 
 @media (max-width: 960px) {
     .pbsg-compare-head,
-    .pbsg-compare-section-title,
     .pbsg-compare-row {
         grid-template-columns: 140px repeat(var(--compare-cols, 3), 1fr);
     }
@@ -1095,7 +1138,6 @@
 
 @media (max-width: 700px) {
     .pbsg-compare-head,
-    .pbsg-compare-section-title,
     .pbsg-compare-row {
         grid-template-columns: 100px repeat(var(--compare-cols, 3), 1fr);
     }

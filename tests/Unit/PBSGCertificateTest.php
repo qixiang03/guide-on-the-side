@@ -157,13 +157,14 @@ class PBSGCertificateTest extends TestCase
     /**
      * @covers PBSG_Certificate::ajax_mark_completed
      */
-    public function test_mark_completed_returns_existing_timestamp_if_already_completed(): void
+    public function test_mark_completed_always_stores_latest_timestamp(): void
     {
         WPStubs::$returns['is_user_logged_in']   = true;
         WPStubs::$returns['wp_verify_nonce']     = 1;
         WPStubs::$returns['get_current_user_id'] = 7;
         WPStubs::$returns['get_post_meta']       = ['_wp_page_template' => 'split-guide-template.php'];
         WPStubs::$returns['user_meta_storage']   = [7 => ['pbsg_completed_42' => 999]];
+        WPStubs::$returns['current_time']        = '1234567890';
         $_POST['nonce']                          = 'valid';
         $_POST['tutorial_id']                    = '42';
 
@@ -173,9 +174,13 @@ class PBSGCertificateTest extends TestCase
             // Expected
         }
 
+        $this->assertTrue(WPStubs::wasCalled('update_user_meta'));
+        $updateArgs = WPStubs::callArgs('update_user_meta', 0);
+        $this->assertSame('1234567890', $updateArgs[2]);
+
         $this->assertTrue(WPStubs::wasCalled('wp_send_json_success'));
         $successArgs = WPStubs::callArgs('wp_send_json_success', 0);
-        $this->assertSame(999, $successArgs[0]['completed_ts']);
+        $this->assertSame(1234567890, $successArgs[0]['completed_ts']);
     }
 
     /* ---------------------------------------------------------------

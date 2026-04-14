@@ -18,6 +18,9 @@ class MockWpdb
     /** @var string Postmeta table name */
     public string $postmeta = 'wp_postmeta';
 
+    /** @var string Users table name */
+    public string $users = 'wp_users';
+
     /** @var list<array{method: string, args: array}> All recorded calls */
     public array $calls = [];
 
@@ -145,6 +148,16 @@ class MockWpdb
         $this->calls[] = ['method' => 'update', 'args' => [$table, $data, $where, $format, $where_format]];
         $this->rows_affected = 1;
         return $this->findReturn('update', $table, 1);
+    }
+
+    /**
+     * Mock delete() — records delete call.
+     */
+    public function delete(string $table, array $where, $where_format = null)
+    {
+        $this->calls[] = ['method' => 'delete', 'args' => [$table, $where, $where_format]];
+        $this->rows_affected = 1;
+        return $this->findReturn('delete', $table, 1);
     }
 
     /**

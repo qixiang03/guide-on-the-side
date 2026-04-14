@@ -21,6 +21,11 @@
     const config = pbsgAnalytics;
     const $wrap  = $( '#pbsg-dashboard-content' );
 
+    // Shortcut: render a Marginalia SVG icon by name.
+    // Returns an empty string if PBSG_ICONS hasn't been enqueued.
+    const icon = ( name, extra ) =>
+        ( typeof PBSG_ICONS !== 'undefined' ) ? PBSG_ICONS.render( name, extra ) : '';
+
     // Compare view state
     let compareIds = [];
 
@@ -147,7 +152,7 @@
             { label: 'Total Views', value: formatNumber( totals.total_views ), color: 'blue' },
             { label: 'Total Completions', value: formatNumber( totals.total_completions ), color: 'blue' },
             { label: 'Avg Completion Rate', value: totals.avg_completion + '%', color: getBadgeColor( totals.avg_completion, bench.completion_rate_green, bench.completion_rate_amber ) },
-            { label: 'Avg Tutorial Score', value: totals.avg_score + '%', color: getBadgeColor( totals.avg_score, bench.score_green, bench.score_amber ), badge: 'all-time' },
+            { label: 'Avg Score', value: totals.avg_score + '%', color: getBadgeColor( totals.avg_score, bench.score_green, bench.score_amber ), badge: 'all-time' },
         ] );
 
         // Main content grid
@@ -166,7 +171,7 @@
         html += '<div class="pbsg-card">';
         html += '<div class="pbsg-card-header">';
         html += 'All Tutorials';
-        html += '<a class="pbsg-card-action" href="' + getExportUrl( 'overview' ) + '">↓ Export CSV</a>';
+        html += '<a class="pbsg-card-action" href="' + getExportUrl( 'overview' ) + '">' + icon( 'arrow-down' ) + ' Export CSV</a>';
         html += '</div>';
         html += renderTutorialTable( tutorials, trend );
         html += '</div>';
@@ -184,7 +189,7 @@
 
         // Needs attention
         html += '<div class="pbsg-card">';
-        html += '<div class="pbsg-card-header">⚠ Needs Attention</div>';
+        html += '<div class="pbsg-card-header">' + icon( 'warning', 'pbsg-icon--warn' ) + ' Needs Attention</div>';
         html += renderNeedsAttention( tutorials );
         html += '</div>';
 
@@ -259,7 +264,7 @@
             html += '<div class="pbsg-card">';
             html += '<div class="pbsg-card-header">';
             html += 'Quiz Questions <span class="pbsg-alltime-badge">all-time</span>';
-            html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">↓ Export CSV</a>';
+            html += '<a class="pbsg-card-action" href="' + getExportUrl( 'questions', stats.tutorial_page_id ) + '">' + icon( 'arrow-down' ) + ' Export CSV</a>';
             html += '</div>';
             html += renderQuestionsTable( questions, stats.tutorial_page_id, bench );
             html += '</div>';
@@ -447,7 +452,7 @@
         let html = '<table class="pbsg-data-table">';
         html += '<thead><tr>';
         html += '<th>Tutorial</th><th>Views</th><th>Completions</th>';
-        html += '<th>Completion Rate</th><th>Avg Tutorial Score <span class="pbsg-alltime-badge">all-time</span></th><th>Trend</th>';
+        html += '<th>Completion Rate</th><th><div class="pbsg-section-header">Avg Score <span class="pbsg-alltime-badge">all-time</span></div></th><th>Trend</th>';
         html += '</tr></thead><tbody>';
 
         tutorials.forEach( t => {
@@ -478,13 +483,13 @@
             const rate  = parseFloat( t.completion_rate ) || 0;
             const score = parseFloat( t.avg_score ) || 0;
             const b     = t.benchmarks || {};
-            const attComp  = ( b.attention_completion !== undefined ) ? b.attention_completion : 60;
-            const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
-            return rate < attComp || score < attScore;
+            const compAmber  = ( b.completion_rate_amber !== undefined ) ? b.completion_rate_amber : 50;
+            const scoreAmber = ( b.score_amber !== undefined ) ? b.score_amber : 50;
+            return rate < compAmber || score < scoreAmber;
         } );
 
         if ( ! flagged.length ) {
-            return '<p style="color:#888;font-size:14px;padding:10px 0;">All tutorials are performing within acceptable thresholds. 👍</p>';
+            return '<p style="color:#888;font-size:14px;padding:10px 0;">All tutorials are performing within acceptable thresholds. ' + icon( 'thumbs-up', 'pbsg-icon--ok' ) + '</p>';
         }
 
         let html = '';
@@ -492,11 +497,11 @@
             const rate  = parseFloat( t.completion_rate ) || 0;
             const score = parseFloat( t.avg_score ) || 0;
             const b     = t.benchmarks || {};
-            const attComp  = ( b.attention_completion !== undefined ) ? b.attention_completion : 60;
-            const attScore = ( b.attention_score !== undefined ) ? b.attention_score : 50;
+            const compAmber  = ( b.completion_rate_amber !== undefined ) ? b.completion_rate_amber : 50;
+            const scoreAmber = ( b.score_amber !== undefined ) ? b.score_amber : 50;
             const reasons = [];
-            if ( rate < attComp ) reasons.push( 'Completion rate below ' + attComp + '%' );
-            if ( score < attScore ) reasons.push( 'Avg tutorial score below ' + attScore + '%' );
+            if ( rate < compAmber ) reasons.push( 'Completion rate in red zone (below ' + compAmber + '%)' );
+            if ( score < scoreAmber ) reasons.push( 'Avg Score in red zone (below ' + scoreAmber + '%)' );
 
             const adminUrl = config.ajaxUrl.replace( 'admin-ajax.php', 'admin.php' );
 
@@ -506,7 +511,7 @@
             html += escapeHtml( t.tutorial_name || 'Tutorial' ) + '</a>';
             html += '<div class="pbsg-attention-reason">' + reasons.join( ' · ' ) + '</div>';
             html += '</div>';
-            html += '<span class="pbsg-badge red">⚠</span>';
+            html += '<span class="pbsg-badge red">' + icon( 'warning' ) + '</span>';
             html += '</div>';
         } );
 
@@ -841,11 +846,11 @@
 
             if ( tData ) {
                 html += '<div class="col-tutorial col-filled" data-col="' + i + '">';
-                html += '<button type="button" class="pbsg-col-remove" data-col="' + i + '" title="Remove">✕</button>';
+                html += '<button type="button" class="pbsg-col-remove" data-col="' + i + '" title="Remove">' + icon( 'close' ) + '</button>';
                 html += '<div class="col-name">' + escapeHtml( tData.name ) + '</div>';
                 html += '<div class="col-meta">' + escapeHtml( tData.meta ) + '</div>';
-                html += '<button type="button" class="pbsg-col-change-btn" data-col="' + i + '">Change ▾</button>';
-                html += '<select class="col-swap-select pbsg-compare-select" data-col="' + i + '">';
+                html += '<button type="button" class="pbsg-col-change-btn" data-col="' + i + '">Change ' + icon( 'chevron-down' ) + '</button>';
+                html += '<select aria-label="Tutorial Select" class="col-swap-select pbsg-compare-select" data-col="' + i + '">';
                 html += buildTutorialOptions( i, tid );
                 html += '</select>';
                 html += '</div>';
@@ -855,7 +860,7 @@
                 html += '<div class="empty-plus">＋</div>';
                 html += '<div class="empty-label">Add Tutorial</div>';
                 html += '</div>';
-                html += '<select class="pbsg-compare-select col-select" data-col="' + i + '">';
+                html += '<select aria-label="Tutorial Select" class="pbsg-compare-select col-select" data-col="' + i + '">';
                 html += buildTutorialOptions( i, 0 );
                 html += '</select>';
                 html += '</div>';
@@ -925,7 +930,7 @@
             html += '</div>'; // end funnel section
 
             // === QUESTION PERFORMANCE SECTION ===
-            html += renderCompareSection( 'Question Performance <span class="pbsg-alltime-badge">all-time</span>', [
+            html += renderCompareSection( '<div class="pbsg-section-header">Question Performance <span class="pbsg-alltime-badge">all-time</span></div>', [
                 { label: 'Avg Score',           key: 'avg_score',          unit: '%', higher: true },
                 { label: 'First Attempt Rate',  key: 'first_attempt_rate', unit: '%', higher: true },
                 { label: 'Avg Attempts/Q',      key: 'avg_attempts',       unit: '',  higher: false },
@@ -977,8 +982,8 @@
                         const pct = t.devices[ deviceType ] || 0;
                         const winClass = ( tids.length > 1 && i === bestIdx && bestVal > 0 ) ? ' winner' : '';
                         html += '<div class="row-value' + winClass + '">';
+                        html += '<div class="metric-big">' + pct + '%</div>';
                         html += '<div class="mini-bar"><div class="mini-bar-fill" style="width:' + pct + '%;"></div></div>';
-                        html += '<span class="metric-unit">' + pct + '%</span>';
                         html += '</div>';
                     } else {
                         html += '<div class="row-value"><span class="metric-unit">—</span></div>';
@@ -998,7 +1003,7 @@
             const dateTo   = $( '#pbsg-date-to' ).val();
             if ( dateFrom ) exportUrl += '&date_from=' + encodeURIComponent( dateFrom );
             if ( dateTo )   exportUrl += '&date_to=' + encodeURIComponent( dateTo );
-            html += '<a href="' + exportUrl + '" class="button pbsg-btn pbsg-btn-primary pbsg-btn-sm">↓ Export Comparison CSV</a>';
+            html += '<a href="' + exportUrl + '" class="button pbsg-btn pbsg-btn-primary pbsg-btn-sm">' + icon( 'arrow-down' ) + ' Export Comparison CSV</a>';
             html += '</div>';
         }
 
@@ -1107,7 +1112,7 @@
         let html = '';
         items.forEach( item => {
             html += '<div class="pbsg-stat-box ' + item.color + '">';
-            html += '<div class="pbsg-stat-label">' + item.label;
+            html += '<div class="pbsg-stat-label pbsg-section-header">' + item.label;
             if ( item.badge ) {
                 html += ' <span class="pbsg-alltime-badge">' + escapeHtml( item.badge ) + '</span>';
             }

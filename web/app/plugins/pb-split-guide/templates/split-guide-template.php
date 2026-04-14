@@ -21,24 +21,36 @@ wp_enqueue_style(
     'pbsg_split_guide_css',
     plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.css',
     array(),
-    '0.4.0'
+    '0.5.0.1'
+);
+
+// Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
+wp_enqueue_script(
+  'pbsg_icons_js',
+  plugin_dir_url( dirname( __FILE__ ) ) . 'assets/pbsg-icons.js',
+  array(),
+  filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/pbsg-icons.js' ),
+  true
 );
 
 wp_enqueue_script(
   'pbsg-split-guide',
   plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.js',
-  array(),
+  array( 'pbsg_icons_js' ),
   filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide.js' ),
   true
 );
 
-wp_enqueue_script(
-    'pbsg-tracker',
-    plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
-    array(),
-    filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js' ),
-    true
-);
+// Only load analytics tracker on published tutorials — prevents draft/preview pollution
+if ( get_post_status() === 'publish' ) {
+    wp_enqueue_script(
+        'pbsg-tracker',
+        plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
+        array(),
+        filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js' ),
+        true
+    );
+}
 
 get_header();
 
@@ -107,39 +119,107 @@ foreach ($steps as $s) {
     'type' => $tutorial_type,
     'url'  => $tutorial_url,
     'file_url' => '',
-    'mime' => ''
+    'mime' => '',
+    'embeddable' => isset($s['embeddable']) ? (bool) $s['embeddable'] : true,
+    'is_document_url' => isset($s['is_document_url']) ? (bool) $s['is_document_url'] : false,
+    'viewer_url' => '',
   ];
 
   if ($tutorial_type === 'file' && $tutorial_attachment_id > 0) {
     $tutorial['file_url'] = wp_get_attachment_url($tutorial_attachment_id);
     $tutorial['mime'] = get_post_mime_type($tutorial_attachment_id);
+
+    // Generate Google Docs Viewer URL for office-type uploads
+    $office_mimes = [
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'text/csv',
+    ];
+    if (in_array($tutorial['mime'], $office_mimes, true) && $tutorial['file_url']) {
+      $host = parse_url($tutorial['file_url'], PHP_URL_HOST) ?: '';
+      $is_local = in_array($host, ['localhost', '127.0.0.1'], true)
+                  || str_ends_with($host, '.test')
+                  || str_ends_with($host, '.local');
+      if (!$is_local) {
+        $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['file_url']) . '&embedded=true';
+      }
+    }
+  }
+
+  // For non-embeddable document URLs, generate Google Viewer URL
+  if ($tutorial_type === 'url' && !empty($tutorial['url']) && !$tutorial['embeddable'] && $tutorial['is_document_url']) {
+    $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
   }
 
   $s['tutorial'] = $tutorial;
 
-  $branch_tutorial_type = isset($s['branch_tutorial_type']) ? $s['branch_tutorial_type'] : '';
-  $branch_tutorial_url  = isset($s['branch_tutorial_url']) ? $s['branch_tutorial_url'] : '';
-  $branch_tutorial_attachment_id = isset($s['branch_tutorial_attachment_id']) ? absint($s['branch_tutorial_attachment_id']) : 0;
+  $branch = null;
 
-  $branch = [
-    'mode' => !empty($s['branch_mode']) ? $s['branch_mode'] : 'none',
-    'trigger_attempts' => !empty($s['branch_trigger_attempts']) ? (int)$s['branch_trigger_attempts'] : 1,
-    'title' => !empty($s['branch_title']) ? $s['branch_title'] : '',
-    'intro' => !empty($s['branch_intro']) ? $s['branch_intro'] : '',
-    'tutorial' => [
-      'type' => $branch_tutorial_type,
-      'url' => $branch_tutorial_url,
-      'file_url' => '',
-      'mime' => ''
-    ]
-  ];
+if (!empty($s['branch']) && is_array($s['branch'])) {
+  $raw_branch = $s['branch'];
 
-  if ($branch_tutorial_type === 'file' && $branch_tutorial_attachment_id > 0) {
-    $branch['tutorial']['file_url'] = wp_get_attachment_url($branch_tutorial_attachment_id);
-    $branch['tutorial']['mime'] = get_post_mime_type($branch_tutorial_attachment_id);
+
+  $branch_questions = [];
+
+  if (!empty($raw_branch['questions']) && is_array($raw_branch['questions'])) {
+    foreach ($raw_branch['questions'] as $q) {
+      if (!is_array($q)) continue;
+
+      $q_tutorial_type = !empty($q['tutorial_type']) ? $q['tutorial_type'] : '';
+      $q_tutorial_url = !empty($q['tutorial_url']) ? $q['tutorial_url'] : '';
+      $q_tutorial_attachment_id = !empty($q['tutorial_attachment_id']) ? absint($q['tutorial_attachment_id']) : 0;
+      $q_tutorial_file_name = !empty($q['tutorial_file_name']) ? $q['tutorial_file_name'] : '';
+      $q_tutorial_file_url = !empty($q['tutorial_file_url']) ? $q['tutorial_file_url'] : '';
+      $q_tutorial_mime = '';
+
+      if ($q_tutorial_type === 'file' && $q_tutorial_attachment_id > 0) {
+        $q_tutorial_file_url = wp_get_attachment_url($q_tutorial_attachment_id);
+        $q_tutorial_mime = get_post_mime_type($q_tutorial_attachment_id);
+      }
+
+      $q['tutorial_type'] = $q_tutorial_type;
+      $q['tutorial_url'] = $q_tutorial_url;
+      $q['tutorial_attachment_id'] = $q_tutorial_attachment_id;
+      $q['tutorial_file_name'] = $q_tutorial_file_name;
+      $q['tutorial_file_url'] = $q_tutorial_file_url;
+      $q['tutorial_mime'] = $q_tutorial_mime;
+
+      $branch_questions[] = $q;
+    }
   }
 
-  $s['branch'] = $branch;
+  $branch = [
+    'mode' => !empty($raw_branch['mode']) ? $raw_branch['mode'] : 'optional',
+    'resource_mode' => !empty($raw_branch['resource_mode']) ? $raw_branch['resource_mode'] : 'main',
+    'trigger_attempts' => 1,
+    'questions' => $branch_questions,
+    'tutorial_type' => !empty($raw_branch['tutorial_type']) ? $raw_branch['tutorial_type'] : '',
+    'tutorial_url' => !empty($raw_branch['tutorial_url']) ? $raw_branch['tutorial_url'] : '',
+    'tutorial_attachment_id' => !empty($raw_branch['tutorial_attachment_id']) ? absint($raw_branch['tutorial_attachment_id']) : 0,
+    'tutorial_file_name' => !empty($raw_branch['tutorial_file_name']) ? $raw_branch['tutorial_file_name'] : '',
+    'tutorial_file_url' => !empty($raw_branch['tutorial_file_url']) ? $raw_branch['tutorial_file_url'] : '',
+    'tutorial_mime' => '',
+  ];
+
+  if ($branch['tutorial_type'] === 'file' && $branch['tutorial_attachment_id'] > 0) {
+    $branch['tutorial_file_url'] = wp_get_attachment_url($branch['tutorial_attachment_id']);
+    $branch['tutorial_mime'] = get_post_mime_type($branch['tutorial_attachment_id']);
+  }
+
+  if (
+    empty($branch['questions']) &&
+    empty($branch['tutorial_url']) &&
+    empty($branch['tutorial_file_url'])
+  ) {
+    $branch = null;
+  }
+}
+
+$s['branch'] = $branch;
 
   $steps_enriched[] = $s;
 }
@@ -155,13 +235,13 @@ foreach ($steps as $s) {
   </div>
 
 <?php if (empty($steps_enriched) && !$has_intro): ?>
-  <p>No steps configured.</p>
+  <p>No pages configured.</p>
 <?php else: ?>
 
   <?php if ($has_intro): ?>
     <div id="pbsgIntroScreen" class="pbsg-intro-screen">
       <?php if ($has_structured_intro): ?>
-        <div class="pbsg-intro-card pbsg-intro-card--structured">
+        <div class="pbsg-intro-card pbsg-intro-card--structured<?php echo $cover_image_url ? '' : ' pbsg-intro-card--no-cover'; ?>">
 
           <?php if ($cover_image_url): ?>
             <div class="pbsg-intro-cover">
@@ -169,46 +249,51 @@ foreach ($steps as $s) {
             </div>
           <?php endif; ?>
 
-          <?php if ($intro_description): ?>
-            <p class="pbsg-intro-description"><?php echo esc_html($intro_description); ?></p>
-          <?php endif; ?>
+          <div class="pbsg-intro-info">
+            <div class="pbsg-intro-eyebrow">Tutorial</div>
+            <h2 class="pbsg-intro-title"><?php echo esc_html(get_the_title($page_id)); ?></h2>
 
-          <?php if (!empty($intro_objectives)): ?>
-            <div class="pbsg-intro-objectives">
-              <h3>What You'll Learn</h3>
-              <ul>
-                <?php foreach ($intro_objectives as $obj): ?>
-                  <li><?php echo esc_html($obj); ?></li>
-                <?php endforeach; ?>
-              </ul>
-            </div>
-          <?php endif; ?>
-
-          <div class="pbsg-intro-meta">
-            <?php if ($intro_duration): ?>
-              <span class="pbsg-intro-duration">
-                &#x23F1; <?php echo esc_html($intro_duration); ?>
-              </span>
+            <?php if ($intro_description): ?>
+              <p class="pbsg-intro-description"><?php echo esc_html($intro_description); ?></p>
             <?php endif; ?>
 
-            <?php if ($step_count > 0): ?>
-              <span class="pbsg-intro-steps-count">
-                &#x1F4CB; <?php echo $step_count; ?> step<?php echo $step_count !== 1 ? 's' : ''; ?>
-              </span>
+            <?php if (!empty($intro_objectives)): ?>
+              <div class="pbsg-intro-objectives">
+                <h3>What You'll Learn</h3>
+                <ul>
+                  <?php foreach ($intro_objectives as $obj): ?>
+                    <li><?php echo esc_html($obj); ?></li>
+                  <?php endforeach; ?>
+                </ul>
+              </div>
             <?php endif; ?>
-          </div>
 
-          <?php if ($intro_prerequisites): ?>
-            <div class="pbsg-intro-prereqs">
-              <h4>Prerequisites</h4>
-              <p><?php echo esc_html($intro_prerequisites); ?></p>
+            <div class="pbsg-intro-meta">
+              <?php if ($intro_duration): ?>
+                <span class="pbsg-intro-duration">
+                  <?php echo pbsg_icon('stopwatch'); ?> <?php echo esc_html($intro_duration); ?>
+                </span>
+              <?php endif; ?>
+
+              <?php if ($step_count > 0): ?>
+                <span class="pbsg-intro-steps-count">
+                  <?php echo pbsg_icon('clipboard'); ?> <?php echo $step_count; ?> Page<?php echo $step_count !== 1 ? 's' : ''; ?>
+                </span>
+              <?php endif; ?>
             </div>
-          <?php endif; ?>
 
-          <div class="pbsg-intro-actions">
-            <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
-              Start Tutorial
-            </button>
+            <?php if ($intro_prerequisites): ?>
+              <div class="pbsg-intro-prereqs">
+                <h4>Prerequisites</h4>
+                <p><?php echo esc_html($intro_prerequisites); ?></p>
+              </div>
+            <?php endif; ?>
+
+            <div class="pbsg-intro-actions">
+              <button type="button" id="pbsgStartTutorial" class="pbsg-start-btn">
+                Start Tutorial
+              </button>
+            </div>
           </div>
 
         </div>
@@ -244,16 +329,16 @@ foreach ($steps as $s) {
     <!-- Menu button -->
     <div class="pbsg-menu-wrap">
       <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
-        <span class="pbsg-menu-icon">☰</span>
-        <span class="pbsg-menu-arrow">▾</span>
+        <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
+        <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
         <span class="pbsg-menu-text">Menu</span>
       </button>
 
       <!-- Dropdown -->
       <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
-        <ul class="pbsg-menu-list">
+        <div class="pbsg-menu-list">
           <?php foreach ($steps_enriched as $idx => $step): ?>
-            <li>
+            
               <button
                 type="button"
                 class="pbsg-menu-item"
@@ -262,13 +347,13 @@ foreach ($steps as $s) {
               >
                 <?php
                   $num = $idx + 1;
-                  $label = !empty($step['title']) ? $step['title'] : "Step $num";
+                  $label = !empty($step['title']) ? $step['title'] : "Page $num";
                   echo esc_html($num . '. ' . $label);
                 ?>
               </button>
-            </li>
+            
           <?php endforeach; ?>
-        </ul>
+        </div>
       </div>
     </div>
 
@@ -280,13 +365,25 @@ foreach ($steps as $s) {
 </div>
 
       <div class="pbsg-iframe-wrap">
-        <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe"></iframe>
+        <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe" tabindex="0"></iframe>
+        <div id="pbsgBranchQuizHost" class="pbsg-branch-quiz-host" style="display:none;"></div>
+      </div>
+
+      <div id="pbsgLearnMoreWrap" class="pbsg-learn-more-wrap" style="display:none;">
+        <button type="button" id="pbsgLearnMore" class="pbsg-learn-more-btn">
+          Learn more about this
+        </button>
       </div>
 
       <div class="pbsg-nav">
-        <button type="button" class="button" id="pbsgPrev">Prev</button>
-        <span id="pbsgProgress"></span>
-        <button type="button" class="button button-primary" id="pbsgNext">Next</button>
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev">Prev</button>
+
+        <div class="pbsg-nav-center">
+          <span id="pbsgProgress" class="pbsg-progress"></span>
+          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">Correct/Attempted 0/0 <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+        </div>
+
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext">Next</button>
       </div>
 
     </div>
@@ -311,25 +408,10 @@ foreach ($steps as $s) {
     <div class="pbsg-banner">
       <div class="pbsg-banner-text">
         <?php echo esc_html($note ? $note : 'If the webpage is not displaying below'); ?>
-        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank" style="text-decoration: underline;">Open in new window ↗</a>
+        <a class="pbsg-open-btn" id="pbsgOpenLink" href="#" target="_blank">Open in new tab <?php echo pbsg_icon('arrow-up-right'); ?></a>
       </div>
       <div class="pbsg-banner-actions">
-        <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>
-      </div>
-    </div>
-
-    <div id="pbsgBranchModal" class="pbsg-branch-modal" style="display:none;" aria-hidden="true">
-      <div class="pbsg-branch-modal-backdrop"></div>
-      <div class="pbsg-branch-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgBranchModalTitle">
-        <button type="button" class="pbsg-branch-modal-close" id="pbsgBranchClose" aria-label="Close" style="display:none;">&times;</button>
-        <h3 id="pbsgBranchModalTitle" class="pbsg-branch-modal-title">Branch Review</h3>
-        <div id="pbsgBranchText" class="pbsg-branch-text"></div>
-        <div class="pbsg-branch-actions">
-          <button type="button" class="button button-primary" id="pbsgBranchOpen">Start</button>
-          <button type="button" class="button" id="pbsgBranchSkip" style="display:none;">Skip</button>
-          <button type="button" class="button button-primary" id="pbsgBranchComplete" style="display:none;">I Finished This Sub-Tutorial</button>
-          <button type="button" class="button" id="pbsgBranchReturn" style="display:none;">Back to Main Tutorial</button>
-        </div>
+        <button type="button" class="pbsg-focus-btn" id="pbsgFocusTutorial">Focus Tutorial</button>  
       </div>
     </div>
 
@@ -377,7 +459,9 @@ foreach ($steps as $s) {
 
 
 
-
+<?php
+$close_tutorial_url = get_post_meta($page_id, PB_Split_Guide_Plugin::META_CLOSE_URL, true);
+?>
 
 <script>
 window.PBSG_CERT = {
@@ -385,6 +469,7 @@ window.PBSG_CERT = {
   tutorialId: <?php echo (int)$page_id; ?>,
   nonce: <?php echo wp_json_encode($cert_nonce); ?>,
   isLoggedIn: <?php echo $is_logged_in ? 'true' : 'false'; ?>,
+  closeTutorialUrl: <?php echo wp_json_encode($close_tutorial_url); ?>,
 };
 </script>
 
@@ -412,23 +497,44 @@ window.PBSG_CERT = {
 
     <?php if ($is_logged_in): ?>
       <div class="pbsg-summary-actions">
-        <input id="pbsgSummaryCertName" type="text" placeholder="Name on certificate (optional)" />
-        <button type="button" class="button button-primary" id="pbsgSummaryCertDownload">
-          Download Certificate (PDF)
+        <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload">
+          Generate Certificate
         </button>
-        <button type="button" class="button" id="pbsgRetakeTutorial">
-          Retake Tutorial
+
+        <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial">
+          Close Tutorial
         </button>
       </div>
     <?php else: ?>
       <div class="pbsg-summary-actions">
-        <p>Please log in to download your certificate.</p>
+        <p>Please log in to generate your certificate.</p>
         <button type="button" class="button" id="pbsgRetakeTutorial">
-          Retake Tutorial
+          Close Tutorial
         </button>
       </div>
     <?php endif; ?>
 
+  </div>
+</div>
+
+<div id="pbsgCertModal" class="pbsg-cert-modal" style="display:none;" aria-hidden="true">
+  <div class="pbsg-cert-modal-backdrop"></div>
+
+  <div class="pbsg-cert-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgCertModalTitle">
+    <button type="button" class="pbsg-cert-modal-close" id="pbsgCertModalClose" aria-label="Close">×</button>
+
+    <h3 id="pbsgCertModalTitle">Generate Certificate</h3>
+    <p>Please enter your name as it should appear on the certificate.</p>
+
+    <label for="pbsgCertModalName" class="pbsg-cert-label">Student Name</label>
+    <input id="pbsgCertModalName" type="text" class="pbsg-cert-input" placeholder="Enter your full name" />
+
+    <div id="pbsgCertModalError" class="pbsg-cert-error" style="display:none;"></div>
+
+    <div class="pbsg-cert-modal-actions">
+      <button type="button" class="pbsg-btn-outline" id="pbsgCertModalCancel">Cancel</button>
+      <button type="button" class="pbsg-btn-primary" id="pbsgCertModalGenerate">Generate</button>
+    </div>
   </div>
 </div>
 

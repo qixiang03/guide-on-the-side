@@ -8,16 +8,188 @@ const openLink = document.getElementById('pbsgOpenLink');
 const fallback = document.getElementById('pbsgTutorialFallback');
 const fallbackLink = document.getElementById('pbsgFallbackLink');
 
+let tutorialPopup;
+let popupPollInterval = null;
+
+// ── Popup window fallback system ──
+
+let popupUrl = '';
+let popupFeatures = '';
+
+function isSafari() {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
+function bringPopupToFront() {
+  if (!popupUrl) return;
+
+  // No stored reference — open fresh
+  if (!tutorialPopup) {
+    openTutorialPopup(popupUrl);
+    return;
+  }
+
+  // ── Bring popup to front ─────────────────────────────────────────────
+  //
+  // Two scenarios based on the popup's .closed property:
+  //
+  // 1. closed === false  →  opener relationship intact (no COOP barrier).
+  //    .focus() works — brings the popup to front. Same technique that
+  //    Springshare/LibWizard uses.
+  //
+  // 2. closed === true   →  either the user genuinely closed the popup,
+  //    or the site sent Cross-Origin-Opener-Policy: same-origin which
+  //    severs the opener relationship (Chrome reports .closed = true and
+  //    silently ignores .focus()). In both cases, reopen.
+
+  var isClosed = false;
+  try { isClosed = tutorialPopup.closed; } catch (e) { isClosed = true; }
+
+  if (!isClosed) {
+    // Opener relationship intact — .focus() will bring popup to front
+    try { tutorialPopup.focus(); } catch (e) { openTutorialPopup(popupUrl); }
+  } else {
+    // Popup closed or COOP-severed — reopen
+    openTutorialPopup(popupUrl);
+  }
+}
+
+function openTutorialPopup(url) {
+  // Close any existing popup cleanly
+  if (tutorialPopup) {
+    try { tutorialPopup.close(); } catch (e) {}
+  }
+  tutorialPopup = null;
+  clearInterval(popupPollInterval);
+  popupPollInterval = null;
+
+  const stage = document.getElementById('pbsgTutorialStage');
+  const banner = document.querySelector('.pbsg-banner');
+  if (!stage) { window.open(url, '_blank'); return; }
+
+  const stageRect = stage.getBoundingClientRect();
+  const bannerRect = banner ? banner.getBoundingClientRect() : stageRect;
+
+  const chromeOffset = window.outerHeight - window.innerHeight;
+  const left = Math.round(window.screenX + stageRect.left);
+  const w    = Math.round(stageRect.width);
+  const h    = Math.round(stageRect.height);
+
+  // Positioning: Chrome and Safari interpret `top` differently.
+  // Chrome: positions the popup's OUTER edge (title bar starts at `top`)
+  // Safari: positions the popup's CONTENT area (title bar is ~70px ABOVE `top`)
+  // Target: popup chrome covers the banner, content aligns with the stage.
+  const bannerScreenTop = Math.round(window.screenY + chromeOffset + bannerRect.top);
+  const popupChromeEstimate = 90;
+  const top = isSafari() ? (bannerScreenTop + popupChromeEstimate) : bannerScreenTop;
+
+  // Store features string ONCE — reuse for re-targeting in bringPopupToFront
+  popupFeatures = 'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top +
+    ',toolbar=no,menubar=no,location=yes,status=no,scrollbars=yes,resizable=yes';
+
+  tutorialPopup = window.open(url, 'pbsgTutorialWindow', popupFeatures);
+
+  if (!tutorialPopup) {
+    window.open(url, '_blank');
+    return;
+  }
+
+  popupUrl = url;
+
+  // Switch button to "Bring to Front" using onclick (OVERWRITES the initial handler)
+  const btn = document.getElementById('pbsgPopupBtn');
+  if (btn) {
+    btn.textContent = 'Bring Tutorial Window To Front';
+    btn.classList.add('pbsg-popup-btn--front');
+    btn.onclick = function() { bringPopupToFront(); };
+  }
+
+  // Hide "Reopen" link while popup is open
+  const reopenLink = document.getElementById('pbsgReopenLink');
+  if (reopenLink) reopenLink.style.display = 'none';
+
+  // Poll to show "Reopen" link if popup was closed.
+  // IMPORTANT: Do NOT null tutorialPopup here — .closed is unreliable for
+  // cross-origin popups in Chrome (returns true even when open). Nulling
+  // the reference was the root cause of "Bring to Front" doing nothing.
+  // bringPopupToFront() handles the "truly closed" case via try/catch on .focus().
+  clearInterval(popupPollInterval);
+  popupPollInterval = setInterval(function() {
+    try {
+      if (tutorialPopup && tutorialPopup.closed) {
+        // Only update UI — keep tutorialPopup reference intact
+        clearInterval(popupPollInterval);
+        popupPollInterval = null;
+        const link = document.getElementById('pbsgReopenLink');
+        if (link) link.style.display = 'inline';
+      }
+    } catch (e) {
+      // Cross-origin .closed access error — stop polling, keep reference
+      clearInterval(popupPollInterval);
+      popupPollInterval = null;
+    }
+  }, 2000);
+}
+
+function closeTutorialPopup() {
+  if (tutorialPopup) {
+    try { tutorialPopup.close(); } catch (e) {}
+  }
+  tutorialPopup = null;
+  // Keep popupUrl and popupFeatures — needed for re-opening if user closed accidentally
+  clearInterval(popupPollInterval);
+  popupPollInterval = null;
+}
+
+function renderPopupFallbackCard(container, url) {
+  let domain = '';
+  try { domain = new URL(url).hostname; } catch(e) { domain = url; }
+
+  container.innerHTML = `
+    <div class="pbsg-popup-fallback-card">
+      <div class="pbsg-popup-fallback-icon">${typeof PBSG_ICONS !== 'undefined' && PBSG_ICONS ? PBSG_ICONS.render('arrow-up-right') : ''}</div>
+      <p class="pbsg-popup-fallback-msg"><strong>${domain}</strong> cannot be embedded inline.</p>
+      <p class="pbsg-popup-fallback-hint">Click below to open it alongside this guide.</p>
+      <button type="button" class="pbsg-popup-btn" id="pbsgPopupBtn">Open in a new window</button>
+      <a class="pbsg-popup-fallback-link" href="#" id="pbsgReopenLink" style="display:none">Reopen the window</a>
+    </div>
+  `;
+
+  // "Open in a new window" button — uses onclick (not addEventListener) so
+  // openTutorialPopup() can OVERWRITE it with bringPopupToFront(). No dual handlers.
+  const btn = document.getElementById('pbsgPopupBtn');
+  if (btn) {
+    btn.onclick = function() { openTutorialPopup(url); };
+  }
+
+  // "Reopen" link — same action, only visible after popup was closed
+  const reopenLink = document.getElementById('pbsgReopenLink');
+  if (reopenLink) {
+    reopenLink.onclick = function(e) { e.preventDefault(); openTutorialPopup(url); };
+  }
+
+  // If popup is already open (navigated back to this step), show "Bring to Front"
+  if (tutorialPopup) {
+    try {
+      if (!tutorialPopup.closed) {
+        if (btn) {
+          btn.textContent = 'Bring Tutorial Window To Front';
+          btn.classList.add('pbsg-popup-btn--front');
+          btn.onclick = function() { bringPopupToFront(); };
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Hide the old fallback bar
+  fallback.style.display = 'none';
+}
+
 const prevBtn = document.getElementById('pbsgPrev');
 const nextBtn = document.getElementById('pbsgNext');
-
-const branchModal = document.getElementById('pbsgBranchModal');
-const branchText = document.getElementById('pbsgBranchText');
-const branchOpenBtn = document.getElementById('pbsgBranchOpen');
-const branchReturnBtn = document.getElementById('pbsgBranchReturn');
-const branchCompleteBtn = document.getElementById('pbsgBranchComplete');
-const branchSkipBtn = document.getElementById('pbsgBranchSkip');
-const branchCloseBtn = document.getElementById('pbsgBranchClose');
+const learnMoreWrap = document.getElementById('pbsgLearnMoreWrap');
+const learnMoreBtn = document.getElementById('pbsgLearnMore');
+const branchQuizHost = document.getElementById('pbsgBranchQuizHost');
 
 const introScreen = document.getElementById('pbsgIntroScreen');
 const mainContent = document.getElementById('pbsgMainContent');
@@ -29,6 +201,322 @@ const startTutorialBtn = document.getElementById('pbsgStartTutorial');
 // --------------------
 const menuBtn = document.getElementById('pbsgMenuBtn');
 const menuDd  = document.getElementById('pbsgMenuDropdown');
+
+
+const h5pFrameHost = h5pFrame ? h5pFrame.parentElement : null;
+const h5pFrameCache = new Map();
+let activeH5PFrame = h5pFrame || null;
+
+function getActiveH5PFrame() {
+  return activeH5PFrame;
+}
+
+function hideAllH5PFrames() {
+  h5pFrameCache.forEach((frame) => {
+    frame.style.display = 'none';
+    frame.style.opacity = '0';
+  });
+
+  if (h5pFrame && !h5pFrameCache.size) {
+    h5pFrame.style.display = 'none';
+    h5pFrame.style.opacity = '0';
+  }
+}
+
+function getOrCreateH5PFrameForStep(stepIndex) {
+  if (!h5pFrameHost || !h5pFrame) return null;
+
+  if (h5pFrameCache.has(stepIndex)) {
+    return h5pFrameCache.get(stepIndex);
+  }
+
+  let frame;
+
+  if (h5pFrameCache.size === 0 && !h5pFrame.dataset.pbsgOwned) {
+    frame = h5pFrame;
+    frame.dataset.pbsgOwned = '1';
+  } else {
+    frame = document.createElement('iframe');
+    frame.className = h5pFrame.className;
+    frame.setAttribute('aria-label', 'Quiz Frame');
+    frame.setAttribute('allowfullscreen', '');
+    frame.style.display = 'none';
+    frame.style.opacity = '0';
+    h5pFrameHost.appendChild(frame);
+  }
+
+  frame.dataset.stepIndex = String(stepIndex);
+  h5pFrameCache.set(stepIndex, frame);
+  return frame;
+}
+
+/**
+ * Returns the shared CSS string injected into every H5P iframe
+ * (both main quiz and branch sub-quiz) for consistent typography,
+ * button styling, and feedback callout rendering.
+ */
+function getH5PStyleCSS() {
+  return `
+          /* ── Base ─────────────────────────────────────────── */
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+            font-size: 14px !important;
+            color: #333 !important;
+            background: #fff !important;
+            margin: 0 !important;
+            box-sizing: border-box !important;
+          }
+
+          .h5p-container,
+          .h5p-content,
+          .h5p-question {
+            font-family: inherit !important;
+            box-sizing: border-box !important;
+            color: #333 !important;
+          }
+
+          .h5p-question {
+            padding: 18px 20px !important;
+            background: #fff !important;
+          }
+
+          /* ── "QUESTION" eyebrow + title ──────────────────── */
+          .h5p-question-text::before,
+          .h5p-question-introduction::before {
+            content: 'Question' !important;
+            display: block !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            color: #999 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.8px !important;
+            margin-bottom: 4px !important;
+          }
+
+          .h5p-question-text,
+          .h5p-question-introduction {
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            color: #222 !important;
+            line-height: 1.3 !important;
+            margin: 0 0 16px 0 !important;
+            padding: 0 !important;
+          }
+
+          /* ── MultiChoice options (default) ─────────────────
+             H5P renders the radio/checkbox as a ::before pseudo-element
+             on .h5p-alternative-container, positioned via text-indent + padding-left.
+             We only override visual properties (colors, border, border-radius) and
+             leave H5P's native layout (text-indent, padding, line-height) untouched
+             so the radio circle stays aligned with the text. ──── */
+          .h5p-alternative-container {
+            background: #fff !important;
+            border: 1.5px solid #d0d0d0 !important;
+            border-radius: 6px !important;
+            margin-bottom: 8px !important;
+            font-size: 14px !important;
+            color: #333 !important;
+            cursor: pointer !important;
+            transition: border-color 0.15s, background 0.15s !important;
+            box-sizing: border-box !important;
+          }
+
+          .h5p-alternative-container:hover {
+            border-color: #8C2004 !important;
+          }
+
+          .h5p-alternative-container .h5p-alternative-inner {
+            color: inherit !important;
+          }
+
+          /* ── MultiChoice options (wrong state) ───────────── */
+          .h5p-alternative-container.h5p-wrong,
+          .h5p-alternative-container.h5p-answer-wrong {
+            background: #fdeeee !important;
+            border: 1.5px solid #8C2004 !important;
+            color: #5c1a1a !important;
+            font-weight: 500 !important;
+          }
+
+          /* ── MultiChoice options (correct state) ─────────── */
+          .h5p-alternative-container.h5p-correct,
+          .h5p-alternative-container.h5p-answer-correct {
+            background: #e8f5e9 !important;
+            border: 1.5px solid #517E1B !important;
+            color: #1b5e20 !important;
+            font-weight: 500 !important;
+          }
+
+          /* ── Blanks input field ──────────────────────────── */
+          .h5p-blanks .h5p-input-wrapper input[type="text"],
+          .h5p-blanks input.h5p-text-input {
+            border: none !important;
+            border-bottom: 2px solid #8C2004 !important;
+            background: #f8f8f8 !important;
+            border-radius: 4px 4px 0 0 !important;
+            padding: 4px 8px !important;
+            font-size: 16px !important;
+            color: #222 !important;
+            font-weight: 500 !important;
+            min-width: 120px !important;
+            transition: border-color 0.15s, background 0.15s !important;
+          }
+
+          .h5p-blanks .h5p-input-wrapper input[type="text"]:focus {
+            outline: none !important;
+            background: #fff !important;
+            border-bottom-color: #517E1B !important;
+          }
+
+          .h5p-blanks .h5p-input-wrapper.h5p-wrong input[type="text"],
+          .h5p-blanks .h5p-input-wrapper.h5p-not-filled-out input[type="text"] {
+            background: #fdeeee !important;
+            border-bottom-color: #8C2004 !important;
+            color: #5c1a1a !important;
+          }
+
+          .h5p-blanks .h5p-input-wrapper.h5p-correct input[type="text"] {
+            background: #e8f5e9 !important;
+            border-bottom-color: #517E1B !important;
+            color: #1b5e20 !important;
+          }
+
+          /* ── Buttons (shared across MultiChoice, Blanks, etc.) ── */
+          .h5p-joubelui-button,
+          .h5p-question-check-answer {
+            min-height: 38px !important;
+            padding: 10px 24px !important;
+            font-size: 14px !important;
+            font-weight: 600 !important;
+            border-radius: 6px !important;
+            background: #8C2004 !important;
+            color: #fff !important;
+            border: 1.5px solid #8C2004 !important;
+            box-shadow: 0 1px 3px rgba(140, 32, 4, 0.3) !important;
+            cursor: pointer !important;
+            font-family: inherit !important;
+            text-transform: none !important;
+            transition: background 0.15s, box-shadow 0.15s !important;
+          }
+
+          .h5p-joubelui-button:hover,
+          .h5p-question-check-answer:hover {
+            background: #6f1a03 !important;
+            box-shadow: 0 2px 6px rgba(140, 32, 4, 0.4) !important;
+            color: #fff !important;
+          }
+
+          /* Retry is intentionally slightly smaller than Check (10px 24px) to
+             visually signal its secondary/ghost-button status */
+          .h5p-question-try-again,
+          .h5p-joubelui-button.h5p-question-try-again {
+            background: #fff !important;
+            color: #8C2004 !important;
+            border: 1.5px solid #8C2004 !important;
+            box-shadow: none !important;
+            padding: 9px 20px !important;
+          }
+
+          .h5p-question-try-again:hover,
+          .h5p-joubelui-button.h5p-question-try-again:hover {
+            background: #fdeeee !important;
+            color: #8C2004 !important;
+          }
+
+          /* Button container — push buttons right */
+          .h5p-question .h5p-question-buttons,
+          .h5p-actions,
+          .h5p-joubelui-button-container {
+            display: flex !important;
+            justify-content: flex-end !important;
+            gap: 10px !important;
+            margin-top: 14px !important;
+          }
+
+          /* ── Feedback callouts ───────────────────────────── */
+          .h5p-feedback {
+            font-size: 13px !important;
+            font-weight: 400 !important;
+            padding: 10px 14px !important;
+            margin-top: 14px !important;
+            border-radius: 4px !important;
+            border-left: 4px solid transparent !important;
+            line-height: 1.5 !important;
+          }
+
+          .h5p-feedback.h5p-feedback-correct,
+          .h5p-question-feedback.h5p-correct {
+            background: #e8f5e9 !important;
+            border-left-color: #517E1B !important;
+            color: #1b5e20 !important;
+          }
+
+          .h5p-feedback.h5p-feedback-incorrect,
+          .h5p-question-feedback.h5p-wrong {
+            background: #fdeeee !important;
+            border-left-color: #8C2004 !important;
+            color: #5c1a1a !important;
+          }
+
+          /* ── Score bar (keep H5P's default green, just resize) ── */
+          .h5p-question-score,
+          .h5p-joubelui-score-bar {
+            font-size: 12px !important;
+            color: #666 !important;
+            margin-top: 10px !important;
+          }
+  `;
+}
+
+function showStepH5PFrame(stepIndex, h5pId) {
+  hideAllH5PFrames();
+
+  if (!h5pId) {
+    activeH5PFrame = null;
+    return null;
+  }
+
+  const frame = getOrCreateH5PFrameForStep(stepIndex);
+  if (!frame) {
+    activeH5PFrame = null;
+    return null;
+  }
+
+  const wantedId = String(h5pId);
+
+  if (frame.dataset.loadedH5pId !== wantedId) {
+    frame.src = h5pUrl(h5pId);
+    frame.dataset.loadedH5pId = wantedId;
+  }
+
+  frame.style.display = '';
+  frame.style.opacity = '1';
+  activeH5PFrame = frame;
+
+  return frame;
+}
+
+function resetH5PFrameCache() {
+  h5pFrameCache.forEach((frame) => {
+    if (frame !== h5pFrame && frame.parentNode) {
+      frame.parentNode.removeChild(frame);
+    }
+  });
+
+  h5pFrameCache.clear();
+
+  if (h5pFrame) {
+    h5pFrame.removeAttribute('data-step-index');
+    h5pFrame.removeAttribute('data-loaded-h5p-id');
+    h5pFrame.removeAttribute('data-pbsg-owned');
+    h5pFrame.src = '';
+    h5pFrame.style.display = '';
+    h5pFrame.style.opacity = '0';
+  }
+
+  activeH5PFrame = h5pFrame || null;
+}
+
 
 function openMenu(){
   if (!menuDd || !menuBtn) return;
@@ -64,7 +552,7 @@ function bindMenu(){
   });
 }
 
-// Only allow going BACK (or current). Future steps are disabled.
+
 function updateMenuState(){
   if (!menuDd) return;
 
@@ -75,7 +563,7 @@ function updateMenuState(){
     const isFuture = idx > i;
 
     el.classList.toggle('is-current', isCurrent);
-    el.classList.toggle('is-disabled', isFuture);
+    el.classList.toggle('is-disabled', inBranch || isFuture);
   });
 }
 
@@ -87,6 +575,10 @@ window.pbsgGoToStep = function(index){
   // block jumping forward
   if (index > i) return;
 
+  if (!inBranch) {
+    saveH5PAnswerState(i);
+  }
+
   i = index;
   render();
 };
@@ -96,16 +588,185 @@ window.pbsgGoToStep = function(index){
 // Gate NEXT by quiz correctness (H5P)
 // --------------------
 const passedSteps = new Set(); // remember which steps are already correct
+const h5pAnswerState = {}; // remember current student answers per step
 
 const triggeredBranchSteps = new Set();
 const completedBranchSteps = new Set();
 
-let activeBranchStep = null;
-let branchReturnTarget = null;
 
 let h5pObs = null;
 let h5pClickHandler = null;
 let h5pBoundDoc = null;
+let h5pInputHandler = null;
+let h5pChangeHandler = null;
+
+
+function buildH5PFieldKey(el, index) {
+  return [
+    el.name || '',
+    el.id || '',
+    el.type || '',
+    index
+  ].join('::');
+}
+
+function saveH5PAnswerState(stepIndex) {
+  const frame = getActiveH5PFrame();
+  if (!Number.isFinite(stepIndex) || !frame) return;
+
+  let doc;
+  try {
+    doc = frame.contentDocument || frame.contentWindow.document;
+  } catch (e) {
+    return;
+  }
+
+  if (!doc || !doc.body) return;
+
+  const state = {
+    choiceSelections: [],
+    textValues: []
+  };
+
+  // Save visible H5P choice selections by position
+  const choiceInputs = Array.from(
+    doc.querySelectorAll(
+      '.h5p-alternative-container input[type="radio"], ' +
+      '.h5p-alternative-container input[type="checkbox"], ' +
+      '.h5p-answer input[type="radio"], ' +
+      '.h5p-answer input[type="checkbox"]'
+    )
+  );
+
+  choiceInputs.forEach((el, index) => {
+    state.choiceSelections.push({
+      index,
+      type: (el.type || '').toLowerCase(),
+      checked: !!el.checked
+    });
+  });
+
+  // Save visible text fields by position
+  const textFields = Array.from(
+    doc.querySelectorAll(
+      'textarea, input[type="text"], input[type="search"], input:not([type])'
+    )
+  ).filter(el => {
+    const type = (el.type || '').toLowerCase();
+    return !['hidden', 'radio', 'checkbox', 'button', 'submit'].includes(type);
+  });
+
+  textFields.forEach((el, index) => {
+    state.textValues.push({
+      index,
+      value: el.value != null ? el.value : ''
+    });
+  });
+
+  h5pAnswerState[stepIndex] = state;
+}
+
+function restoreH5PAnswerState(stepIndex, doc) {
+  const state = h5pAnswerState[stepIndex];
+  if (!state || !doc || !doc.body) return false;
+
+  let restoredAny = false;
+
+  // Restore visible H5P choices by position
+  const choiceInputs = Array.from(
+    doc.querySelectorAll(
+      '.h5p-alternative-container input[type="radio"], ' +
+      '.h5p-alternative-container input[type="checkbox"], ' +
+      '.h5p-answer input[type="radio"], ' +
+      '.h5p-answer input[type="checkbox"]'
+    )
+  );
+
+  if (Array.isArray(state.choiceSelections) && choiceInputs.length) {
+    state.choiceSelections.forEach(saved => {
+      const el = choiceInputs[saved.index];
+      if (!el) return;
+
+      const wantChecked = !!saved.checked;
+      const isChecked = !!el.checked;
+
+      if (wantChecked !== isChecked) {
+        const clickable =
+          el.closest('.h5p-alternative-container') ||
+          el.closest('.h5p-answer') ||
+          el.closest('label') ||
+          el;
+
+        try {
+          clickable.click();
+        } catch (e) {
+          el.checked = wantChecked;
+          try {
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          } catch (err) {}
+        }
+      }
+
+      restoredAny = true;
+    });
+  }
+
+  // Restore visible text fields by position
+  const textFields = Array.from(
+    doc.querySelectorAll(
+      'textarea, input[type="text"], input[type="search"], input:not([type])'
+    )
+  ).filter(el => {
+    const type = (el.type || '').toLowerCase();
+    return !['hidden', 'radio', 'checkbox', 'button', 'submit'].includes(type);
+  });
+
+  if (Array.isArray(state.textValues) && textFields.length) {
+    state.textValues.forEach(saved => {
+      const el = textFields[saved.index];
+      if (!el) return;
+
+      el.value = saved.value != null ? saved.value : '';
+
+      try {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (e) {}
+
+      restoredAny = true;
+    });
+  }
+
+  return restoredAny;
+}
+
+function cleanupH5PWatcher() {
+  if (h5pObs) {
+    try { h5pObs.disconnect(); } catch (e) {}
+    h5pObs = null;
+  }
+
+  if (h5pBoundDoc) {
+  try {
+    if (h5pClickHandler) {
+      h5pBoundDoc.removeEventListener('click', h5pClickHandler, true);
+    }
+    if (h5pInputHandler) {
+      h5pBoundDoc.removeEventListener('input', h5pInputHandler, true);
+    }
+    if (h5pChangeHandler) {
+      h5pBoundDoc.removeEventListener('change', h5pChangeHandler, true);
+    }
+  } catch (e) {}
+}
+
+  h5pBoundDoc = null;
+  h5pClickHandler = null;
+  h5pInputHandler = null;
+  h5pChangeHandler = null;
+}
 
 function lockNext(locked){
   if (!nextBtn) return;
@@ -113,29 +774,15 @@ function lockNext(locked){
   nextBtn.classList.toggle('pbsg-locked', !!locked);
 }
 
-function openBranchModal() {
-  if (!branchModal) return;
-  branchModal.style.display = '';
-  branchModal.setAttribute('aria-hidden', 'false');
-  document.body.classList.add('pbsg-branch-modal-open');
-}
-
-function closeBranchModal() {
-  if (!branchModal) return;
-  branchModal.style.display = 'none';
-  branchModal.setAttribute('aria-hidden', 'true');
-  document.body.classList.remove('pbsg-branch-modal-open');
-}
-
 function hasBranch(step) {
   return !!(
     step &&
     step.branch &&
-    step.branch.mode !== 'none' &&
-    step.branch.tutorial &&
+    (step.branch.mode === 'optional' || step.branch.mode === 'mandatory') &&
     (
-      (step.branch.tutorial.type === 'url' && step.branch.tutorial.url) ||
-      (step.branch.tutorial.type === 'file' && step.branch.tutorial.file_url)
+      (Array.isArray(step.branch.questions) && step.branch.questions.length > 0) ||
+      (step.branch.tutorial_type === 'url' && step.branch.tutorial_url) ||
+      (step.branch.tutorial_type === 'file' && step.branch.tutorial_file_url)
     )
   );
 }
@@ -144,119 +791,12 @@ function shouldTriggerBranch(stepIndex) {
   const step = steps[stepIndex];
   if (!hasBranch(step)) return false;
 
-  const required = step.branch.trigger_attempts || 1;
   const attempts = attemptCounts[stepIndex] || 0;
-
-  return attempts >= required;
+  return attempts >= 1;
 }
 
 function isMandatoryBranch(step) {
   return hasBranch(step) && step.branch.mode === 'mandatory';
-}
-
-function resetBranchUI() {
-  activeBranchStep = null;
-  branchReturnTarget = null;
-
-  closeBranchModal();
-
-  if (branchText) branchText.innerHTML = '';
-
-  if (branchReturnBtn) branchReturnBtn.style.display = 'none';
-  if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
-  if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-  if (branchOpenBtn) {
-    branchOpenBtn.style.display = 'inline-block';
-    branchOpenBtn.textContent = 'Start';
-  }
-  if (branchCloseBtn) branchCloseBtn.style.display = 'none';
-}
-
-function showBranchPrompt(stepIndex) {
-  const step = steps[stepIndex];
-  if (!hasBranch(step) || !branchText) return;
-
-  activeBranchStep = stepIndex;
-  branchReturnTarget = stepIndex;
-
-  const required = Math.max(1, parseInt(step.branch.trigger_attempts, 10) || 1);
-  const attempts = Math.max(required, parseInt(attemptCounts[stepIndex], 10) || required);
-  const title = step.branch.title || 'Branch Review';
-
-  let intro = step.branch.intro || '';
-  if (!intro) {
-    if (step.branch.mode === 'mandatory') {
-      intro = `You answered this question incorrectly ${attempts} ${attempts === 1 ? 'time' : 'times'}. You must complete this sub-tutorial before continuing.`;
-    } else {
-      intro = `You answered this question incorrectly ${attempts} ${attempts === 1 ? 'time' : 'times'}. Practicing this sub-tutorial may help you learn better.`;
-    }
-  }
-
-  const modeText = step.branch.mode === 'mandatory'
-    ? 'You can continue only after you finish this sub-tutorial and answer the main quiz correctly.'
-    : 'You may start the sub-tutorial now or skip it and return to the main tutorial.';
-
-  const modalTitle = document.getElementById('pbsgBranchModalTitle');
-  if (modalTitle) modalTitle.textContent = title;
-
-  branchText.innerHTML = `
-    ${intro}<br>
-    <span class="pbsg-branch-mode">${modeText}</span>
-  `;
-
-  if (branchOpenBtn) {
-    branchOpenBtn.textContent = 'Start';
-    branchOpenBtn.style.display = 'inline-block';
-  }
-
-  if (branchReturnBtn) branchReturnBtn.style.display = 'none';
-
-  if (step.branch.mode === 'mandatory') {
-    if (branchCompleteBtn) {
-      branchCompleteBtn.textContent = 'I Finished This Sub-Tutorial';
-      branchCompleteBtn.style.display = 'inline-block';
-    }
-    if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-    if (branchCloseBtn) branchCloseBtn.style.display = 'none';
-  } else {
-    if (branchCompleteBtn) branchCompleteBtn.style.display = 'none';
-    if (branchSkipBtn) {
-      branchSkipBtn.textContent = 'Skip';
-      branchSkipBtn.style.display = 'inline-block';
-    }
-    if (branchCloseBtn) branchCloseBtn.style.display = 'inline-block';
-  }
-
-  openBranchModal();
-}
-
-function renderBranchTutorial(stepIndex) {
-  const step = steps[stepIndex];
-  if (!hasBranch(step)) return;
-
-  let url = '';
-  if (step.branch.tutorial.type === 'url') {
-    url = step.branch.tutorial.url || '';
-  } else if (step.branch.tutorial.type === 'file') {
-    url = step.branch.tutorial.file_url || '';
-  }
-
-  if (!url) return;
-
-  window.open(url, '_blank', 'noopener,noreferrer');
-
-  if (step.branch.mode === 'mandatory') {
-    if (branchOpenBtn) branchOpenBtn.style.display = 'none';
-    if (branchCompleteBtn) branchCompleteBtn.style.display = 'inline-block';
-    if (branchSkipBtn) branchSkipBtn.style.display = 'none';
-  } else {
-    closeBranchModal();
-  }
-}
-
-function returnToMainTutorial() {
-  if (branchReturnTarget === null || !steps[branchReturnTarget]) return;
-  renderTutorial(steps[branchReturnTarget]);
 }
 
 function isCurrentStepBlockedByMandatoryBranch() {
@@ -265,6 +805,27 @@ function isCurrentStepBlockedByMandatoryBranch() {
   if (!triggeredBranchSteps.has(i)) return false;
   return !completedBranchSteps.has(i);
 }
+
+function isCurrentStepSkippableByOptionalBranch() {
+  const step = steps[i];
+  if (!step || !hasBranch(step)) return false;
+  if (step.branch.mode !== 'optional') return false;
+  if (!triggeredBranchSteps.has(i)) return false;
+  if (completedBranchSteps.has(i)) return false;
+  return true;
+}
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== window.location.origin) return;
+
+  const data = event.data || {};
+  if (data.type !== 'pbsg_branch_completed') return;
+
+  const stepIndex = parseInt(data.stepIndex, 10);
+  if (!Number.isFinite(stepIndex)) return;
+
+  completedBranchSteps.add(stepIndex);
+});
 
 
 // Heuristics to detect "correct" in H5P iframe document.
@@ -336,35 +897,31 @@ function isCheckButton(el){
   if (text === 'check') return true;
   if (text === 'check answer') return true;
 
-  return false;
+  return (
+    cls.includes('check') ||
+    cls.includes('submit') ||
+    cls.includes('answer') ||
+    text.includes('check') ||
+    text.includes('submit')
+  );
+
 }
 
 function attachH5PWatcher(stepIndex){
+  const frame = getActiveH5PFrame();
+
   // If no quiz in this step, no gating needed
-  if (!h5pFrame || !steps[stepIndex]?.h5p_id) {
+  if (!frame || !steps[stepIndex]?.h5p_id) {
     lockNext(false);
     return;
   }
 
-  // Disconnect old observer
-  if (h5pObs) {
-    try { h5pObs.disconnect(); } catch(e) {}
-    h5pObs = null;
-  }
-
-  // Remove old click handler from previous iframe doc
-  if (h5pBoundDoc && h5pClickHandler) {
-    try {
-      h5pBoundDoc.removeEventListener('click', h5pClickHandler, true);
-    } catch (e) {}
-    h5pBoundDoc = null;
-    h5pClickHandler = null;
-  }
+  cleanupH5PWatcher();
 
   const tryAttach = () => {
     let doc;
     try {
-      doc = h5pFrame.contentDocument || h5pFrame.contentWindow.document;
+      doc = frame.contentDocument || frame.contentWindow.document;
     } catch (e) {
       // Cross-origin -> can't read, fail open
       lockNext(false);
@@ -373,38 +930,96 @@ function attachH5PWatcher(stepIndex){
 
     if (!doc || !doc.body) return false;
 
-    const updatePassState = () => {
-      const correct = isH5PCorrect(doc);
-      const step = steps[stepIndex];
 
-      if (correct) {
-        passedSteps.add(stepIndex);
-        resetBranchUI();
-        lockNext(false);
-        updateCertificateGate();
-        return;
+    // Inject consistent styling into H5P iframe
+    try {
+      if (!doc.getElementById('pbsg-h5p-style')) {
+        const style = doc.createElement('style');
+        style.id = 'pbsg-h5p-style';
+
+        style.textContent = getH5PStyleCSS();
+        doc.head.appendChild(style);
       }
+    } catch (e) {
+      console.warn('H5P style injection failed:', e);
+    }
 
-      passedSteps.delete(stepIndex);
+    frame.style.transition = 'opacity 0.12s ease';
+    frame.style.opacity = '1';
 
-      if (shouldTriggerBranch(stepIndex)) {
-        triggeredBranchSteps.add(stepIndex);
-        showBranchPrompt(stepIndex);
+    let restoreDone = false;
 
-        if (step.branch.mode === 'mandatory' && !completedBranchSteps.has(stepIndex)) {
-          lockNext(true);
-        } else {
-          lockNext(true);
-        }
-      } else {
-        lockNext(true);
+    const tryRestoreAnswers = () => {
+      if (restoreDone) return;
+      const ok = restoreH5PAnswerState(stepIndex, doc);
+      if (ok) {
+        restoreDone = true;
       }
-
-      updateCertificateGate();
     };
 
-    // Initial status only: DO NOT count here
-    updatePassState();
+    tryRestoreAnswers();
+    setTimeout(tryRestoreAnswers, 100);
+    setTimeout(tryRestoreAnswers, 300);
+    setTimeout(tryRestoreAnswers, 600);
+
+    const updatePassState = ({ allowBranchPrompt = false } = {}) => {
+    const correct = isH5PCorrect(doc);
+    const step = steps[stepIndex];
+    const hasChecked = (attemptCounts[stepIndex] || 0) > 0;
+
+    // Global rule: until Check is clicked, Next must stay disabled
+    if (!hasChecked) {
+      lockNext(true);
+      updateRunningScore();
+      updateCertificateGate();
+      return;
+    }
+
+    if (correct) {
+      passedSteps.add(stepIndex);
+      lockNext(false);
+      updateRunningScore();
+      updateCertificateGate();
+      return;
+    }
+
+    // Only remove passed state after a real Check action
+    // Only remove passed state after a real Check action
+    if (allowBranchPrompt) {
+      passedSteps.delete(stepIndex);
+    }
+
+    // A wrong checked answer may trigger branch state
+    if (allowBranchPrompt && shouldTriggerBranch(stepIndex)) {
+      triggeredBranchSteps.add(stepIndex);
+    }
+
+    // Show the Learn More button whenever this step already has a triggered branch
+    if (
+      triggeredBranchSteps.has(stepIndex) &&
+      !completedBranchSteps.has(stepIndex) &&
+      !inBranch &&
+      stepIndex === i
+    ) {
+      showLearnMoreButton();
+    }
+
+    // For mandatory branch: keep Next locked until branch is completed
+    const mustStayLocked =
+      isMandatoryBranch(step) &&
+      triggeredBranchSteps.has(stepIndex) &&
+      !completedBranchSteps.has(stepIndex);
+
+    // Optional branch or no branch: can continue after Check
+    lockNext(mustStayLocked);
+
+    updateRunningScore();
+    updateCertificateGate();
+  };
+
+
+    // Initial status only: DO NOT count and DO NOT trigger branch popup here
+    updatePassState({ allowBranchPrompt: false });
 
     // Count only real clicks on the H5P Check button
     h5pClickHandler = (e) => {
@@ -417,18 +1032,36 @@ function attachH5PWatcher(stepIndex){
 
       attemptCounts[stepIndex] = (attemptCounts[stepIndex] || 0) + 1;
 
-      // Wait a moment for H5P to update the result after clicking Check
+      // Wait for H5P to finish drawing the result, then evaluate once
       setTimeout(() => {
-        updatePassState();
-      }, 150);
+        updatePassState({ allowBranchPrompt: true });
+      }, 250);
     };
 
     doc.addEventListener('click', h5pClickHandler, true);
     h5pBoundDoc = doc;
 
+    h5pInputHandler = (e) => {
+      const el = e.target;
+      if (!el) return;
+      if (!el.matches('input, textarea, select')) return;
+      saveH5PAnswerState(stepIndex);
+    };
+
+    h5pChangeHandler = (e) => {
+      const el = e.target;
+      if (!el) return;
+      if (!el.matches('input, textarea, select')) return;
+      saveH5PAnswerState(stepIndex);
+    };
+
+    doc.addEventListener('input', h5pInputHandler, true);
+    doc.addEventListener('change', h5pChangeHandler, true);
+
     // Keep pass/fail state updated when H5P redraws result UI
     h5pObs = new MutationObserver(() => {
-      updatePassState();
+      tryRestoreAnswers();
+      updatePassState({ allowBranchPrompt: false });
     });
     h5pObs.observe(doc.body, { childList: true, subtree: true, attributes: true });
 
@@ -444,6 +1077,7 @@ function attachH5PWatcher(stepIndex){
 
 const titleEl = document.getElementById('pbsgStepTitle');
 const progressEl = document.getElementById('pbsgProgress');
+const runningScoreEl = document.getElementById('pbsgRunningScore');
 const progressFillEl = document.getElementById('pbsgProgressFill');
 const progressLabelEl = document.getElementById('pbsgProgressLabel');
 
@@ -451,7 +1085,12 @@ const certBox = document.getElementById('pbsgCertificate');
 const certNameInput = document.getElementById('pbsgCertName');
 const certBtn = document.getElementById('pbsgCertDownload');
 const summaryCertBtn = document.getElementById('pbsgSummaryCertDownload');
-const summaryCertName = document.getElementById('pbsgSummaryCertName');
+const certModal = document.getElementById('pbsgCertModal');
+const certModalName = document.getElementById('pbsgCertModalName');
+const certModalGenerate = document.getElementById('pbsgCertModalGenerate');
+const certModalCancel = document.getElementById('pbsgCertModalCancel');
+const certModalClose = document.getElementById('pbsgCertModalClose');
+const certModalError = document.getElementById('pbsgCertModalError');
 const certHint = document.getElementById('pbsgCertHint');
 const finalGradeEl = document.getElementById('pbsgFinalGrade');
 const retakeBtn = document.getElementById('pbsgRetakeTutorial');
@@ -467,8 +1106,15 @@ function requiredQuizStepsCount(){
   return steps.filter(s => !!s.h5p_id).length;
 }
 
+function attemptedQuizStepsCount(){
+  let n = 0;
+  steps.forEach((s, idx) => {
+    if (s.h5p_id && (attemptCounts[idx] || 0) > 0) n++;
+  });
+  return n;
+}
+
 function passedQuizStepsCount(){
-  // only count steps that actually have quizzes
   let n = 0;
   steps.forEach((s, idx) => {
     if (s.h5p_id && passedSteps.has(idx)) n++;
@@ -489,6 +1135,20 @@ function getFinalGradePercent(){
   return ((passed / total) * 100).toFixed(2);
 }
 
+function updateRunningScore() {
+  if (!runningScoreEl) return;
+
+  const correct = passedQuizStepsCount();
+  const attempted = attemptedQuizStepsCount();
+
+  // Use innerHTML so the Marginalia check icon renders as inline SVG.
+  // Numeric values are safe (produced by Number coercion above).
+  const checkIcon = (typeof PBSG_ICONS !== 'undefined')
+    ? PBSG_ICONS.render('check', 'pbsg-icon--ok')
+    : '';
+  runningScoreEl.innerHTML = `Correct/Attempted ${correct}/${attempted} ${checkIcon}`;
+}
+
 function resetTutorialToStart(){
   const summaryScreen = document.getElementById('pbsgSummaryScreen');
 
@@ -500,12 +1160,19 @@ function resetTutorialToStart(){
 
   triggeredBranchSteps.clear();
   completedBranchSteps.clear();
-  resetBranchUI();
+  inBranch = false;
+  branchParentIndex = null;
+  branchStepIndex = 0;
+  currentTutorialSignature = null;
+  resetH5PFrameCache();
+  showH5PFrame();
+  hideLearnMoreButton();
 
-  steps.forEach((step, idx) => {
-    attemptCounts[idx] = 0;
-    passedSteps.delete(idx);
-  });
+    steps.forEach((step, idx) => {
+      attemptCounts[idx] = 0;
+      passedSteps.delete(idx);
+      delete h5pAnswerState[idx];
+    });
 
   if (hasIntroScreen()) {
     if (introScreen) introScreen.style.display = '';
@@ -523,25 +1190,16 @@ function hasIntroScreen(){
 function updateCertificateGate(){
   if (!certBtn) return;
 
-  // Only show/allow certificate on last step
+  // Only allow certificate on the summary / last step area
   if (i !== steps.length - 1) {
     lockCert(true, '');
     return;
   }
 
-  const total = requiredQuizStepsCount();
-  const passed = passedQuizStepsCount();
-
-  if (total === 0) {
-    lockCert(false, ''); // no quizzes => allow
-    return;
-  }
-
-  if (allQuizzesPassed()) {
-    lockCert(false, 'All steps passed. You can download your certificate.');
-  } else {
-    lockCert(true, `Complete all quiz steps correctly first (${passed}/${total} passed).`);
-  }
+  // New rule:
+  // Certificate is always allowed on the last step,
+  // even if not all quizzes are passed.
+  lockCert(false, '');
 
   finalizeCompletionIfReady();
 }
@@ -550,6 +1208,26 @@ function updateCertificateGate(){
 let certMarked = false;
 
 let i = 0;
+let inBranch = false;
+let branchParentIndex = null;
+let branchStepIndex = 0;
+// Expose branch state for the analytics tracker (read-only accessor)
+window.pbsgInBranch = function() { return inBranch; };
+let currentTutorialSignature = null;
+
+
+function getCurrentBranch() {
+  if (branchParentIndex === null) return null;
+  const parent = steps[branchParentIndex];
+  if (!parent || !parent.branch) return null;
+  return parent.branch;
+}
+
+function getCurrentBranchQuestion() {
+  const branch = getCurrentBranch();
+  if (!branch || !Array.isArray(branch.questions)) return null;
+  return branch.questions[branchStepIndex] || null;
+}
 
 let attemptCounts = {};
 steps.forEach((_, idx) => {
@@ -594,19 +1272,23 @@ async function markCompletedOnce() {
 
 
 async function finalizeCompletionIfReady() {
-  if (!window.PBSG_CERT?.isLoggedIn) return false;
   if (i !== steps.length - 1) return false;
-  if (!allQuizzesPassed()) return false;
 
-  return await markCompletedOnce();
+  const ok = window.PBSG_CERT?.isLoggedIn
+    ? await markCompletedOnce()
+    : true;
+
+  if (ok) {
+    notifyParentBranchCompleted();
+  }
+
+  return ok;
 }
-
-
 
 function h5pUrl(id){
   const u = new URL(ajaxUrl, location.origin);
-  u.searchParams.set('action','h5p_embed');
-  u.searchParams.set('id',id);
+  u.searchParams.set('action', 'h5p_embed');
+  u.searchParams.set('id', id);
   return u.toString();
 }
 
@@ -748,13 +1430,23 @@ function toEmbeddableUrl(rawUrl){
   return rawUrl;
 }
 
-function renderTutorial(step){
+function renderTutorial(step, options = {}){
   const t = step.tutorial || {};
   const tutorialStage = document.getElementById('pbsgTutorialStage');
 
   if (!tutorialStage) return;
 
-  // Reset stage to iframe by default
+  const force = !!options.force;
+  const nextSignature = getTutorialSignature(step);
+
+  if (!force && currentTutorialSignature === nextSignature) {
+    return;
+  }
+
+  currentTutorialSignature = nextSignature;
+
+  closeTutorialPopup();
+
   tutorialStage.innerHTML = `
     <iframe aria-label="Tutorial Frame" id="pbsgTutorialFrame" class="pbsg-iframe"
       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -802,6 +1494,22 @@ function renderTutorial(step){
       return;
     }
 
+    // Image inline
+    if (mime.startsWith('image/') && !mime.includes('svg')) {
+      tutorialStage.innerHTML = `<img src="${t.file_url}" class="pbsg-inline-image" alt="">`;
+      fallback.style.display = 'none';
+      openLink.href = t.file_url;
+      return;
+    }
+
+    // Office documents via Google Docs Viewer
+    if (t.viewer_url) {
+      freshFrame.src = t.viewer_url;
+      fallback.style.display = 'none';
+      openLink.href = t.file_url;
+      return;
+    }
+
     // Other files fallback
     fallback.style.display = 'block';
     fallbackLink.href = t.file_url;
@@ -811,9 +1519,21 @@ function renderTutorial(step){
   }
 
   if (t.url) {
-    freshFrame.src = toEmbeddableUrl(t.url);
     openLink.href = t.url;
-    fallback.style.display = 'none';
+
+    if (t.embeddable !== false) {
+      // Tier 1: iframe (embeddable or unknown)
+      freshFrame.src = toEmbeddableUrl(t.url);
+      fallback.style.display = 'none';
+    } else if (t.viewer_url) {
+      // Tier 2: Google Docs Viewer (non-embeddable document URL)
+      freshFrame.src = t.viewer_url;
+      fallback.style.display = 'none';
+    } else {
+      // Tier 3: popup fallback (non-embeddable, non-document URL)
+      closeTutorialPopup();
+      renderPopupFallbackCard(tutorialStage, t.url);
+    }
   } else {
     freshFrame.src = '';
     fallback.style.display = 'none';
@@ -823,20 +1543,42 @@ function renderTutorial(step){
 
 function render(){
 
-  resetBranchUI();
+  cleanupH5PWatcher();
+
+  if (inBranch) {
+    renderBranchStep();
+    return;
+  }
+
+  showH5PFrame();
+  hideLearnMoreButton();
 
   const step = steps[i];
   if (!step) return;
 
-  if (step.h5p_id) h5pFrame.src = h5pUrl(step.h5p_id);
-  else h5pFrame.src='';
+  if (
+    step.h5p_id &&
+    !passedSteps.has(i) &&
+    hasBranch(step) &&
+    triggeredBranchSteps.has(i) &&
+    !completedBranchSteps.has(i)
+  ) {
+    showLearnMoreButton();
+
+    if (isMandatoryBranch(step)) {
+      lockNext(true);
+    }
+  }
+
+  showStepH5PFrame(i, step.h5p_id);
 
   renderTutorial(step);
 
   //titleEl.textContent = step.title || `Step ${i+1}`;
+  
   if (titleEl) titleEl.textContent = '';
-  // Inline (left pane) progress
-  progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
+  if (progressEl) progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
+  updateRunningScore();
 
   
 
@@ -848,10 +1590,14 @@ function render(){
   prevBtn.disabled = i === 0;
 
   if (step.h5p_id) {
-    if (isCurrentStepBlockedByMandatoryBranch()) {
+    const hasChecked = (attemptCounts[i] || 0) > 0;
+
+    if (!hasChecked) {
+      lockNext(true);
+    } else if (isCurrentStepBlockedByMandatoryBranch()) {
       lockNext(true);
     } else {
-      lockNext(!passedSteps.has(i));
+      lockNext(false);
     }
   } else {
     lockNext(false);
@@ -875,73 +1621,76 @@ function render(){
   updateMenuState();
 }
 
-prevBtn.onclick = ()=>{ if(i>0){i--;render();} };
+prevBtn.onclick = () => {
+  if (inBranch) {
+    if (branchStepIndex > 0) {
+      branchStepIndex--;
+      renderBranchStep();
+    }
+    return;
+  }
+
+  if (i > 0) {
+    saveH5PAnswerState(i);
+    i--;
+    render();
+  }
+};
 
 nextBtn.onclick = async () => {
-  if (i < steps.length - 1) {
+  cleanupH5PWatcher();
+
+  if (inBranch) {
+    const branch = getCurrentBranch();
+    if (!branch) return;
+
+    if (branchStepIndex < branch.questions.length - 1) {
+      branchStepIndex++;
+      renderBranchStep();
+      return;
+    }
+
+    inBranch = false;
+    completedBranchSteps.add(branchParentIndex);
+
+    const nextMainIndex = branchParentIndex + 1;
+
+    if (nextMainIndex < steps.length) {
+      i = nextMainIndex;
+      branchParentIndex = null;
+      branchStepIndex = 0;
+      render();
+    } else {
+      branchParentIndex = null;
+      branchStepIndex = 0;
+      await finalizeCompletionIfReady();
+      showSummaryScreen();
+    }
+
+    return;
+  }
+
+   if (i < steps.length - 1) {
+    saveH5PAnswerState(i);
     i++;
     render();
   } else {
+    saveH5PAnswerState(i);
     await finalizeCompletionIfReady();
     showSummaryScreen();
   }
 };
 
-if (branchOpenBtn) {
-  branchOpenBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-    renderBranchTutorial(activeBranchStep);
-  };
-}
+if (learnMoreBtn) {
+  learnMoreBtn.onclick = () => {
+    const step = steps[i];
+    if (!step || !hasBranch(step)) return;
 
-if (branchReturnBtn) {
-  branchReturnBtn.onclick = () => {
-    returnToMainTutorial();
-  };
-}
+    inBranch = true;
+    branchParentIndex = i;
+    branchStepIndex = 0;
 
-if (branchSkipBtn) {
-  branchSkipBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-
-    const step = steps[activeBranchStep];
-    if (step.branch.mode === 'mandatory') return;
-
-    resetBranchUI();
-
-    if (step.h5p_id) {
-      lockNext(true);
-    } else {
-      lockNext(false);
-    }
-  };
-}
-
-if (branchCompleteBtn) {
-  branchCompleteBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-
-    completedBranchSteps.add(activeBranchStep);
-    const completedStep = activeBranchStep;
-    const step = steps[completedStep];
-
-    resetBranchUI();
-
-    if (completedStep === i) {
-      if (step.branch.mode === 'mandatory') {
-        if (passedSteps.has(i)) {
-          lockNext(false);
-        } else {
-          lockNext(true);
-        }
-      } else {
-        if (passedSteps.has(i)) {
-          lockNext(false);
-        } else {
-          lockNext(true);
-        }
-      }
-    }
+    renderBranchStep();
   };
 }
 
@@ -964,51 +1713,396 @@ if (certBtn) {
   };
 }
 
-if (summaryCertBtn) {
-  summaryCertBtn.onclick = async () => {
-    const ok = await finalizeCompletionIfReady();
+function showLearnMoreButton() {
+  if (learnMoreWrap) learnMoreWrap.style.display = '';
+}
 
-    if (!ok) {
-      alert('Tutorial completion has not been recorded yet. Please make sure all quiz steps are passed.');
+function hideLearnMoreButton() {
+  if (learnMoreWrap) learnMoreWrap.style.display = 'none';
+}
+
+function showH5PFrame() {
+  if (branchQuizHost) {
+    branchQuizHost.style.display = 'none';
+    branchQuizHost.innerHTML = '';
+  }
+
+  const frame = getActiveH5PFrame();
+  if (frame) {
+    frame.style.display = '';
+  }
+}
+
+function resetLeftQuizScroll() {
+  const quizWrap = document.querySelector('.pbsg-left .pbsg-iframe-wrap');
+
+  if (quizWrap) {
+    quizWrap.scrollTop = 0;
+    quizWrap.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }
+
+  if (branchQuizHost) {
+    branchQuizHost.scrollTop = 0;
+  }
+}
+
+function showBranchQuizHost() {
+  hideAllH5PFrames();
+  activeH5PFrame = null;
+
+  if (branchQuizHost) {
+    branchQuizHost.style.display = '';
+    branchQuizHost.scrollTop = 0;
+  }
+
+  resetLeftQuizScroll();
+
+  requestAnimationFrame(() => {
+    resetLeftQuizScroll();
+  });
+
+  setTimeout(() => {
+    resetLeftQuizScroll();
+  }, 0);
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/[&<>"']/g, function (m) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[m];
+  });
+}
+
+function renderInlineBranchQuestion(q) {
+  if (!branchQuizHost) return;
+
+  showBranchQuizHost();
+
+  if (!q.h5p_id || q.h5p_id <= 0) {
+    // Defensive — should never happen post-deployment because save_meta always creates h5p_id
+    branchQuizHost.innerHTML = '<div class="pbsg-branch-error">This branch question is not configured. Please re-save the tutorial.</div>';
+    lockNext(false);
+    return;
+  }
+
+  const iframeSrc = h5pUrl(q.h5p_id);
+
+  branchQuizHost.innerHTML = `
+    <iframe
+      id="pbsgBranchH5PFrame"
+      src="${iframeSrc}"
+      class="pbsg-branch-h5p-iframe"
+      allowfullscreen
+      frameborder="0">
+    </iframe>
+  `;
+
+  // Lock Next until the student passes the H5P question
+  lockNext(true);
+
+  const iframe = document.getElementById('pbsgBranchH5PFrame');
+  if (iframe) {
+    iframe.addEventListener('load', () => {
+      injectH5PStyle(iframe);
+      attachBranchH5PxAPI(iframe);
+    });
+  }
+}
+
+/**
+ * Inject the shared quiz typography/hierarchy CSS into any H5P iframe.
+ * Used by both the main quiz path and branch sub-quiz path so both
+ * render with the same visual refresh.
+ */
+function injectH5PStyle(frame) {
+  try {
+    const doc = frame.contentDocument || frame.contentWindow.document;
+    if (!doc || !doc.head) return;
+    if (doc.getElementById('pbsg-h5p-style')) return; // already injected
+
+    const style = doc.createElement('style');
+    style.id = 'pbsg-h5p-style';
+    style.textContent = getH5PStyleCSS();
+    doc.head.appendChild(style);
+  } catch (e) {
+    console.warn('Branch H5P style injection failed:', e);
+  }
+}
+
+function attachBranchH5PxAPI(iframe) {
+  try {
+    const win = iframe.contentWindow;
+    if (!win || !win.H5P || !win.H5P.externalDispatcher) {
+      // H5P not yet ready — retry once after a short delay
+      setTimeout(() => attachBranchH5PxAPI(iframe), 200);
       return;
     }
 
-    const name = (summaryCertName?.value || '').trim();
+    win.H5P.externalDispatcher.on('xAPI', (event) => {
+      const verb = (event && event.data && event.data.statement && event.data.statement.verb && event.data.statement.verb.id) || '';
+      const result = event && event.data && event.data.statement && event.data.statement.result;
 
-    const u = new URL(window.PBSG_CERT.ajaxUrl, location.origin);
-    u.searchParams.set('action', 'pbsg_download_certificate');
-    u.searchParams.set('tutorial_id', String(window.PBSG_CERT.tutorialId));
-    u.searchParams.set('nonce', window.PBSG_CERT.nonce);
-
-    if (name) u.searchParams.set('name', name);
-
-    window.location.href = u.toString();
-  };
+      // 'answered' verb fires when student clicks Check
+      if (verb.endsWith('/answered') && result && result.score) {
+        const passed = result.score.scaled >= 1.0;
+        if (passed) {
+          lockNext(false);
+        } else {
+          lockNext(true);
+        }
+      }
+    });
+  } catch (e) {
+    // Cross-origin or H5P-not-ready — fall back to allowing Next so the student isn't stuck
+    console.warn('Branch H5P xAPI listener failed:', e);
+    lockNext(false);
+  }
 }
 
-
-if (branchCloseBtn) {
-  branchCloseBtn.onclick = () => {
-    if (activeBranchStep === null) return;
-
-    const step = steps[activeBranchStep];
-    if (step.branch.mode === 'mandatory') return;
-
-    resetBranchUI();
-
-    if (step.h5p_id) {
-      lockNext(true);
-    } else {
-      lockNext(false);
+function buildBranchTutorialStep(branch) {
+  return {
+    tutorial: {
+      type: branch.tutorial_type || '',
+      url: branch.tutorial_url || '',
+      file_url: branch.tutorial_file_url || '',
+      mime: branch.tutorial_mime || ''
     }
   };
 }
 
-if (retakeBtn) {
-  retakeBtn.onclick = () => {
-    resetTutorialToStart();
+function getTutorialSignature(step) {
+  const t = step?.tutorial || {};
+  return JSON.stringify({
+    type: t.type || '',
+    url: t.url || '',
+    file_url: t.file_url || '',
+    mime: t.mime || ''
+  });
+}
+
+function buildMainTutorialStepForBranch(parentStep) {
+  return {
+    tutorial: {
+      type: parentStep?.tutorial?.type || '',
+      url: parentStep?.tutorial?.url || '',
+      file_url: parentStep?.tutorial?.file_url || '',
+      mime: parentStep?.tutorial?.mime || ''
+    }
   };
 }
+
+function buildBranchQuestionTutorialStep(q) {
+  return {
+    tutorial: {
+      type: q?.tutorial_type || '',
+      url: q?.tutorial_url || '',
+      file_url: q?.tutorial_file_url || '',
+      mime: q?.tutorial_mime || ''
+    }
+  };
+}
+
+function getEffectiveBranchTutorialStep(parentStep, branch, q) {
+  const mode = branch?.resource_mode || 'main';
+
+  if (mode === 'main') {
+    return buildMainTutorialStepForBranch(parentStep);
+  }
+
+  if (mode === 'per_question') {
+    return buildBranchQuestionTutorialStep(q);
+  }
+
+  return buildBranchTutorialStep(branch);
+}
+
+function renderBranchStep() {
+  cleanupH5PWatcher();
+  hideLearnMoreButton();
+
+  const parentStep = steps[branchParentIndex];
+  const branch = getCurrentBranch();
+  const q = getCurrentBranchQuestion();
+
+  if (!branch || !q || !parentStep) return;
+
+  renderInlineBranchQuestion(q);
+
+  resetLeftQuizScroll();
+
+  requestAnimationFrame(() => {
+    resetLeftQuizScroll();
+  });
+
+  setTimeout(() => {
+    resetLeftQuizScroll();
+  }, 0);
+
+  const effectiveTutorialStep = getEffectiveBranchTutorialStep(parentStep, branch, q);
+  renderTutorial(effectiveTutorialStep);
+
+  
+  const branchTotal = Array.isArray(branch.questions) ? branch.questions.length : 0;
+  const letter = String.fromCharCode(65 + branchStepIndex); // A, B, C...
+  const mainNumber = branchParentIndex + 1;
+  const branchCurrent = branchStepIndex + 1;
+
+  // Total tutorial pages — used as the denominator so the student sees their
+  // overall position in the tutorial (e.g. "Page: 2A of 10") rather than just
+  // their position within the branch detour.
+  const totalPages = Array.isArray(steps) ? steps.length : 0;
+  const pageText = `Page: ${mainNumber}${letter} of ${totalPages}`;
+
+  if (progressEl) progressEl.textContent = pageText;
+  updateRunningScore();
+  if (progressLabelEl) progressLabelEl.textContent = pageText;
+
+  // Progress bar fill based on parent step position in the overall tutorial,
+  // not the local branch position. The bar stays at the parent step's position
+  // throughout the branch detour so the student sees they haven't lost ground.
+  const pct = totalPages ? ((branchParentIndex + 1) / totalPages) * 100 : 0;
+  if (progressFillEl) progressFillEl.style.width = pct.toFixed(2) + '%';
+
+
+  prevBtn.disabled = branchStepIndex === 0;
+  lockNext(true);
+
+  updateMenuStateForBranch();
+}
+
+function updateMenuStateForBranch() {
+  if (!menuDd) return;
+
+  const items = menuDd.querySelectorAll('.pbsg-menu-item');
+  items.forEach(el => {
+    el.classList.remove('is-current');
+    el.classList.add('is-disabled');
+  });
+}
+
+
+function openCertModal() {
+  if (!certModal) return;
+  certModal.style.display = '';
+  certModal.setAttribute('aria-hidden', 'false');
+
+  if (certModalError) {
+    certModalError.style.display = 'none';
+    certModalError.textContent = '';
+  }
+
+  if (certModalName) {
+    certModalName.value = '';
+    setTimeout(() => certModalName.focus(), 50);
+  }
+}
+
+function closeCertModal() {
+  if (!certModal) return;
+  certModal.style.display = 'none';
+  certModal.setAttribute('aria-hidden', 'true');
+
+  if (certModalError) {
+    certModalError.style.display = 'none';
+    certModalError.textContent = '';
+  }
+}
+
+function buildCertificateUrl(studentName) {
+  const u = new URL(window.PBSG_CERT.ajaxUrl, location.origin);
+  u.searchParams.set('action', 'pbsg_download_certificate');
+  u.searchParams.set('tutorial_id', String(window.PBSG_CERT.tutorialId));
+  u.searchParams.set('nonce', window.PBSG_CERT.nonce);
+  u.searchParams.set('name', studentName);
+  u.searchParams.set('final_score', String(getFinalGradePercent()));
+  return u.toString();
+}
+
+if (summaryCertBtn) {
+  summaryCertBtn.onclick = async () => {
+    await finalizeCompletionIfReady();
+    openCertModal();
+  };
+}
+
+if (certModalGenerate) {
+  certModalGenerate.onclick = async () => {
+    const name = (certModalName?.value || '').trim();
+
+    if (!name) {
+      if (certModalError) {
+        certModalError.textContent = 'Student name is required.';
+        certModalError.style.display = 'block';
+      }
+      if (certModalName) certModalName.focus();
+      return;
+    }
+
+    await finalizeCompletionIfReady();
+
+    const previewUrl = buildCertificateUrl(name);
+
+    // Disable both buttons so certificate cannot be generated again
+    certModalGenerate.disabled = true;
+    if (summaryCertBtn) {
+      summaryCertBtn.disabled = true;
+      summaryCertBtn.classList.add('pbsg-locked');
+    }
+
+    window.open(previewUrl, '_blank');
+
+    closeCertModal();
+  };
+}
+
+if (certModalCancel) {
+  certModalCancel.onclick = () => {
+    closeCertModal();
+  };
+}
+
+if (certModalClose) {
+  certModalClose.onclick = () => {
+    closeCertModal();
+  };
+}
+
+if (certModal) {
+  certModal.addEventListener('click', (e) => {
+    if (e.target.classList.contains('pbsg-cert-modal-backdrop')) {
+      closeCertModal();
+    }
+  });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && certModal && certModal.style.display !== 'none') {
+    closeCertModal();
+  }
+});
+
+
+function handleCloseTutorialAction() {
+  const closeUrl = (window.PBSG_CERT?.closeTutorialUrl || '').trim();
+
+  if (closeUrl) {
+    window.location.href = closeUrl;
+    return;
+  }
+
+  // Try to close the current tab
+  window.close();
+}
+
+retakeBtn.onclick = () => {
+  closeTutorialPopup();
+  handleCloseTutorialAction();
+};
 
 // ===== Focus System =====
 const focusTutBtn = document.getElementById('pbsgFocusTutorial');
@@ -1018,16 +2112,34 @@ function clearFocus(){
   document.body.classList.remove('pbsg-focus-tutorial','pbsg-focus-quiz');
   focusTutBtn.textContent='Focus Tutorial';
   focusQuizBtn.textContent='Focus Quiz';
+  
+  // Remove the inert attribute from both panes when exiting focus mode
+  const leftPane = document.querySelector('.pbsg-left');
+  const rightPane = document.querySelector('.pbsg-right');
+  if (leftPane) leftPane.removeAttribute('inert');
+  if (rightPane) rightPane.removeAttribute('inert');
 }
 
 function toggleFocus(mode){
   const cls = mode==='tutorial'?'pbsg-focus-tutorial':'pbsg-focus-quiz';
-  if(document.body.classList.contains(cls)){ clearFocus(); }
-  else{
+  if(document.body.classList.contains(cls)){ 
+    clearFocus(); 
+  } else {
     clearFocus();
     document.body.classList.add(cls);
-    if(mode==='tutorial') focusTutBtn.textContent='Exit Focus';
-    else focusQuizBtn.textContent='Exit Focus';
+    
+    const leftPane = document.querySelector('.pbsg-left');
+    const rightPane = document.querySelector('.pbsg-right');
+    
+    if(mode==='tutorial') {
+      focusTutBtn.textContent='Exit Focus';
+      // Tutorial is active (right pane), make quiz pane (left pane) inert
+      if (leftPane) leftPane.setAttribute('inert', '');
+    } else {
+      focusQuizBtn.textContent='Exit Focus';
+      // Quiz is active (left pane), make tutorial pane (right pane) inert
+      if (rightPane) rightPane.setAttribute('inert', '');
+    }
   }
 }
 
@@ -1078,6 +2190,24 @@ if (startTutorialBtn && introScreen && mainContent) {
   };
 }
 
+
+function notifyParentBranchCompleted() {
+  const params = new URLSearchParams(window.location.search);
+  const parentStep = params.get('pbsg_branch_parent_step');
+
+  if (!parentStep) return;
+
+  if (window.opener && !window.opener.closed) {
+    window.opener.postMessage(
+      {
+        type: 'pbsg_branch_completed',
+        stepIndex: parentStep
+      },
+      window.location.origin
+    );
+  }
+}
+
 function showSummaryScreen(){
 
   const mainContent = document.getElementById('pbsgMainContent');
@@ -1102,7 +2232,7 @@ function showSummaryScreen(){
 
   if (finalGradeEl) {
     const grade = getFinalGradePercent();
-    finalGradeEl.innerHTML = `<p><strong>Final Grade:</strong> ${grade}%</p>`;
+    finalGradeEl.innerHTML = `<p><strong>Final Score:</strong> ${grade}%</p>`;
   }
 }
 

@@ -212,8 +212,14 @@ class PBSG_Analytics {
             wp_send_json_error( 'Invalid tutorial', 400 );
         }
 
-        // Parse device type from user-agent (no fingerprinting)
-        $device = self::detect_device();
+        // Reject events for non-published tutorials (prevents draft/preview pollution)
+        if ( get_post_status( $tutorial_id ) !== 'publish' ) {
+            wp_send_json_error( 'tutorial_unavailable', 410 );
+        }
+
+        // Parse device type from user-agent + client touch hint (no fingerprinting)
+        $touch  = isset( $data['touch_points'] ) ? absint( $data['touch_points'] ) : 0;
+        $device = self::detect_device( $touch );
 
         // Route to handler
         switch ( $event_type ) {
@@ -813,7 +819,7 @@ class PBSG_Analytics {
             $filename = 'tutorial-analytics-overview-' . $date_from . '-to-' . $date_to . '.csv';
             self::send_csv_headers( $filename );
 
-            fputcsv( $output, array( 'Tutorial', 'Views', 'Completions', 'Completion Rate (%)', 'Avg Tutorial Score (%)', 'Avg Time (s)' ) );
+            fputcsv( $output, array( 'Tutorial', 'Views', 'Completions', 'Completion Rate (%)', 'Avg Score (%)', 'Avg Time (s)' ) );
             $data = self::get_overview_data();
             foreach ( $data['tutorials'] as $t ) {
                 fputcsv( $output, array(
@@ -836,30 +842,30 @@ class PBSG_Analytics {
             $filename = 'comparison-' . implode( '-', $tut_names ) . '-' . $date_from . '-to-' . $date_to . '.csv';
             self::send_csv_headers( $filename );
 
-            fputcsv( $output, array( 'Metric', 'Tutorial 1', 'Tutorial 2', 'Tutorial 3' ) );
+            $col_count = count( $tuts );
+
+            // Build header with actual tutorial names
+            $header = array( 'Metric' );
+            foreach ( $tuts as $t ) {
+                $header[] = $t['name'];
+            }
+            fputcsv( $output, $header );
 
             $metrics = array(
                 array( 'Views', 'views' ),
                 array( 'Completions', 'completions' ),
                 array( 'Completion Rate (%)', 'completion_rate' ),
                 array( 'Avg Time (s)', 'avg_time_seconds' ),
-                array( 'Avg Tutorial Score (%)', 'avg_score' ),
+                array( 'Avg Score (%)', 'avg_score' ),
                 array( 'First Attempt Rate (%)', 'first_attempt_rate' ),
                 array( 'Avg Attempts', 'avg_attempts' ),
                 array( 'Give-up Rate (%)', 'giveup_rate' ),
             );
 
-            // Tutorial names header
-            $name_row = array( 'Tutorial' );
-            for ( $i = 0; $i < 3; $i++ ) {
-                $name_row[] = isset( $tuts[ $i ] ) ? $tuts[ $i ]['name'] : '';
-            }
-            fputcsv( $output, $name_row );
-
             foreach ( $metrics as $m ) {
                 $row = array( $m[0] );
-                for ( $i = 0; $i < 3; $i++ ) {
-                    $row[] = isset( $tuts[ $i ] ) ? $tuts[ $i ][ $m[1] ] : '';
+                for ( $i = 0; $i < $col_count; $i++ ) {
+                    $row[] = $tuts[ $i ][ $m[1] ];
                 }
                 fputcsv( $output, $row );
             }
@@ -1166,17 +1172,42 @@ class PBSG_Analytics {
     }
 
     /**
-     * Simple device detection from user-agent (no fingerprinting).
+     * Enhanced device detection from user-agent + client touch hint.
+     * No fingerprinting — only UA pattern matching + navigator.maxTouchPoints.
+     *
+     * @param int $touch_points Client-reported navigator.maxTouchPoints (0 if unavailable)
      */
-    private static function detect_device() {
+    private static function detect_device( $touch_points = 0 ) {
         $ua = isset( $_SERVER['HTTP_USER_AGENT'] ) ? strtolower( $_SERVER['HTTP_USER_AGENT'] ) : '';
 
-        if ( preg_match( '/tablet|ipad|playbook|silk/i', $ua ) ) {
+        // 1. Explicit tablet markers (legacy iPads, Kindle, PlayBook)
+        if ( preg_match( '/ipad|playbook|silk/i', $ua ) ) {
             return self::DEVICE_TABLET;
         }
-        if ( preg_match( '/mobile|android|iphone|ipod|blackberry|opera mini|iemobile/i', $ua ) ) {
+
+        // 2. Explicit phone markers
+        if ( preg_match( '/iphone|ipod/i', $ua ) ) {
             return self::DEVICE_MOBILE;
         }
+
+        // 3. Android: "android" + "mobile" = phone; "android" without "mobile" = tablet
+        if ( strpos( $ua, 'android' ) !== false ) {
+            if ( strpos( $ua, 'mobile' ) !== false ) {
+                return self::DEVICE_MOBILE;
+            }
+            return self::DEVICE_TABLET;
+        }
+
+        // 4. Non-Android "mobile" marker (Opera Mini, BlackBerry, IEMobile, etc.)
+        if ( preg_match( '/mobile|blackberry|opera mini|iemobile/i', $ua ) ) {
+            return self::DEVICE_MOBILE;
+        }
+
+        // 5. iPadOS detection: macOS-like UA but high touch points (>= 3)
+        if ( $touch_points >= 3 && strpos( $ua, 'macintosh' ) !== false ) {
+            return self::DEVICE_TABLET;
+        }
+
         return self::DEVICE_DESKTOP;
     }
 

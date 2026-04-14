@@ -68,6 +68,45 @@ if (!defined('OBJECT')) {
     define('OBJECT', 'OBJECT');
 }
 
+if (!defined('UPLOAD_ERR_OK')) {
+    define('UPLOAD_ERR_OK', 0);
+}
+if (!defined('UPLOAD_ERR_NO_FILE')) {
+    define('UPLOAD_ERR_NO_FILE', 4);
+}
+
+/**
+ * Minimal WP_Error stand-in for unit tests (WordPress not loaded).
+ */
+if (!class_exists('WP_Error', false)) {
+    class WP_Error
+    {
+        public function __construct(
+            public string $code = '',
+            public string $message = '',
+            public mixed $data = null
+        ) {
+        }
+
+        public function get_error_message(): string
+        {
+            return $this->message;
+        }
+
+        public function get_error_code(): string
+        {
+            return $this->code;
+        }
+    }
+}
+
+if (!function_exists('is_wp_error')) {
+    function is_wp_error(mixed $thing): bool
+    {
+        return $thing instanceof WP_Error;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  WordPress hook system stubs                                       */
 /* ------------------------------------------------------------------ */
@@ -276,6 +315,13 @@ if (!function_exists('current_user_can')) {
     }
 }
 
+if (!function_exists('is_super_admin')) {
+    function is_super_admin($user_id = false): bool
+    {
+        return (bool) WPStubs::returnFor('is_super_admin', false);
+    }
+}
+
 if (!function_exists('check_ajax_referer')) {
     function check_ajax_referer(string $action = '', $query_arg = false, bool $die = true)
     {
@@ -377,6 +423,48 @@ if (!function_exists('wp_send_json_error')) {
  * Test code should catch this exception to verify handler responses.
  */
 class WPDieException extends \RuntimeException {}
+
+/* ------------------------------------------------------------------ */
+/*  WP_Error stub                                                     */
+/* ------------------------------------------------------------------ */
+
+if (!class_exists('WP_Error')) {
+    class WP_Error
+    {
+        protected string $code;
+        protected string $message;
+        protected mixed $data;
+
+        public function __construct(string $code = '', string $message = '', mixed $data = '')
+        {
+            $this->code    = $code;
+            $this->message = $message;
+            $this->data    = $data;
+        }
+
+        public function get_error_code(): string
+        {
+            return $this->code;
+        }
+
+        public function get_error_message(): string
+        {
+            return $this->message;
+        }
+
+        public function get_error_data(): mixed
+        {
+            return $this->data;
+        }
+    }
+}
+
+if (!function_exists('is_wp_error')) {
+    function is_wp_error($thing): bool
+    {
+        return $thing instanceof WP_Error;
+    }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Enqueue stubs                                                     */
@@ -488,11 +576,18 @@ if (!function_exists('get_post_mime_type')) {
 /* ------------------------------------------------------------------ */
 
 if (!function_exists('get_header')) {
-    function get_header(string $name = null, array $args = []): void {}
+    function get_header(?string $name = null, array $args = []): void {}
 }
 
 if (!function_exists('get_footer')) {
-    function get_footer(string $name = null, array $args = []): void {}
+    function get_footer(?string $name = null, array $args = []): void {}
+}
+
+if (!function_exists('status_header')) {
+    function status_header(int $code, string $description = ''): void
+    {
+        WPStubs::record('status_header', [$code, $description]);
+    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -516,6 +611,14 @@ if (!function_exists('set_transient')) {
     }
 }
 
+if (!function_exists('delete_transient')) {
+    function delete_transient(string $transient): bool
+    {
+        WPStubs::record('delete_transient', [$transient]);
+        return true;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Page template stub (used by analytics tutorial validation)         */
 /* ------------------------------------------------------------------ */
@@ -527,6 +630,16 @@ if (!function_exists('get_page_template_slug')) {
         $map = WPStubs::returnFor('page_template_slugs', []);
         $post_id = is_object($post) ? $post->ID : (int) $post;
         return $map[$post_id] ?? '';
+    }
+}
+
+if (!function_exists('get_post_status')) {
+    function get_post_status($post = null): string|false
+    {
+        WPStubs::record('get_post_status', [$post]);
+        $map = WPStubs::returnFor('post_statuses', []);
+        $post_id = is_object($post) ? $post->ID : (int) $post;
+        return $map[$post_id] ?? WPStubs::returnFor('get_post_status', 'publish');
     }
 }
 
@@ -663,6 +776,39 @@ if (!function_exists('size_format')) {
     }
 }
 
+if (!function_exists('wp_remote_head')) {
+    function wp_remote_head(string $url, array $args = [])
+    {
+        WPStubs::record('wp_remote_head', [$url, $args]);
+        $override = WPStubs::returnFor('wp_remote_head', null);
+        if ($override !== null) {
+            return $override;
+        }
+        return new WP_Error('http_request_failed', 'Stubbed — no real HTTP in tests');
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_headers')) {
+    function wp_remote_retrieve_headers($response): array
+    {
+        if (is_wp_error($response)) {
+            return [];
+        }
+        return (array) ($response['headers'] ?? []);
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_header')) {
+    function wp_remote_retrieve_header($response, string $header): string
+    {
+        if (is_wp_error($response)) {
+            return '';
+        }
+        $headers = $response['headers'] ?? [];
+        return (string) ($headers[strtolower($header)] ?? '');
+    }
+}
+
 if (!function_exists('add_shortcode')) {
     function add_shortcode(string $tag, callable $callback): void
     {
@@ -677,3 +823,126 @@ if (!function_exists('add_menu_page')) {
         return $menu_slug;
     }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Sanitization stubs (additional)                                   */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('sanitize_textarea_field')) {
+    function sanitize_textarea_field(string $str): string
+    {
+        WPStubs::record('sanitize_textarea_field', [$str]);
+        return trim($str);
+    }
+}
+
+if (!function_exists('sanitize_file_name')) {
+    function sanitize_file_name(string $filename): string
+    {
+        return preg_replace('/[^A-Za-z0-9._-]/', '-', $filename) ?? $filename;
+    }
+}
+
+if (!function_exists('wp_kses_post')) {
+    function wp_kses_post(string $data): string
+    {
+        WPStubs::record('wp_kses_post', [$data]);
+        return $data; // pass-through for tests
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Post creation / file stubs                                        */
+/* ------------------------------------------------------------------ */
+
+if (!function_exists('wp_insert_post')) {
+    /**
+     * @param array<string, mixed> $postarr
+     * @return int|WP_Error
+     */
+    function wp_insert_post($postarr, bool $wp_error = false, bool $fire_after_hooks = true)
+    {
+        WPStubs::record('wp_insert_post', [$postarr, $wp_error, $fire_after_hooks]);
+        if ($wp_error) {
+            $err = WPStubs::returnFor('wp_insert_post_wp_error', null);
+            if ($err instanceof WP_Error) {
+                return $err;
+            }
+        }
+        $ret = WPStubs::returnFor('wp_insert_post', 1001);
+        if (is_wp_error($ret)) {
+            return $wp_error ? $ret : 0;
+        }
+        return (int) $ret;
+    }
+}
+
+if (!function_exists('get_edit_post_link')) {
+    function get_edit_post_link($post = 0, string $context = 'display'): ?string
+    {
+        $id = is_object($post) ? (int) $post->ID : (int) $post;
+        WPStubs::record('get_edit_post_link', [$post, $context]);
+        $override = WPStubs::returnFor('get_edit_post_link', null);
+        if ($override !== null) {
+            return $override;
+        }
+        return 'https://example.test/wp-admin/post.php?post=' . $id . '&action=edit';
+    }
+}
+
+if (!function_exists('media_handle_upload')) {
+    function media_handle_upload(string $file_id, int $post_id = 0, ?array $post_data = null, ?array $overrides = null)
+    {
+        WPStubs::record('media_handle_upload', [$file_id, $post_id, $post_data, $overrides]);
+        return WPStubs::returnFor('media_handle_upload', 55);
+    }
+}
+
+if (!function_exists('get_attached_file')) {
+    function get_attached_file(int $attachment_id, bool $unfiltered = false): string|false
+    {
+        WPStubs::record('get_attached_file', [$attachment_id, $unfiltered]);
+        return WPStubs::returnFor('get_attached_file_' . $attachment_id, '/tmp/upload.bin');
+    }
+}
+
+if (!function_exists('get_posts')) {
+    /**
+     * @param array<string, mixed> $args
+     * @return list<\WP_Post|object>
+     */
+    function get_posts(array $args = [], $deprecated = null): array
+    {
+        WPStubs::record('get_posts', [$args, $deprecated]);
+        return (array) WPStubs::returnFor('get_posts', []);
+    }
+}
+
+if (!function_exists('get_permalink')) {
+    function get_permalink($post = 0, bool $leavename = false): string|false
+    {
+        WPStubs::record('get_permalink', [$post, $leavename]);
+        $id = is_object($post) ? (int) $post->ID : (int) $post;
+        $override = WPStubs::returnFor('get_permalink_' . $id, null);
+        if ($override !== null) {
+            return $override;
+        }
+        return 'https://example.test/?p=' . $id;
+    }
+}
+
+if (!function_exists('wp_get_current_user')) {
+    function wp_get_current_user(): object
+    {
+        WPStubs::record('wp_get_current_user', []);
+        $u = WPStubs::returnFor('wp_get_current_user', null);
+        if (is_object($u)) {
+            return $u;
+        }
+        $o = new stdClass();
+        $o->roles = (array) WPStubs::returnFor('current_user_roles', []);
+        $o->ID = (int) WPStubs::returnFor('get_current_user_id', 0);
+        return $o;
+    }
+}
+

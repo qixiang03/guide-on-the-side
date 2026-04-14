@@ -51,6 +51,7 @@ class PBSG_Admin_Menu_Filter {
      */
     const ALLOWED_PAGE_PARAMS = array(
         'pbsg-my-tutorials',
+        'pbsg-new-tutorial',
         'pbsg-analytics',
         'h5p',
         'h5p_new',

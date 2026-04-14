@@ -73,6 +73,7 @@
         const payload = Object.assign( {
             event_type:       eventType,
             tutorial_page_id: TUTORIAL_ID,
+            touch_points:     navigator.maxTouchPoints || 0,
         }, data || {} );
 
         try {
@@ -80,8 +81,13 @@
                 method:      'POST',
                 headers:     { 'Content-Type': 'application/json' },
                 body:        JSON.stringify( payload ),
-                keepalive:   true,   // Allow request to outlive the page
+                keepalive:   true,
                 credentials: 'same-origin',
+            } ).then( function( response ) {
+                // Tutorial unpublished mid-session — redirect student
+                if ( response.status === 410 ) {
+                    window.location.href = '/?pbsg-error=410';
+                }
             } ).catch( function() {
                 // Silently fail — analytics should never break the tutorial
             } );
@@ -98,6 +104,7 @@
         const payload = Object.assign( {
             event_type:       eventType,
             tutorial_page_id: TUTORIAL_ID,
+            touch_points:     navigator.maxTouchPoints || 0,
         }, data || {} );
 
         try {
@@ -238,6 +245,10 @@
      * Process an H5P quiz attempt xAPI statement.
      */
     function handleQuizAttempt( statement ) {
+        // Skip branch/remediation quiz attempts — they're not assessable content
+        if ( typeof window.pbsgInBranch === 'function' && window.pbsgInBranch() ) {
+            return;
+        }
         var result = statement.result || {};
         var object = statement.object || {};
 
@@ -287,6 +298,10 @@
      * Handle H5P "give up" events.
      */
     function handleQuizGiveup( statement ) {
+        // Skip branch/remediation quiz giveups — they're not assessable content
+        if ( typeof window.pbsgInBranch === 'function' && window.pbsgInBranch() ) {
+            return;
+        }
         const object   = statement.object || {};
         const objectId = object.id || '';
         const h5pMatch = objectId.match( /h5p-(\d+)/ );
