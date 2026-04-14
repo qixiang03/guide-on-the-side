@@ -127,27 +127,8 @@ foreach ($steps as $s) {
 
   if ($tutorial_type === 'file' && $tutorial_attachment_id > 0) {
     $tutorial['file_url'] = wp_get_attachment_url($tutorial_attachment_id);
-    $tutorial['mime'] = get_post_mime_type($tutorial_attachment_id);
-
-    // Generate Google Docs Viewer URL for office-type uploads
-    $office_mimes = [
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-      'text/csv',
-    ];
-    if (in_array($tutorial['mime'], $office_mimes, true) && $tutorial['file_url']) {
-      $host = parse_url($tutorial['file_url'], PHP_URL_HOST) ?: '';
-      $is_local = in_array($host, ['localhost', '127.0.0.1'], true)
-                  || str_ends_with($host, '.test')
-                  || str_ends_with($host, '.local');
-      if (!$is_local) {
-        $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['file_url']) . '&embedded=true';
-      }
-    }
+    $tutorial['mime'] = get_post_mime_type($tutorial_attachment_id) ?: '';
+    $tutorial['viewer_url'] = PBSG_Embed_Check::viewer_url($tutorial['file_url'] ?: '', $tutorial['mime']);
   }
 
   // For non-embeddable document URLs, generate Google Viewer URL
