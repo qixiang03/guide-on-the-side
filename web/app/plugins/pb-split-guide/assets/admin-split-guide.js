@@ -3059,8 +3059,6 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
         <input type="text" id="pbsg-tpl-name" style="width:100%;" placeholder="e.g. Library Catalogue Search" />
         <p style="margin:12px 0 6px;"><strong>Description</strong></p>
         <textarea id="pbsg-tpl-desc" style="width:100%; min-height:70px;" placeholder="Optional \u2014 describe when to use this template"></textarea>
-        <p style="margin:12px 0 6px;"><strong>Category</strong></p>
-        <input type="text" id="pbsg-tpl-cat" style="width:100%;" placeholder="e.g. General, Research, Databases" />
         <p id="pbsg-tpl-save-error" style="color:#d63638; margin:8px 0 0; display:none;"></p>
         <div style="margin-top:16px; display:flex; gap:8px;">
           <button type="button" class="button button-primary" id="pbsg-tpl-save-btn">Save Template</button>
@@ -3087,7 +3085,6 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
         post_id:     postId,
         name:        name,
         description: $('#pbsg-tpl-desc').val(),
-        category:    $('#pbsg-tpl-cat').val(),
         steps_json:  $('#pbsg_steps_json').val(),
         header_note: $('#pbsg_header_note').val() || '',
       })
