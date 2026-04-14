@@ -135,7 +135,72 @@ curl -sI http://192.168.0.198/wp/wp-login.php
 \\\# Should return HTTP 200
 ```
 
+## H5P Setup (After Fresh Database Import)
+
+After a fresh `lando start` and database import, H5P requires additional configuration on the `/development/` subsite (blog\_id=39). Run these commands from `/var/www/guide-on-the-side`:
+
+```bash
+# 1. Install pressbooks-book theme dependencies (required for /development/ subsite)
+lando composer install --working-dir=web/app/themes/pressbooks-book
+
+# 2. Fix H5P hub settings for the /development/ subsite
+#    --skip-themes --skip-plugins required because McLuhan theme errors without its composer deps
+lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option update h5p_hub_is_enabled 1
+lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option update h5p_send_usage_statistics 1
+lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option update h5p_has_request_user_consent 1
+
+# 3. Add site UUID (workaround for broken H5P Hub registration endpoint)
+#    hub-api.h5p.org/v1/sites returns a broken 302 redirect — upstream H5P bug.
+#    Copy site 1's UUID to site 39 as a workaround.
+lando wp --url=https://pressbooks.test/development/ --skip-themes --skip-plugins option add h5p_h5p_site_uuid 575494e6-7409-47ce-a3e9-3a2279aca75e
+
+# 4. Populate the H5P content type cache
+lando wp --url=https://pressbooks.test/wp/ eval '
+  $plugin = H5P_Plugin::get_instance();
+  $core = $plugin->get_h5p_instance("core");
+  $result = $core->updateContentTypeCache();
+  echo (bool)$result ? "SUCCESS" : "FAILED";
+'
+
+# 5. Flush object cache
+lando wp cache flush
+```
+
+### H5P Verification
+
+```bash
+lando ssh -s database -c "mysql -u pressbooks_oss_user -psecretpassword pressbooks_oss -e '
+  SELECT COUNT(*) FROM wp_h5p_libraries_hub_cache;
+  SELECT meta_key, meta_value FROM wp_sitemeta WHERE meta_key = \"h5p_content_type_cache_updated_at\";
+'"
+```
+
+Expected: 50+ rows in `wp_h5p_libraries_hub_cache`, timestamp = today (not 0 / 1970).
+
+### Why These Steps Are Needed
+
+| Issue | Symptom | Root Cause |
+| - | - | - |
+| H5P hub disabled on site 39 | "Failed to load data" on H5P admin pages | `h5p_hub_is_enabled` empty in `wp_39_options` — H5P treats empty string as false, returns 403 HUB\_DISABLED |
+| Empty content type cache | "Last update: January 1, 1970" | `wp_h5p_libraries_hub_cache` has 0 rows — cache was never populated for this environment |
+| Missing site UUID | Cache refresh fails silently after ~1 week | Site 39 has no UUID; H5P tries to register one but `hub-api.h5p.org/v1/sites` returns a broken 302 redirect (upstream bug) — workaround is reusing site 1's UUID |
+| JSON-escaped AJAX URLs go to HTTPS | `ERR_CONNECTION_REFUSED` in browser console for `admin-ajax.php` | WordPress `json_encode()` escapes slashes (`https:\/\/pressbooks.test`); old nginx `sub_filter` rules only matched literal `https://pressbooks.test` and missed the escaped variant — fixed by adding escaped `sub_filter` lines (see nginx config below) |
+
 ## Troubleshooting
+
+### H5P "Failed to load data" / "Last update: 1970"
+
+Run the full H5P setup sequence from the **H5P Setup** section above. The three most common causes are: hub disabled for site 39, empty content type cache, and missing site UUID. See that section for fix commands and root cause details.
+
+### AJAX Calls Failing with ERR\_CONNECTION\_REFUSED (HTTPS on port 443)
+
+WordPress embeds admin URLs using `json_encode()`, which escapes slashes: `https:\/\/pressbooks.test`. If the nginx `sub_filter` config only has the plain variants (`https://pressbooks.test`), it misses these escaped URLs. The fallback `pressbooks.test → 137.149.157.198` rule then strips only the hostname, leaving `https://` intact — the browser tries port 443 (blocked) and gets `ERR_CONNECTION_REFUSED`.
+
+**Fix:** Ensure the nginx config includes the JSON-escaped `sub_filter` lines (shown in nginx Configuration section below). Then reload nginx:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ### Database Healthcheck Fails (mysqld.pid error)
 
@@ -227,7 +292,9 @@ server \\\{
         proxy\\\_cookie\\\_domain pressbooks.test 137.149.157.198;    
         proxy\\\_cookie\\\_flags ~ nosecure;    
     
-        \\\# Rewrite URLs in response body    
+        \\\# Rewrite URLs in response body (plain and JSON-escaped variants)    
+        sub\\\_filter 'https:\/\/pressbooks.test' 'http:\/\/137.149.157.198';    
+        sub\\\_filter 'http:\/\/pressbooks.test' 'http:\/\/137.149.157.198';    
         sub\\\_filter 'https://pressbooks.test' 'http://137.149.157.198';    
         sub\\\_filter 'http://pressbooks.test' 'http://137.149.157.198';    
         sub\\\_filter 'pressbooks.test' '137.149.157.198';    
@@ -317,6 +384,7 @@ docker system prune -a   \\\# Clean up (careful!)
 | - | - | - |
 | 2026-02-17 | Daniel McGrath | Initial deployment staging documentation |
 | 2026-02-17 | Daniel McGrath | Added proxy\_cookie\_flags to fix login cookie issue |
+| 2026-04-14 | Daniel McGrath | Added H5P setup section and JSON-escaped sub\_filter fix (from Week 6/7 troubleshooting docs) |
 
 
 ## AI Disclosure
