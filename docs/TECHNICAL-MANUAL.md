@@ -3,7 +3,7 @@
 **Project**: Guide on the Side - Interactive Tutorial System for UPEI Library  
 **Plugin**: `pb-split-guide` (`web/app/plugins/pb-split-guide/`)  
 **Stack**: WordPress 6.9 + Pressbooks (multisite) + H5P + Lando (local) + nginx + Docker (staging)  
-**Last Updated**: April 2026 - Sprint 9
+**Last Updated**: April 2026 - Sprint 10
 
 ---
 
@@ -94,7 +94,8 @@ web/app/plugins/pb-split-guide/
 │   │   └── accessibility-dashboard-profile.js   # Profile page JS
 │   └── styles/
 │       ├── admin-colors-upei.css                # UPEI Library admin color scheme
-│       └── admin-colors-colorblind.css          # Colorblind-friendly color scheme
+│       ├── admin-colors-colorblind.css          # Colorblind-friendly color scheme
+│       └── profile.css                          # Accessibility profile page styles
 ├── assets/
 │   ├── admin-split-guide.js        # All admin-page JavaScript (steps editor, modals)
 │   ├── split-guide.js              # Frontend tutorial JS (navigation, H5P events)
@@ -105,7 +106,8 @@ web/app/plugins/pb-split-guide/
 │   ├── admin/
 │   │   ├── admin-split-guide.css   # Admin metabox + modal styles
 │   │   ├── admin-librarians.css/js # Librarian management page styles/scripts
-│   │   └── admin-cross-edit.css/js # Cross-edit toggle UI
+│   │   ├── admin-cross-edit.css/js # Cross-edit toggle UI
+│   │   └── pbsg-fonts.css          # Custom font-face declarations for admin
 │   ├── analytics-dashboard.css/js  # Analytics dashboard styles/scripts
 │   └── images/
 │       └── logo.png                # Used on generated certificates
@@ -154,14 +156,27 @@ On every request, the file:
 1. Requires all class files via `require_once`
 2. Instantiates `new PB_Split_Guide_Plugin()` (registers all hooks in `__construct`)
 3. Registers activation hooks for table creation
-4. Calls `PBSG_Analytics::init()`, `PBSG_Analytics_Dashboard::init()`, `PBSG_Certificate::init()`
+4. Calls static `init()` on all subsystem classes
 
 **Activation hooks (run once on plugin activate):**
 
 ```php
-register_activation_hook(__FILE__, ['PBSG_Analytics',        'create_tables']);
-register_activation_hook(__FILE__, ['PBSG_Template_Manager', 'create_tables']);
-register_activation_hook(__FILE__, ['PBSG_Roles',            'activate']);
+register_activation_hook(__FILE__, ['PBSG_Roles',     'activate']);
+register_activation_hook(__FILE__, ['PBSG_Analytics', 'create_tables']);
+```
+
+**Note:** `PBSG_Template_Manager` does **not** use `register_activation_hook`. Instead it hooks `maybe_create_tables()` onto `admin_init` (priority 1) so the table is created lazily on the first admin page load after activation.
+
+**Static `init()` calls (every request):**
+
+```php
+PBSG_Roles::init();
+PBSG_Analytics::init();
+PBSG_Analytics_Dashboard::init();
+PBSG_Certificate::init();
+PBSG_Admin_Menu_Filter::init();
+PBSG_Librarian_Manager::init();
+PBSG_Export_Import::init();
 ```
 
 ---
@@ -319,7 +334,7 @@ The Split Guide Settings metabox (`render_metabox()` in `pb-split-guide.php`) pr
 - Branching configuration per step
 - Inline quiz builder (creates H5P content via `PBSG_H5P_Factory`)
 - Cover image picker
-- "Save as Template" button (opens modal → `wp_ajax_pbsg_save_as_template`)
+- "Save All as Template" button (opens modal → `wp_ajax_pbsg_save_as_template`)
 
 All metabox state is serialized to a hidden `<input id="pbsg_steps_json">` field and saved via `save_meta()` on `save_post_page`.
 
@@ -502,7 +517,7 @@ Managed in `web/app/plugins/pb-split-guide/composer.json`. Run from inside the p
 
 ## 6. Local Development Setup
 
-The authoritative setup guide is **`docs/DEV-SETUP-GUIDE.md`** (note: that doc describes an older Docker Compose approach; the active setup uses Lando).
+The authoritative setup guide is **`docs/DEV-SETUP-GUIDE.md`**.
 
 ### 6.1 Active Setup (Lando)
 
@@ -561,7 +576,7 @@ lando composer test     # PHPUnit integration tests
 
 ## 7. Deployment (Staging Server)
 
-The authoritative reference is **`docs/DEPLOYMENT-STAGING.md`**.
+For staging server details (SSH access, nginx config, proxy architecture), see **`docs/DEPLOYMENT-STAGING.md`**. For general production deployment steps, see **`docs/ADMIN-GUIDE.md` Part 2**.
 
 ### 7.1 Server Info
 
