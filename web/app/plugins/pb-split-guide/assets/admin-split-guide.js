@@ -711,7 +711,9 @@ function branchSummary(s) {
               ${quizBadge}${resBadge}
             </div>
             <div class="pbsg-step-header-actions">
-              <span class="pbsg-step-chevron" data-idx="${idx}" title="Collapse">${icon('chevron-down')}</span>
+              <button type="button" class="pbsg-step-chevron pbsg-btn-ghost" data-idx="${idx}" aria-label="Toggle step visibility" title="Collapse">
+                ${icon('chevron-down')}
+              </button>
               <button type="button" class="pbsg-btn-ghost pbsg-remove-step" data-idx="${idx}" title="Remove step">&times;</button>
             </div>
           </div>
@@ -862,7 +864,7 @@ function branchSummary(s) {
       const cor = a.correct;
       const rowClass = 'pbsg-answer-row' + (cor ? ' pbsg-answer-row--correct' : ' pbsg-answer-row--incorrect');
       rows += `<div class="${rowClass}">
-        <input type="checkbox" class="pbsg-answer-check" data-idx="${idx}" data-aidx="${ai}" ${cor ? 'checked' : ''} />
+        <input type="checkbox" aria-label="Answer Option Correct Check" class="pbsg-answer-check" data-idx="${idx}" data-aidx="${ai}" ${cor ? 'checked' : ''} />
         <input type="text" class="pbsg-answer-input" data-idx="${idx}" data-aidx="${ai}" value="${esc(a.text)}" placeholder="Answer option..." />
         ${cor ? `<span class="pbsg-answer-correct-label">${icon('check', 'pbsg-icon--ok')} Correct</span>` : ''}
         <button type="button" class="pbsg-answer-remove" data-idx="${idx}" data-aidx="${ai}" title="Remove">&times;</button>
@@ -1056,7 +1058,7 @@ function branchSummary(s) {
       <div class="pbsg-resource-type-toggle" data-idx="${idx}">
         <label class="${!isFile ? 'active' : ''}">
           <input type="radio" name="pbsg_res_type_${idx}" value="url" ${!isFile ? 'checked' : ''} />
-          <span>${icon('link')} URL</span>
+          <span class="span">${icon('link')} URL</span>
         </label>
         <label class="${isFile ? 'active' : ''}">
           <input type="radio" name="pbsg_res_type_${idx}" value="file" ${isFile ? 'checked' : ''} />
@@ -2716,8 +2718,11 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   $(document).on('click', '#pbsg-layout-toggle', function () {
     var $body = $('#pbsg-layout-body');
     var $chevron = $('#pbsg-layout-chevron');
+    var isVisible = $body.is(':visible');
+    
     $body.toggle();
-    $chevron.html(icon($body.is(':visible') ? 'chevron-down' : 'chevron-right'));
+    $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
+    $(this).attr('aria-expanded', !isVisible);
   });
 
   // Slider ↔ preview ↔ hidden field
@@ -2937,8 +2942,11 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   $(document).on('click', '#pbsg-benchmark-toggle', function () {
     var $body = $('#pbsg-benchmark-body');
     var $chevron = $('#pbsg-benchmark-chevron');
+    var isVisible = $body.is(':visible');
+    
     $body.toggle();
-    $chevron.html(icon($body.is(':visible') ? 'chevron-down' : 'chevron-right'));
+    $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
+    $(this).attr('aria-expanded', !isVisible);
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -2949,8 +2957,11 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   $(document).on('click', '#pbsg-close-url-toggle', function () {
     var $body = $('#pbsg-close-url-body');
     var $chevron = $('#pbsg-close-url-chevron');
+    var isVisible = $body.is(':visible');
+    
     $body.toggle();
-    $chevron.html(icon($body.is(':visible') ? 'chevron-down' : 'chevron-right'));
+    $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
+    $(this).attr('aria-expanded', !isVisible);
   });
 
   // Use-site-defaults checkbox toggles controls
