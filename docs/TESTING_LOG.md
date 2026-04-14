@@ -15,15 +15,15 @@ This document maintains a history of development, peer reviews, and functional t
 | 007   | Certificate, H5P AJAX, Dashboard & JS Tests, Black-Box TC-11–TC-13 | 2026-03-10 |Xiaohan | Yang|
 | 008   | Template Picker & Export/Import Test Coverage | 2026-03-23 | Xiaohan | Daniel |
 | 009   | Merge main→develop: Test Fixes for RBAC + Template Picker + Upload Stubs | 2026-03-24 | Enzo | Xiaohan|
-| 010   | Accessibility Dashboard, Custom Themes, Keyboard Shortcuts & ARIA Labels | 2026-03-29 | Enzo  | |
-| 011   | Branch Sub-Tutorial Frontend Restoration (Cindy's lost merge code) | 2026-03-29 | Enzo  | |
-| 012   | pb-split-guide Test Gap Closure — Template/Export/H5P AJAX/A11y + Smoke Hook Strategy | 2026-03-30 | Xiaohan | |
-| 013   | pb-split-guide Specific Confirmation Dialogs (delete step, leave page, librarian deactivate/reactivate) | 2026-03-30 | Xiaohan | |
-| 014   | Analytics Audit Fixes — Branch Quiz Exclusion, Draft Filtering, Device Detection, Normalizer Bug | 2026-04-06 | Enzo | |
-| 015   | PBSG_Certificate — mark_completed always latest timestamp + unit test alignment | 2026-04-06 | Xiaohan | |
-| 016   | H5P Ownership, Template Duplication, Inline Name Editing + Benchmark Sliders + CSV Export Fix | 2026-04-09 | Enzo | |
-| 017   | Tutorial Intro Layout, Branch H5P Conversion, Quiz Typography Refresh, H5P Edit Bug Fix | 2026-04-12 | Enzo | |
-| 018   | Network Admin Menu Visibility Fix + Admin Guide + Dev Setup Guide Update | 2026-04-13 | Enzo | |
+| 010   | Accessibility Dashboard, Custom Themes, Keyboard Shortcuts & ARIA Labels | 2026-03-29 | Enzo  |Xiaohan |
+| 011   | Branch Sub-Tutorial Frontend Restoration (Cindy's lost merge code) | 2026-03-29 | Enzo  |Yang |
+| 012   | pb-split-guide Test Gap Closure — Template/Export/H5P AJAX/A11y + Smoke Hook Strategy | 2026-03-30 | Xiaohan |Yang |
+| 013   | pb-split-guide Specific Confirmation Dialogs (delete step, leave page, librarian deactivate/reactivate) | 2026-03-30 | Xiaohan |Yang |
+| 014   | Analytics Audit Fixes — Branch Quiz Exclusion, Draft Filtering, Device Detection, Normalizer Bug | 2026-04-06 | Enzo |Xiaohan |
+| 015   | PBSG_Certificate — mark_completed always latest timestamp + unit test alignment | 2026-04-06 | Xiaohan | Yang|
+| 016   | H5P Ownership, Template Duplication, Inline Name Editing + Benchmark Sliders + CSV Export Fix | 2026-04-09 | Enzo |Xiaohan|
+| 017   | Tutorial Intro Layout, Branch H5P Conversion, Quiz Typography Refresh, H5P Edit Bug Fix | 2026-04-12 | Enzo | Xiaohan|
+| 018   | Network Admin Menu Visibility Fix + Admin Guide + Dev Setup Guide Update | 2026-04-13 | Enzo |Xiaohan |
 
 
 ---
