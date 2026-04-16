@@ -175,6 +175,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   border-radius: var(--pbsg-radius) !important;
   box-shadow: var(--pbsg-shadow) !important;
   overflow: hidden !important;
+  container-type: inline-size;
 }
 
 .pbsg-right {
@@ -347,19 +348,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 }
 
 /* Nav stays visible at the bottom */
-.pbsg-nav {
-  flex: 0 0 auto !important;
-  display: grid !important;
-  grid-template-columns: 1fr auto 1fr !important;
-  gap: 12px !important;
-  align-items: center !important;
-  padding-top: 16px !important;
-  border-top: 1px solid var(--pbsg-border) !important;
-  background: #fff !important;
-  position: sticky !important;
-  bottom: 0 !important;
-  z-index: 5 !important;
-}
+/* .pbsg-nav layout moved to container-query block near end of file */
 
 #pbsgProgress,
 .pbsg-progress {
@@ -1730,25 +1719,12 @@ body.tutorial-active #colophon {
   scroll-margin-top: 0 !important;
 }
 
-.pbsg-nav {
-  display: grid;
-  grid-template-columns: minmax(110px, 140px) 1fr minmax(110px, 140px);
-  align-items: center;
-  gap: 12px;
-}
+/* .pbsg-nav / .pbsg-nav-btn / .pbsg-nav-center layout moved to
+   container-query block near end of file. */
 
 .pbsg-nav-btn {
-  min-width: 110px;
   padding: 8px 18px;
   font-size: 15px;
-}
-
-.pbsg-nav-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  min-width: 0;
 }
 
 .pbsg-progress {
@@ -1762,5 +1738,75 @@ body.tutorial-active #colophon {
   white-space: nowrap;
   font-weight: 600;
   color: #2e7d32;
-  min-width: 200px;
+}
+
+/* ================================================================
+   Nav bar — container-query responsive wrap (4 tiers)
+   Tier 1 >480px : single row (default)
+   Tier 2 ≤480px : progress wraps above buttons; buttons share width
+   Tier 3 ≤300px : compact labels (2/10, 3/3 ✓)
+   Tier 4 ≤180px : stack buttons vertically, hide score
+   ================================================================ */
+.pbsg-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  row-gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gots-border, #E0E0E0);
+}
+.pbsg-nav-btn {
+  flex: 0 0 auto;
+  min-width: 100px;
+}
+.pbsg-nav-center {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
+  white-space: nowrap;
+  order: 0;
+  color: var(--gots-muted, #646970);
+}
+
+/* Long/short label swap primitives */
+.pbsg-progress-short,
+.pbsg-score-short { display: none; }
+
+/* Tier 2 — wrap progress above buttons */
+@container (max-width: 480px) {
+  .pbsg-nav-center {
+    flex-basis: 100%;
+    order: -1;
+    justify-content: space-between;
+  }
+  .pbsg-nav-btn { flex: 1 1 0; }
+}
+
+/* Tier 3 — compact labels; muted for progress, green for score */
+@container (max-width: 300px) {
+  .pbsg-progress-long,
+  .pbsg-score-long { display: none; }
+  .pbsg-progress-short,
+  .pbsg-score-short { display: inline; }
+  .pbsg-progress-short {
+    color: var(--gots-muted, #646970);
+    font-family: "Roboto Condensed", "Roboto", sans-serif;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .pbsg-score-short {
+    color: var(--gots-primary, #517E1B);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Tier 4 — stack buttons, hide score */
+@container (max-width: 180px) {
+  .pbsg-running-score { display: none; }
+  .pbsg-nav-btn { flex-basis: 100%; min-width: 0; }
 }
