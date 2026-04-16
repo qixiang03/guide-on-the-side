@@ -483,14 +483,20 @@ function showStepH5PFrame(stepIndex, h5pId) {
   }
 
   const wantedId = String(h5pId);
+  const isNewLoad = frame.dataset.loadedH5pId !== wantedId;
 
-  if (frame.dataset.loadedH5pId !== wantedId) {
+  if (isNewLoad) {
+    frame.style.opacity = '0';
     frame.src = h5pUrl(h5pId);
     frame.dataset.loadedH5pId = wantedId;
   }
 
   frame.style.display = '';
-  frame.style.opacity = '1';
+  // For new loads, keep opacity 0 — attachH5PWatcher fades it in once H5P has rendered.
+  // For cached frames the H5P is already rendered so show immediately.
+  if (!isNewLoad) {
+    frame.style.opacity = '1';
+  }
   activeH5PFrame = frame;
 
   return frame;
@@ -965,14 +971,22 @@ function attachH5PWatcher(stepIndex){
     const updatePassState = ({ allowBranchPrompt = false } = {}) => {
     const correct = isH5PCorrect(doc);
     const step = steps[stepIndex];
-    const hasChecked = (attemptCounts[stepIndex] || 0) > 0;
+    let hasChecked = (attemptCounts[stepIndex] || 0) > 0;
 
-    // Global rule: until Check is clicked, Next must stay disabled
+    // Global rule: until an answer is submitted, Next must stay disabled.
+    // Exception: if H5P is already showing a correct result (e.g. SingleChoiceSet
+    // or TrueFalse which give immediate feedback without a separate Check button),
+    // trust the DOM state and count it as one attempt so navigation unlocks.
     if (!hasChecked) {
-      lockNext(true);
-      updateRunningScore();
-      updateCertificateGate();
-      return;
+      if (!correct) {
+        lockNext(true);
+        updateRunningScore();
+        updateCertificateGate();
+        return;
+      }
+      // H5P shows correct without a detectable Check click — record the attempt.
+      attemptCounts[stepIndex] = 1;
+      hasChecked = true;
     }
 
     if (correct) {
@@ -1591,10 +1605,11 @@ function render(){
 
   if (step.h5p_id) {
     const hasChecked = (attemptCounts[i] || 0) > 0;
+    const alreadyPassed = passedSteps.has(i);
 
-    if (!hasChecked) {
+    if (isCurrentStepBlockedByMandatoryBranch()) {
       lockNext(true);
-    } else if (isCurrentStepBlockedByMandatoryBranch()) {
+    } else if (!hasChecked && !alreadyPassed) {
       lockNext(true);
     } else {
       lockNext(false);
@@ -2095,8 +2110,19 @@ function handleCloseTutorialAction() {
     return;
   }
 
-  // Try to close the current tab
+  // Try to close the tab (only works if the tab was opened via window.open()).
+  // Browsers block window.close() on directly-navigated tabs, so fall back to
+  // history navigation or the site root if close is ignored.
   window.close();
+  setTimeout(() => {
+    if (!window.closed) {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = window.location.origin;
+      }
+    }
+  }, 300);
 }
 
 retakeBtn.onclick = () => {

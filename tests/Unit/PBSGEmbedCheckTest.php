@@ -359,4 +359,33 @@ final class PBSGEmbedCheckTest extends TestCase
 
         $this->assertStringStartsWith('https://docs.google.com/gview?url=', $url);
     }
+
+    public function test_check_returns_embeddable_for_youtube_watch_url(): void
+    {
+        $result = PBSG_Embed_Check::check('https://www.youtube.com/watch?v=uJ235iTBkh0');
+
+        $this->assertTrue($result['embeddable']);
+        $this->assertFalse($result['is_document_url']);
+    }
+
+    public function test_check_returns_embeddable_for_youtu_be_shortlink(): void
+    {
+        $result = PBSG_Embed_Check::check('https://youtu.be/uJ235iTBkh0');
+
+        $this->assertTrue($result['embeddable']);
+    }
+
+    public function test_check_returns_embeddable_for_vimeo(): void
+    {
+        $result = PBSG_Embed_Check::check('https://vimeo.com/123456789');
+
+        $this->assertTrue($result['embeddable']);
+    }
+
+    public function test_check_returns_embeddable_for_ted(): void
+    {
+        $result = PBSG_Embed_Check::check('https://www.ted.com/talks/some_talk');
+
+        $this->assertTrue($result['embeddable']);
+    }
 }

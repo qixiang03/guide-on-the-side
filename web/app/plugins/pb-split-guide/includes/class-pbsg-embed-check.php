@@ -42,6 +42,19 @@ final class PBSG_Embed_Check {
     ];
 
     /**
+     * Hostnames that are known to provide embeddable players.
+     * Their watch/landing pages block iframes (X-Frame-Options: SAMEORIGIN),
+     * but their embed endpoints work fine. Skip the HEAD request for these.
+     */
+    private const KNOWN_EMBEDDABLE_HOSTS = [
+        'youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com',
+        'youtu.be',
+        'vimeo.com', 'player.vimeo.com',
+        'dailymotion.com', 'www.dailymotion.com',
+        'ted.com', 'www.ted.com', 'embed.ted.com',
+    ];
+
+    /**
      * Check whether a URL is embeddable and whether it is a document.
      *
      * @param string $url The URL to check.
@@ -52,6 +65,13 @@ final class PBSG_Embed_Check {
             'embeddable'      => true,
             'is_document_url' => false,
         ];
+
+        // Known video platforms: their watch pages block framing but their
+        // embed endpoints work. Trust them without a HEAD request.
+        $host = strtolower( parse_url( $url, PHP_URL_HOST ) ?: '' );
+        if ( in_array( $host, self::KNOWN_EMBEDDABLE_HOSTS, true ) ) {
+            return $result;
+        }
 
         // Detect document extension from URL path
         $url_path = strtolower( parse_url( $url, PHP_URL_PATH ) ?: '' );
