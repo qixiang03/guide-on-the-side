@@ -357,14 +357,18 @@ $s['branch'] = $branch;
       </div>
 
       <div class="pbsg-nav">
-        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev">Prev</button>
-
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev"><?php esc_html_e('Prev', 'pb-split-guide'); ?></button>
         <div class="pbsg-nav-center">
-          <span id="pbsgProgress" class="pbsg-progress"></span>
-          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">Correct/Attempted 0/0 <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+          <span id="pbsgProgress" class="pbsg-progress">
+            <span class="pbsg-progress-long"><?php esc_html_e('Page:', 'pb-split-guide'); ?> <span class="pbsg-progress-current">1</span> <?php esc_html_e('of', 'pb-split-guide'); ?> <span class="pbsg-progress-total">1</span></span>
+            <span class="pbsg-progress-short"><span class="pbsg-progress-current">1</span>/<span class="pbsg-progress-total">1</span></span>
+          </span>
+          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">
+            <span class="pbsg-score-long"><?php esc_html_e('Correct/Attempted', 'pb-split-guide'); ?> <span class="pbsg-score-value">0/0</span> <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+            <span class="pbsg-score-short"><span class="pbsg-score-value">0/0</span> <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+          </span>
         </div>
-
-        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext">Next</button>
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext"><?php esc_html_e('Next', 'pb-split-guide'); ?></button>
       </div>
 
     </div>

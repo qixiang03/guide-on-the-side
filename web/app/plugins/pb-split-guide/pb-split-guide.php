@@ -2155,7 +2155,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_split_guide_css',
       plugin_dir_url(__FILE__) . 'assets/split-guide.css',
       [],
-      '0.5.0.1'
+      '0.5.0.2'
     );
 
     // Only localize tracker data on published tutorials — prevents draft/preview pollution

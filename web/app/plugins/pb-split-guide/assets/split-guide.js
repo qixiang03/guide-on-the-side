@@ -8,6 +8,31 @@ const openLink = document.getElementById('pbsgOpenLink');
 const fallback = document.getElementById('pbsgTutorialFallback');
 const fallbackLink = document.getElementById('pbsgFallbackLink');
 
+// ── Dual-label nav updaters ──
+//
+// The nav template renders both a long label ("Page: 2 of 10",
+// "Correct/Attempted 3/5") and a short label ("2/10", "3/5") inside the
+// progress and running-score elements. CSS container queries decide which
+// variant is visible at any given width. Because both copies live in the
+// DOM simultaneously, the helpers below MUST use querySelectorAll + forEach
+// so the long and short variants stay in sync. Do not swap to querySelector
+// on a single span — one of the two copies will go stale.
+function pbsgSetProgress(current, total) {
+  document.querySelectorAll('#pbsgProgress .pbsg-progress-current').forEach(function (el) {
+    el.textContent = current;
+  });
+  document.querySelectorAll('#pbsgProgress .pbsg-progress-total').forEach(function (el) {
+    el.textContent = total;
+  });
+}
+
+function pbsgSetScore(correct, attempted) {
+  var value = correct + '/' + attempted;
+  document.querySelectorAll('#pbsgRunningScore .pbsg-score-value').forEach(function (el) {
+    el.textContent = value;
+  });
+}
+
 let tutorialPopup;
 let popupPollInterval = null;
 
@@ -1155,12 +1180,11 @@ function updateRunningScore() {
   const correct = passedQuizStepsCount();
   const attempted = attemptedQuizStepsCount();
 
-  // Use innerHTML so the Marginalia check icon renders as inline SVG.
-  // Numeric values are safe (produced by Number coercion above).
-  const checkIcon = (typeof PBSG_ICONS !== 'undefined')
-    ? PBSG_ICONS.render('check', 'pbsg-icon--ok')
-    : '';
-  runningScoreEl.innerHTML = `Correct/Attempted ${correct}/${attempted} ${checkIcon}`;
+  // The template pre-renders the "Correct/Attempted" label and the check
+  // icon inside both long and short score spans, so we only need to update
+  // the numeric value spans. pbsgSetScore keeps the long/short variants in
+  // sync.
+  pbsgSetScore(correct, attempted);
 }
 
 function resetTutorialToStart(){
@@ -1591,7 +1615,7 @@ function render(){
   //titleEl.textContent = step.title || `Step ${i+1}`;
   
   if (titleEl) titleEl.textContent = '';
-  if (progressEl) progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
+  if (progressEl) pbsgSetProgress(i + 1, steps.length);
   updateRunningScore();
 
   
@@ -1962,10 +1986,8 @@ function renderBranchStep() {
   renderTutorial(effectiveTutorialStep);
 
   
-  const branchTotal = Array.isArray(branch.questions) ? branch.questions.length : 0;
   const letter = String.fromCharCode(65 + branchStepIndex); // A, B, C...
   const mainNumber = branchParentIndex + 1;
-  const branchCurrent = branchStepIndex + 1;
 
   // Total tutorial pages — used as the denominator so the student sees their
   // overall position in the tutorial (e.g. "Page: 2A of 10") rather than just
@@ -1973,7 +1995,7 @@ function renderBranchStep() {
   const totalPages = Array.isArray(steps) ? steps.length : 0;
   const pageText = `Page: ${mainNumber}${letter} of ${totalPages}`;
 
-  if (progressEl) progressEl.textContent = pageText;
+  if (progressEl) pbsgSetProgress(`${mainNumber}${letter}`, totalPages);
   updateRunningScore();
   if (progressLabelEl) progressLabelEl.textContent = pageText;
 
