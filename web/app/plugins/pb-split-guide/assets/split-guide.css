@@ -553,6 +553,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  gap: 8px !important;
   min-height: 38px !important;
   padding: 9px 20px !important;
   background: #fff !important;
@@ -1856,10 +1857,6 @@ body.tutorial-active #colophon {
 
 .pbsg-title {
   font-size: 32px !important;
-}
-
-.pbsg-step-title {
-  font-size: 15px !important;
 }
 
 .pbsg-banner-text,

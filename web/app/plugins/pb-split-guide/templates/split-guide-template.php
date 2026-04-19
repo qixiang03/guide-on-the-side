@@ -21,7 +21,7 @@ wp_enqueue_style(
     'pbsg_split_guide_css',
     plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.css',
     array(),
-    '0.5.0.1'
+    filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide.css' )
 );
 
 // Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.

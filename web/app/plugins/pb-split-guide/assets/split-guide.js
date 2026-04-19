@@ -2233,11 +2233,21 @@ retakeBtn.onclick = () => {
 const focusTutBtn = document.getElementById('pbsgFocusTutorial');
 const focusQuizBtn = document.getElementById('pbsgFocusQuiz');
 
+function setFocusBtnLabel(btn, text){
+  if (!btn) return;
+  const label = btn.querySelector('.pbsg-focus-label');
+  if (label) {
+    label.textContent = text;
+  } else {
+    btn.textContent = text;
+  }
+}
+
 function clearFocus(){
   document.body.classList.remove('pbsg-focus-tutorial','pbsg-focus-quiz');
-  focusTutBtn.textContent='Focus Tutorial';
-  focusQuizBtn.textContent='Focus Quiz';
-  
+  setFocusBtnLabel(focusTutBtn, 'Focus Tutorial');
+  setFocusBtnLabel(focusQuizBtn, 'Focus Quiz');
+
   // Remove the inert attribute from both panes when exiting focus mode
   const leftPane = document.querySelector('.pbsg-left');
   const rightPane = document.querySelector('.pbsg-right');
@@ -2247,21 +2257,21 @@ function clearFocus(){
 
 function toggleFocus(mode){
   const cls = mode==='tutorial'?'pbsg-focus-tutorial':'pbsg-focus-quiz';
-  if(document.body.classList.contains(cls)){ 
-    clearFocus(); 
+  if(document.body.classList.contains(cls)){
+    clearFocus();
   } else {
     clearFocus();
     document.body.classList.add(cls);
-    
+
     const leftPane = document.querySelector('.pbsg-left');
     const rightPane = document.querySelector('.pbsg-right');
-    
+
     if(mode==='tutorial') {
-      focusTutBtn.textContent='Exit Focus';
+      setFocusBtnLabel(focusTutBtn, 'Exit Focus');
       // Tutorial is active (right pane), make quiz pane (left pane) inert
       if (leftPane) leftPane.setAttribute('inert', '');
     } else {
-      focusQuizBtn.textContent='Exit Focus';
+      setFocusBtnLabel(focusQuizBtn, 'Exit Focus');
       // Quiz is active (left pane), make tutorial pane (right pane) inert
       if (rightPane) rightPane.setAttribute('inert', '');
     }
