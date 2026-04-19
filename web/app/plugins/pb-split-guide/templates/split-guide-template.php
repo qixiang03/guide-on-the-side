@@ -306,43 +306,50 @@ $s['branch'] = $branch;
     <div class="pbsg-left-inner">
 
       <div class="pbsg-quiz-header">
-  <div class="pbsg-quiz-header-left">
-    <!-- Menu button -->
-    <div class="pbsg-menu-wrap">
-      <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
-        <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
-        <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
-        <span class="pbsg-menu-text">Menu</span>
-      </button>
 
-      <!-- Dropdown -->
-      <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
-        <div class="pbsg-menu-list">
-          <?php foreach ($steps_enriched as $idx => $step): ?>
-            
-              <button
-                type="button"
-                class="pbsg-menu-item"
-                data-step-index="<?php echo esc_attr($idx); ?>"
-                role="menuitem"
-              >
-                <?php
-                  $num = $idx + 1;
-                  $label = !empty($step['title']) ? $step['title'] : "Page $num";
-                  echo esc_html($num . '. ' . $label);
-                ?>
-              </button>
-            
-          <?php endforeach; ?>
-        </div>
+  <!-- Menu button + dropdown -->
+  <div class="pbsg-menu-wrap">
+    <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
+      <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
+      <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
+      <span class="pbsg-menu-label">Menu</span>
+    </button>
+
+    <!-- Dropdown (KEEP EXISTING INNER MARKUP — Task 3 will replace it) -->
+    <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
+      <div class="pbsg-menu-list">
+        <?php foreach ($steps_enriched as $idx => $step): ?>
+
+            <button
+              type="button"
+              class="pbsg-menu-item"
+              data-step-index="<?php echo esc_attr($idx); ?>"
+              role="menuitem"
+            >
+              <?php
+                $num = $idx + 1;
+                $label = !empty($step['title']) ? $step['title'] : "Page $num";
+                echo esc_html($num . '. ' . $label);
+              ?>
+            </button>
+
+        <?php endforeach; ?>
       </div>
     </div>
-
-    <!-- Current step title -->
-    <div id="pbsgStepTitle" class="pbsg-step-title"></div>
   </div>
 
-  <button type="button" class="pbsg-focus-btn" id="pbsgFocusQuiz">Focus Quiz</button>
+  <!-- Title zone (eyebrow + title) -->
+  <div class="pbsg-step-title-zone">
+    <span class="pbsg-step-eyebrow" id="pbsgStepEyebrow" aria-hidden="true"></span>
+    <span class="pbsg-step-title" id="pbsgStepTitle"></span>
+  </div>
+
+  <!-- Focus Quiz button -->
+  <button type="button" class="pbsg-focus-btn" id="pbsgFocusQuiz" aria-label="Focus Quiz">
+    <span class="pbsg-focus-icon"><?php echo pbsg_icon('maximize'); ?></span>
+    <span class="pbsg-focus-label">Focus Quiz</span>
+  </button>
+
 </div>
 
       <div class="pbsg-iframe-wrap">
