@@ -315,24 +315,37 @@ $s['branch'] = $branch;
       <span class="pbsg-menu-label">Menu</span>
     </button>
 
-    <!-- Dropdown (KEEP EXISTING INNER MARKUP — Task 3 will replace it) -->
+    <!-- Dropdown -->
     <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
-      <div class="pbsg-menu-list">
+      <div class="pbsg-menu-head">
+        <span class="pbsg-menu-head-position">
+          Steps &middot; <span class="pbsg-menu-head-current">1</span> of <span class="pbsg-menu-head-total"><?php echo (int) count($steps_enriched); ?></span>
+        </span>
+        <span class="pbsg-menu-head-done">
+          <span class="pbsg-menu-head-done-count">0</span>
+          <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?>
+        </span>
+      </div>
+      <div class="pbsg-menu-list" id="pbsgMenuList">
         <?php foreach ($steps_enriched as $idx => $step): ?>
-
-            <button
-              type="button"
-              class="pbsg-menu-item"
-              data-step-index="<?php echo esc_attr($idx); ?>"
-              role="menuitem"
-            >
-              <?php
-                $num = $idx + 1;
-                $label = !empty($step['title']) ? $step['title'] : "Page $num";
-                echo esc_html($num . '. ' . $label);
-              ?>
-            </button>
-
+          <?php
+            $num = $idx + 1;
+            $label = !empty($step['title']) ? $step['title'] : "Step $num";
+          ?>
+          <button
+            type="button"
+            class="pbsg-menu-item"
+            data-step-index="<?php echo esc_attr($idx); ?>"
+            role="menuitem"
+          >
+            <span class="pbsg-menu-item-label">
+              <span class="pbsg-menu-item-num"><?php echo esc_html($num . '.'); ?></span>
+              <?php echo esc_html($label); ?>
+            </span>
+            <span class="pbsg-menu-item-check" aria-hidden="true">
+              <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?>
+            </span>
+          </button>
         <?php endforeach; ?>
       </div>
     </div>
