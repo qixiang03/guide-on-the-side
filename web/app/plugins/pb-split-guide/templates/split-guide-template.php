@@ -133,7 +133,7 @@ foreach ($steps as $s) {
 
   // For non-embeddable document URLs, generate Google Viewer URL
   if ($tutorial_type === 'url' && !empty($tutorial['url']) && !$tutorial['embeddable'] && $tutorial['is_document_url']) {
-    $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
+    $tutorial['viewer_url'] = 'https://docs.google.com/viewerng/viewer?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
   }
 
   $s['tutorial'] = $tutorial;

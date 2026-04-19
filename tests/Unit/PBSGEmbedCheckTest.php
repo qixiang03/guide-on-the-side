@@ -281,7 +281,7 @@ final class PBSGEmbedCheckTest extends TestCase
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         );
 
-        $this->assertStringStartsWith('https://docs.google.com/gview?url=', $url);
+        $this->assertStringStartsWith('https://docs.google.com/viewerng/viewer?url=', $url);
         $this->assertStringContainsString(rawurlencode('https://example.com/uploads/report.docx'), $url);
         $this->assertStringContainsString('&embedded=true', $url);
     }
@@ -304,7 +304,7 @@ final class PBSGEmbedCheckTest extends TestCase
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         );
 
-        $this->assertStringContainsString('docs.google.com/gview', $url);
+        $this->assertStringContainsString('docs.google.com/viewerng/viewer', $url);
         $this->assertStringContainsString(rawurlencode('http://localhost/uploads/report.docx'), $url);
     }
 
@@ -315,7 +315,7 @@ final class PBSGEmbedCheckTest extends TestCase
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         );
 
-        $this->assertStringContainsString('docs.google.com/gview', $url);
+        $this->assertStringContainsString('docs.google.com/viewerng/viewer', $url);
         $this->assertStringContainsString(rawurlencode('http://pressbooks.test/uploads/report.docx'), $url);
     }
 
@@ -326,7 +326,7 @@ final class PBSGEmbedCheckTest extends TestCase
             'application/vnd.ms-excel'
         );
 
-        $this->assertStringContainsString('docs.google.com/gview', $url);
+        $this->assertStringContainsString('docs.google.com/viewerng/viewer', $url);
         $this->assertStringContainsString(rawurlencode('http://mysite.local/uploads/report.xlsx'), $url);
     }
 
@@ -347,7 +347,7 @@ final class PBSGEmbedCheckTest extends TestCase
             'text/csv'
         );
 
-        $this->assertStringStartsWith('https://docs.google.com/gview?url=', $url);
+        $this->assertStringStartsWith('https://docs.google.com/viewerng/viewer?url=', $url);
     }
 
     public function test_viewer_url_for_pptx(): void
@@ -357,7 +357,7 @@ final class PBSGEmbedCheckTest extends TestCase
             'application/vnd.openxmlformats-officedocument.presentationml.presentation'
         );
 
-        $this->assertStringStartsWith('https://docs.google.com/gview?url=', $url);
+        $this->assertStringStartsWith('https://docs.google.com/viewerng/viewer?url=', $url);
     }
 
     public function test_check_returns_embeddable_for_youtube_watch_url(): void
