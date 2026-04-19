@@ -61,6 +61,7 @@ if ( ! class_exists( 'PBSG_Icons' ) ) {
     'clipboard' => '<rect x="5" y="5" width="14" height="16" rx="1.5"/> <rect x="9" y="3" width="6"  height="4"  rx="1"/> <line x1="9" y1="12" x2="15" y2="12"/> <line x1="9" y1="16" x2="13" y2="16"/>',
     'thumbs-up' => '<path d="M4 11h3v10H5a1 1 0 0 1-1-1z"/> <path d="M7 11l4-7a2 2 0 0 1 3 1v4h5a2 2 0 0 1 2 2.3l-1.5 7.3A2 2 0 0 1 17.5 20H7"/>',
     'refresh' => '<path d="M4 12a8 8 0 0 1 14-5.3"/> <path d="M20 3v5h-5"/> <path d="M20 12a8 8 0 0 1-14 5.3"/> <path d="M4 21v-5h5"/>',
+    'maximize'    => '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
         );
 
         /**
