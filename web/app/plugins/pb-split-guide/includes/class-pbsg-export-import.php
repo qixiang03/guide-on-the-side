@@ -14,7 +14,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  */
 class PBSG_Export_Import {
 
-	const EXPORT_VERSION = '1.0';
+	const EXPORT_VERSION = '1.1';
 
 	public static function init() {
 		add_action( 'wp_ajax_pbsg_export_tutorial', [ __CLASS__, 'handle_export' ] );
