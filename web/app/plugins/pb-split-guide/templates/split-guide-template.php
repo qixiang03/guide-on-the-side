@@ -468,37 +468,70 @@ window.PBSG_CERT = {
 
 
 <div id="pbsgSummaryScreen" class="pbsg-summary-screen" style="display:none;">
-  <div class="pbsg-summary-card">
+  <div class="pbsg-summary-card<?php echo $cover_image_url ? ' pbsg-summary-card--structured' : ''; ?>">
 
-    <h2 class="pbsg-summary-title">Tutorial Summary</h2>
-
-    <div class="pbsg-summary-message">
-      <p>You have completed this tutorial.</p>
-    </div>
-
-    <div id="pbsgAttemptSummary" class="pbsg-attempt-summary"></div>
-
-    <div id="pbsgFinalGrade" class="pbsg-final-grade"></div>
-
-    <?php if ($is_logged_in): ?>
-      <div class="pbsg-summary-actions">
-        <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload">
-          Generate Certificate
-        </button>
-
-        <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial">
-          Close Tutorial
-        </button>
-      </div>
-    <?php else: ?>
-      <div class="pbsg-summary-actions">
-        <p>Please log in to generate your certificate.</p>
-        <button type="button" class="button" id="pbsgRetakeTutorial">
-          Close Tutorial
-        </button>
+    <?php if ($cover_image_url): ?>
+      <div class="pbsg-summary-cover">
+        <img src="<?php echo esc_url($cover_image_url); ?>" alt="" />
       </div>
     <?php endif; ?>
 
+    <div class="pbsg-summary-info">
+
+      <div class="pbsg-summary-eyebrow"><?php esc_html_e('Completed', 'pb-split-guide'); ?></div>
+      <p class="pbsg-summary-desc" id="pbsgSummaryDesc">
+        <?php
+          /* translators: %d: number of steps */
+          printf(
+            esc_html__("You've completed all %d steps of this tutorial.", 'pb-split-guide'),
+            (int) count($steps_enriched)
+          );
+        ?>
+      </p>
+
+      <div class="pbsg-objectives-wrap" id="pbsgObjectivesWrap" hidden>
+        <div class="pbsg-objectives-head">
+          <span><?php esc_html_e('Questions', 'pb-split-guide'); ?></span>
+          <span class="pbsg-objectives-count">
+            <span id="pbsgSummaryCorrect">0</span>
+            /
+            <span id="pbsgSummaryTotal">0</span>
+            <?php esc_html_e('correct', 'pb-split-guide'); ?>
+          </span>
+        </div>
+        <ul class="pbsg-objectives" id="pbsgSummaryQuestions" tabindex="0"></ul>
+      </div>
+
+      <div class="pbsg-summary-meta">
+        <span class="pbsg-meta-item">
+          <?php echo pbsg_icon('stopwatch', 'pbsg-meta-icon'); ?>
+          <strong id="pbsgSummaryDuration">—</strong>
+        </span>
+        <span class="pbsg-meta-sep" data-pbsg-meta-sep hidden>·</span>
+        <span class="pbsg-meta-item" id="pbsgSummaryCorrectItem" hidden>
+          <?php echo pbsg_icon('check', 'pbsg-meta-icon'); ?>
+          <strong><span id="pbsgSummaryCorrect2">0</span> / <span id="pbsgSummaryTotal2">0</span> <?php esc_html_e('correct', 'pb-split-guide'); ?></strong>
+        </span>
+        <span class="pbsg-meta-sep" data-pbsg-meta-sep hidden>·</span>
+        <span class="pbsg-meta-item is-score" id="pbsgSummaryScoreItem" hidden>
+          <?php echo pbsg_icon('chart-bar', 'pbsg-meta-icon'); ?>
+          <strong id="pbsgSummaryScore">—</strong>
+        </span>
+      </div>
+
+      <?php if ($is_logged_in): ?>
+        <div class="pbsg-summary-actions">
+          <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload"><?php esc_html_e('Generate Certificate', 'pb-split-guide'); ?></button>
+          <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial"><?php esc_html_e('Close Tutorial', 'pb-split-guide'); ?></button>
+        </div>
+      <?php else: ?>
+        <div class="pbsg-summary-actions">
+          <p><?php esc_html_e('Please log in to generate your certificate.', 'pb-split-guide'); ?></p>
+          <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial"><?php esc_html_e('Close Tutorial', 'pb-split-guide'); ?></button>
+        </div>
+      <?php endif; ?>
+
+    </div>
   </div>
 </div>
 
@@ -508,8 +541,9 @@ window.PBSG_CERT = {
   <div class="pbsg-cert-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgCertModalTitle">
     <button type="button" class="pbsg-cert-modal-close" id="pbsgCertModalClose" aria-label="Close">×</button>
 
-    <h3 id="pbsgCertModalTitle">Generate Certificate</h3>
-    <p>Please enter your name as it should appear on the certificate.</p>
+    <div class="pbsg-cert-modal-eyebrow"><?php esc_html_e('Certificate', 'pb-split-guide'); ?></div>
+    <h3 id="pbsgCertModalTitle"><?php esc_html_e('Generate Certificate', 'pb-split-guide'); ?></h3>
+    <p class="pbsg-cert-modal-desc"><?php esc_html_e('Please enter your name as it should appear on the certificate.', 'pb-split-guide'); ?></p>
 
     <label for="pbsgCertModalName" class="pbsg-cert-label">Student Name</label>
     <input id="pbsgCertModalName" type="text" class="pbsg-cert-input" placeholder="Enter your full name" />

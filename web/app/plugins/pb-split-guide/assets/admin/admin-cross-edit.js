@@ -14,47 +14,149 @@
      ================================================================ */
 
   var confirmMessages = {
-    cross_edit_on: 'Enable cross-editing? All librarians will be able to edit tutorials created by other librarians. They will not be able to delete or change the publish status of tutorials they don\'t own.',
-    cross_edit_off: 'Disable cross-editing? Librarians will only be able to edit their own tutorials. Any unsaved changes by librarians currently editing another\'s tutorial will be lost.',
-    transfer_on: 'Enable ownership transfer? Librarians will be able to transfer ownership of their own tutorials to other librarians or administrators.',
-    transfer_off: 'Disable ownership transfer? Librarians will no longer be able to transfer their tutorials to other librarians. Administrators can still reassign tutorial ownership at any time.'
+    cross_edit_on: {
+      variant: 'default',
+      iconKey: 'lockClosed',
+      heading: 'Enable cross-editing?',
+      subtitle: 'Librarians will gain new edit permissions across the library.',
+      bodyLabel: 'What this changes',
+      bullets: [
+        'All librarians can <strong>edit</strong> tutorials created by other librarians.',
+        "Librarians <strong>cannot delete</strong> or change the publish status of tutorials they don't own.",
+        'Administrators continue to have full access — this setting does not affect them.'
+      ],
+      confirmLabel: 'Enable cross-editing'
+    },
+    cross_edit_off: {
+      variant: 'neutral',
+      iconKey: 'lockOpen',
+      heading: 'Disable cross-editing?',
+      subtitle: "Librarians will lose access to tutorials they don't own.",
+      bodyLabel: 'What this changes',
+      bullets: [
+        'Librarians will only be able to edit <strong>their own</strong> tutorials.',
+        "Other librarians' tutorials will be <strong>hidden from their tutorial list</strong>.",
+        'Administrators retain full access to all tutorials.'
+      ],
+      caveat: "<strong>Heads up:</strong> any unsaved changes by librarians currently editing another librarian's tutorial will be lost when they next load the page.",
+      confirmLabel: 'Disable cross-editing'
+    },
+    transfer_on: {
+      variant: 'default',
+      iconKey: 'shuffle',
+      heading: 'Enable ownership transfer?',
+      subtitle: 'Librarians will be able to hand off tutorials to other librarians.',
+      bodyLabel: 'What this changes',
+      bullets: [
+        'Librarians can transfer ownership of <strong>their own</strong> tutorials to other librarians or administrators.',
+        'The new owner gains full control (edit, publish, delete).',
+        'Administrators can still reassign ownership regardless of this setting.'
+      ],
+      confirmLabel: 'Enable ownership transfer'
+    },
+    transfer_off: {
+      variant: 'neutral',
+      iconKey: 'shuffle',
+      heading: 'Disable ownership transfer?',
+      subtitle: 'Librarians will no longer be able to transfer their tutorials.',
+      bodyLabel: 'What this changes',
+      bullets: [
+        'Librarians will <strong>no longer</strong> be able to transfer their tutorials to other librarians.',
+        'Administrators can still reassign tutorial ownership at any time.'
+      ],
+      confirmLabel: 'Disable ownership transfer'
+    }
   };
 
   function initSettingsConfirmation() {
-    var $form = $('form[action="options.php"]');
+    var $form = $('form[action$="options.php"]');
     if (!$form.length) return;
 
     var $crossEdit = $('#pbsg_cross_edit_toggle');
     var $transfer  = $('#pbsg_transfer_toggle');
-
     if (!$crossEdit.length && !$transfer.length) return;
 
-    $form.on('submit', function (e) {
-      var messages = [];
+    // Each item pairs a confirm-message config with the toggle it describes
+    // so that cancelling the modal can revert just that toggle independently.
+    function changedItems() {
+      var out = [];
 
       if ($crossEdit.length) {
-        var crossOriginal = $crossEdit.data('original') === 1 || $crossEdit.data('original') === '1';
-        var crossCurrent  = $crossEdit.is(':checked');
-        if (crossCurrent !== crossOriginal) {
-          messages.push(crossCurrent ? confirmMessages.cross_edit_on : confirmMessages.cross_edit_off);
+        var cOrig = $crossEdit.data('original') === 1 || $crossEdit.data('original') === '1';
+        var cNow  = $crossEdit.is(':checked');
+        if (cNow !== cOrig) {
+          out.push({
+            cfg:      cNow ? confirmMessages.cross_edit_on : confirmMessages.cross_edit_off,
+            $toggle:  $crossEdit,
+            original: cOrig
+          });
         }
       }
-
       if ($transfer.length) {
-        var transferOriginal = $transfer.data('original') === 1 || $transfer.data('original') === '1';
-        var transferCurrent  = $transfer.is(':checked');
-        if (transferCurrent !== transferOriginal) {
-          messages.push(transferCurrent ? confirmMessages.transfer_on : confirmMessages.transfer_off);
+        var tOrig = $transfer.data('original') === 1 || $transfer.data('original') === '1';
+        var tNow  = $transfer.is(':checked');
+        if (tNow !== tOrig) {
+          out.push({
+            cfg:      tNow ? confirmMessages.transfer_on : confirmMessages.transfer_off,
+            $toggle:  $transfer,
+            original: tOrig
+          });
         }
       }
+      return out;
+    }
 
-      if (messages.length > 0) {
-        var combined = messages.join('\n\n');
-        if (!window.confirm(combined)) {
-          e.preventDefault();
-        }
-      }
+    $form.on('submit', function (e) {
+      var items = changedItems();
+      if (!items.length) return;  // nothing permission-related changed — let WP save
+
+      e.preventDefault();
+      presentChain(items, 0, $form);
     });
+
+    function presentChain(items, index, $formRef) {
+      if (index >= items.length) {
+        // All decisions made. Submit only if at least one toggle is still changed
+        // (i.e. was confirmed rather than cancelled). Cancelled toggles were
+        // reverted to their original state inside onCancel.
+        var anyStillChanged = items.some(function (it) {
+          return it.$toggle.is(':checked') !== it.original;
+        });
+        if (!anyStillChanged) return;
+
+        // The form has <input name="submit"> (from WP's submit_button()) which
+        // shadows the native form.submit method. Call the prototype method
+        // directly to bypass the shadow. Native .submit() also skips the
+        // 'submit' event, so our own handler isn't re-entered.
+        var formEl = $formRef[0];
+        if (formEl) {
+          HTMLFormElement.prototype.submit.call(formEl);
+        }
+        return;
+      }
+      var item = items[index];
+      var cfg  = item.cfg;
+      window.PbsgModal.open({
+        variant:     cfg.variant,
+        icon:        (window.pbsgModalIcons && window.pbsgModalIcons[cfg.iconKey]) || '',
+        heading:     cfg.heading,
+        subtitle:    cfg.subtitle,
+        bodyLabel:   cfg.bodyLabel,
+        bullets:     cfg.bullets,
+        caveat:      cfg.caveat,
+        confirmLabel: cfg.confirmLabel,
+        onConfirm: function () {
+          // Keep the new state; proceed to the next toggle's modal.
+          presentChain(items, index + 1, $formRef);
+        },
+        onCancel:  function () {
+          // Revert THIS toggle to its original value, then still ask about
+          // the remaining toggles — each decision is independent.
+          item.$toggle.prop('checked', item.original);
+          presentChain(items, index + 1, $formRef);
+        }
+      });
+    }
   }
 
   /* ================================================================

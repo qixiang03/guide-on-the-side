@@ -362,7 +362,6 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 
 #pbsgPrev,
 #pbsgNext {
-  width: 100% !important;
   min-height: 38px !important;
   padding: 9px 20px !important;
   font-family: var(--pbsg-admin-font) !important;
@@ -1164,52 +1163,199 @@ body.pbsg-standalone .pbsg-wrap{
   margin: 40px auto;
 }
 
+/* ================================================================
+   Summary / completion card — mirrors intro card design language
+   ================================================================ */
 .pbsg-summary-card {
-  background:#fff;
-  border: 1px solid var(--pbsg-border);
-  border-radius: var(--pbsg-radius);
-  padding: 36px 40px;
-  box-shadow: var(--pbsg-shadow);
+  background: #fff;
+  border: 1px solid var(--gots-border, #E0E0E0);
+  border-radius: 8px;
+  padding: 32px 36px;
+  max-width: 620px;
+  margin: 0 auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
 }
-
-.pbsg-summary-title{
-  text-align:center;
-  font-size: 24px;
-  font-weight: 700;
-  color: #222;
-  margin-bottom: 8px;
+.pbsg-summary-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gots-primary, #517E1B);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
 }
-
-.pbsg-attempt-summary ul{
-  margin: 20px 0;
-  padding-left: 20px;
-}
-
-.pbsg-attempt-summary li{
-  margin-bottom: 8px;
+.pbsg-summary-desc {
   font-size: 14px;
-  color: #333;
-  line-height: 1.6;
+  line-height: 1.5;
+  color: #555;
+  margin: 0 0 20px;
 }
 
-.pbsg-summary-actions{
-  margin-top: 28px;
-  text-align: center;
+/* ── Structured summary card — two-column (cover left, info right)
+      Applied only when the tutorial has a cover image. Mirrors the
+      intro card pattern at .pbsg-intro-card--structured so the two
+      bookends of a tutorial share the same visual rhythm. ───────── */
+.pbsg-summary-card--structured {
+  padding: 0;
+  overflow: hidden;
+  flex-direction: row;
+  max-width: 820px;
+}
+.pbsg-summary-cover {
+  flex: 0 0 auto;
+  min-height: 360px;
+  max-width: 45%;
+  margin: 0;
+}
+/* ID selector required to beat Pressbooks Aldine theme's `#content img { height: auto }` */
+#pbsgSummaryScreen .pbsg-summary-cover img {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  display: block;
+  border-radius: 0;
+  object-fit: cover;
+}
+.pbsg-summary-card--structured .pbsg-summary-info {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
 }
 
-.pbsg-final-grade {
-  margin: 20px 0;
-  font-size: 28px;
+@media (max-width: 768px) {
+  .pbsg-summary-card--structured {
+    flex-direction: column;
+    max-width: 92vw;
+  }
+  .pbsg-summary-cover {
+    width: 100%;
+    height: 160px;
+    min-height: 0;
+    max-width: none;
+  }
+  #pbsgSummaryScreen .pbsg-summary-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pbsg-summary-card--structured .pbsg-summary-info {
+    padding: 24px 20px;
+  }
+}
+
+/* Objectives block — bounded height + scroll when many questions */
+.pbsg-objectives-wrap {
+  margin: 0 0 18px;
+  border: 1px solid #F1F1F1;
+  border-radius: 6px;
+  background: #FCFCFC;
+  position: relative;
+}
+.pbsg-objectives-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gots-muted, #646970);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid #F1F1F1;
+  background: #F8F8F8;
+}
+.pbsg-objectives-head .pbsg-objectives-count {
+  color: var(--gots-primary, #517E1B);
   font-weight: 700;
-  text-align: center;
+}
+.pbsg-summary-card .pbsg-objectives {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.pbsg-summary-card .pbsg-objectives::-webkit-scrollbar { width: 6px; }
+.pbsg-summary-card .pbsg-objectives::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 3px; }
+.pbsg-summary-card .pbsg-objectives li {
+  padding: 8px 14px 8px 34px;
+  position: relative;
+  font-size: 13px;
+  border-bottom: 1px solid #F1F1F1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  line-height: 1.35;
+}
+.pbsg-summary-card .pbsg-objectives li:last-child { border-bottom: none; }
+.pbsg-summary-card .pbsg-objectives li::before {
+  content: '\2713';
+  position: absolute;
+  left: 14px;
+  top: 8px;
+  color: var(--gots-primary, #517E1B);
+  font-weight: 700;
+  font-size: 13px;
+}
+.pbsg-summary-card .pbsg-objectives li.is-wrong::before {
+  content: '\2013';
+  color: var(--gots-muted, #646970);
+}
+.pbsg-summary-card .pbsg-objectives .pbsg-obj-label {
   color: #222;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pbsg-summary-card .pbsg-objectives .pbsg-obj-meta {
+  color: var(--gots-muted, #646970);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: 10px;
 }
 
+/* Bottom fade when list overflows */
+.pbsg-objectives-wrap.has-overflow::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 6px;
+  bottom: 0;
+  height: 26px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #FCFCFC);
+  pointer-events: none;
+}
+
+/* Meta strip — same as intro */
+.pbsg-summary-meta {
+  display: flex;
+  gap: 18px;
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--gots-muted, #646970);
+  padding: 12px 16px;
+  background: var(--gots-bg, #F8F8F8);
+  border-radius: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pbsg-summary-meta .pbsg-meta-item { display: inline-flex; align-items: center; gap: 8px; }
+.pbsg-summary-meta .pbsg-meta-sep { opacity: 0.35; }
+.pbsg-summary-meta strong { color: #222; font-weight: 600; }
+.pbsg-summary-meta .pbsg-meta-icon { width: 18px; height: 18px; flex-shrink: 0; }
+.pbsg-summary-meta .pbsg-meta-item.is-score { color: var(--gots-primary, #517E1B); }
+.pbsg-summary-meta .pbsg-meta-item.is-score strong { color: var(--gots-primary, #517E1B); }
+
+/* Action buttons — reuse .pbsg-btn-outline / existing primary */
 .pbsg-summary-actions {
   display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -1408,21 +1554,42 @@ body.tutorial-active #colophon {
   z-index: 2;
 }
 
+/* Eyebrow — mirrors .pbsg-summary-eyebrow so the modal reads as
+   the same typographic system as the summary card that launched it */
+.pbsg-cert-modal-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gots-primary, #517E1B);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
 .pbsg-cert-modal-dialog h3 {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
+  font-family: "Lusitana", Georgia, serif;
   font-size: 22px;
   font-weight: 700;
   color: #222;
+  line-height: 1.2;
+}
+
+/* Modal description — matches .pbsg-summary-desc body copy */
+.pbsg-cert-modal-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #555;
+  margin: 0 0 4px;
 }
 
 .pbsg-cert-label {
   display: block;
   margin: 18px 0 6px;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: #333;
+  color: var(--gots-primary, #517E1B);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
 }
 
 .pbsg-cert-input {

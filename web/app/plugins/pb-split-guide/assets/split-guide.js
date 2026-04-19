@@ -448,14 +448,52 @@ function getH5PStyleCSS() {
             color: #8C2004 !important;
           }
 
-          /* Button container — push buttons right */
+          /* H5P's Question.js truncates the retry button to an icon-only
+             2.235em square when it decides the button row is too wide
+             (see question.js:674 — it calls $button.html('').addClass('truncated')
+             which wipes the label from the DOM). Next to our wide "Show
+             solution" button, that truncated retry looks like a broken
+             square. Override the size clamp and re-inject the saved label
+             via ::after + aria-label (H5P stores the original text there
+             at question.js:671 before wiping). */
+          .h5p-joubelui-button.truncated {
+            width: auto !important;
+            height: auto !important;
+            border-radius: 6px !important;
+          }
+          .h5p-question-try-again.truncated::after {
+            content: attr(aria-label);
+            display: inline;
+            font: inherit;
+            margin-left: 0;
+            vertical-align: baseline;
+          }
+
+          /* Button container — push buttons right.
+             H5P toggles .h5p-question-visible, .has-scorebar, and .wrap on
+             this element, each of which ships its own width/display rules
+             (see H5P.Question-1.5/styles/question.css:186-206). Match all
+             variants so our right-alignment wins regardless of state. */
           .h5p-question .h5p-question-buttons,
+          .h5p-question-buttons.h5p-question-visible,
+          .h5p-question-buttons.has-scorebar,
+          .h5p-question-buttons.has-scorebar.wrap,
           .h5p-actions,
           .h5p-joubelui-button-container {
             display: flex !important;
+            flex-wrap: wrap !important;
             justify-content: flex-end !important;
+            align-items: center !important;
             gap: 10px !important;
             margin-top: 14px !important;
+            width: auto !important;
+            max-width: 100% !important;
+          }
+
+          /* When H5P inserts a scorebar sibling inside the buttons container,
+             push it to the left so buttons stay right-aligned */
+          .h5p-question-buttons .h5p-joubelui-score-bar {
+            margin-right: auto !important;
           }
 
           /* ── Feedback callouts ───────────────────────────── */
@@ -1131,7 +1169,6 @@ const certModalCancel = document.getElementById('pbsgCertModalCancel');
 const certModalClose = document.getElementById('pbsgCertModalClose');
 const certModalError = document.getElementById('pbsgCertModalError');
 const certHint = document.getElementById('pbsgCertHint');
-const finalGradeEl = document.getElementById('pbsgFinalGrade');
 const retakeBtn = document.getElementById('pbsgRetakeTutorial');
 
 function lockCert(locked, msg){
@@ -1172,6 +1209,14 @@ function getFinalGradePercent(){
   if (total === 0) return 100;
 
   return ((passed / total) * 100).toFixed(2);
+}
+
+function formatDurationMs(ms) {
+  if (!ms || ms < 0) ms = 0;
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}m ${s.toString().padStart(2, '0')}s`;
 }
 
 function updateRunningScore() {
@@ -1271,6 +1316,8 @@ let attemptCounts = {};
 steps.forEach((_, idx) => {
   attemptCounts[idx] = 0;
 });
+
+const pbsgTutorialStartedAt = Date.now();
 
 async function markCompletedOnce() {
   if (!window.PBSG_CERT?.isLoggedIn) return false;
@@ -2257,30 +2304,88 @@ function notifyParentBranchCompleted() {
 }
 
 function showSummaryScreen(){
-
   const mainContent = document.getElementById('pbsgMainContent');
   const summaryScreen = document.getElementById('pbsgSummaryScreen');
-  const attemptBox = document.getElementById('pbsgAttemptSummary');
 
-  if(mainContent) mainContent.style.display = 'none';
-  if(summaryScreen) summaryScreen.style.display = '';
+  if (mainContent) mainContent.style.display = 'none';
+  if (summaryScreen) summaryScreen.style.display = '';
 
-  if(attemptBox){
-    let html = '<ul>';
-
-    steps.forEach((step, idx)=>{
-      const tries = attemptCounts[idx] || 0;
-      const label = step.title || `Question ${idx+1}`;
-      html += `<li><strong>${label}</strong>: tried ${tries} time${tries===1?'':'s'}</li>`;
-    });
-
-    html += '</ul>';
-    attemptBox.innerHTML = html;
+  // Duration
+  const durationEl = document.getElementById('pbsgSummaryDuration');
+  if (durationEl) {
+    durationEl.textContent = formatDurationMs(Date.now() - pbsgTutorialStartedAt);
   }
 
-  if (finalGradeEl) {
-    const grade = getFinalGradePercent();
-    finalGradeEl.innerHTML = `<p><strong>Final Score:</strong> ${grade}%</p>`;
+  const totalQ = requiredQuizStepsCount();
+  const correctQ = passedQuizStepsCount();
+
+  const wrap = document.getElementById('pbsgObjectivesWrap');
+  const list = document.getElementById('pbsgSummaryQuestions');
+  const correctHead = document.getElementById('pbsgSummaryCorrect');
+  const totalHead = document.getElementById('pbsgSummaryTotal');
+  const correctMeta = document.getElementById('pbsgSummaryCorrect2');
+  const totalMeta = document.getElementById('pbsgSummaryTotal2');
+  const correctItem = document.getElementById('pbsgSummaryCorrectItem');
+  const scoreItem = document.getElementById('pbsgSummaryScoreItem');
+  const scoreEl = document.getElementById('pbsgSummaryScore');
+  const metaSeps = document.querySelectorAll('.pbsg-summary-meta [data-pbsg-meta-sep]');
+
+  if (totalQ > 0) {
+    // Build objectives list
+    if (list) {
+      list.innerHTML = '';
+      let qIdx = 0;
+      steps.forEach((step, idx) => {
+        if (!step.h5p_id) return;
+        qIdx += 1;
+        const tries = attemptCounts[idx] || 0;
+        const passed = passedSteps.has(idx);
+        const li = document.createElement('li');
+        if (!passed) li.classList.add('is-wrong');
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'pbsg-obj-label';
+        const strong = document.createElement('strong');
+        strong.textContent = `Question ${qIdx}`;
+        labelSpan.appendChild(strong);
+
+        const metaSpan = document.createElement('span');
+        metaSpan.className = 'pbsg-obj-meta';
+        metaSpan.textContent = `${tries} attempt${tries === 1 ? '' : 's'}`;
+
+        li.appendChild(labelSpan);
+        li.appendChild(metaSpan);
+        list.appendChild(li);
+      });
+    }
+
+    if (correctHead) correctHead.textContent = String(correctQ);
+    if (totalHead) totalHead.textContent = String(totalQ);
+    if (correctMeta) correctMeta.textContent = String(correctQ);
+    if (totalMeta) totalMeta.textContent = String(totalQ);
+    if (scoreEl) scoreEl.textContent = `${getFinalGradePercent()}%`;
+
+    if (wrap) wrap.hidden = false;
+    if (correctItem) correctItem.hidden = false;
+    if (scoreItem) scoreItem.hidden = false;
+    metaSeps.forEach(sep => { sep.hidden = false; });
+
+    // Overflow indicator — measure after layout settles
+    if (wrap && list) {
+      requestAnimationFrame(() => {
+        if (list.scrollHeight > list.clientHeight + 1) {
+          wrap.classList.add('has-overflow');
+        } else {
+          wrap.classList.remove('has-overflow');
+        }
+      });
+    }
+  } else {
+    // No quizzes — keep objectives + correct/score hidden, leave duration visible
+    if (wrap) wrap.hidden = true;
+    if (correctItem) correctItem.hidden = true;
+    if (scoreItem) scoreItem.hidden = true;
+    metaSeps.forEach(sep => { sep.hidden = true; });
   }
 }
 
