@@ -205,28 +205,46 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 .pbsg-quiz-header {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 12px !important;
-
+  gap: 10px !important;
   flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+/* Title zone — eyebrow + title stacked vertically, takes remaining space */
+.pbsg-step-title-zone {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  line-height: 1.25 !important;
+  overflow: hidden !important;
+}
+
+.pbsg-step-eyebrow {
+  font-family: "Roboto Condensed", "Roboto", var(--pbsg-admin-font) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: var(--pbsg-primary, #517E1B) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.7px !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
 .pbsg-step-title {
-  font-family: var(--pbsg-admin-font) !important;
-  font-size: 18px !important;
-  font-weight: 600 !important;
-  line-height: 1.3 !important;
-  color: var(--pbsg-text) !important;
+  font-family: "Lusitana", Georgia, serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #222 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
+/* Focus Quiz icon slot */
+.pbsg-focus-icon { display: inline-flex !important; }
+.pbsg-focus-icon .pbsg-icon { width: 14px !important; height: 14px !important; }
 
 /* ===== Quiz pane Menu ===== */
-.pbsg-quiz-header-left{
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  min-width: 0 !important;
-}
 
 .pbsg-menu-wrap{
   position: relative !important;
@@ -260,7 +278,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 
 .pbsg-menu-icon{ font-size: 14px !important; }
 .pbsg-menu-arrow{ font-size: 10px !important; margin-right: 0 !important; }
-.pbsg-menu-text{ font-size: 14px !important; }
+.pbsg-menu-label{ font-size: 14px !important; }
 
 .pbsg-menu-btn[aria-expanded="true"] .pbsg-menu-arrow{
   transform: rotate(180deg);
@@ -1778,7 +1796,7 @@ body.tutorial-active #colophon {
   font-size: 10px !important;
 }
 
-.pbsg-menu-text {
+.pbsg-menu-label {
   font-size: 13px !important;
 }
 
