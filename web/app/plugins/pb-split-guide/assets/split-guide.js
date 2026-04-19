@@ -227,6 +227,16 @@ const startTutorialBtn = document.getElementById('pbsgStartTutorial');
 const menuBtn = document.getElementById('pbsgMenuBtn');
 const menuDd  = document.getElementById('pbsgMenuDropdown');
 
+const stepEyebrowEl = document.getElementById('pbsgStepEyebrow');
+const menuListEl    = document.getElementById('pbsgMenuList');
+const menuHeadCurrentEl = menuDd ? menuDd.querySelector('.pbsg-menu-head-current') : null;
+const menuHeadTotalEl   = menuDd ? menuDd.querySelector('.pbsg-menu-head-total')   : null;
+const menuHeadDoneEl    = menuDd ? menuDd.querySelector('.pbsg-menu-head-done-count') : null;
+
+// Tracks which step indices the user has visited in this session.
+// In-memory only — no persistence, no storage, no PII.
+const visitedSteps = new Set();
+
 
 const h5pFrameHost = h5pFrame ? h5pFrame.parentElement : null;
 const h5pFrameCache = new Map();
@@ -625,15 +635,33 @@ function bindMenu(){
 function updateMenuState(){
   if (!menuDd) return;
 
+  // Record current step as visited (current position is trivially visited).
+  if (Number.isFinite(i)) visitedSteps.add(i);
+
   const items = menuDd.querySelectorAll('.pbsg-menu-item');
-  items.forEach(el=>{
+  items.forEach(el => {
     const idx = parseInt(el.dataset.stepIndex, 10);
     const isCurrent = idx === i;
-    const isFuture = idx > i;
+    const isFuture  = idx > i;
+    const isVisited = visitedSteps.has(idx) && !isCurrent;
 
-    el.classList.toggle('is-current', isCurrent);
+    el.classList.toggle('is-current',  isCurrent);
+    el.classList.toggle('is-visited',  isVisited);
     el.classList.toggle('is-disabled', inBranch || isFuture);
   });
+
+  // Sticky header counters
+  if (menuHeadCurrentEl) menuHeadCurrentEl.textContent = String((i | 0) + 1);
+  if (menuHeadTotalEl)   menuHeadTotalEl.textContent   = String(steps.length);
+  if (menuHeadDoneEl)    menuHeadDoneEl.textContent    = String(visitedSteps.size);
+
+  // Overflow fade — toggle after layout settles
+  if (menuListEl) {
+    // rAF so we read scrollHeight after any new class-driven layout change.
+    requestAnimationFrame(() => {
+      menuListEl.classList.toggle('has-overflow', menuListEl.scrollHeight > menuListEl.clientHeight + 1);
+    });
+  }
 }
 
 // Expose a jump function that uses your existing render()
@@ -1660,8 +1688,10 @@ function render(){
   renderTutorial(step);
 
   //titleEl.textContent = step.title || `Step ${i+1}`;
-  
-  if (titleEl) titleEl.textContent = '';
+
+  if (titleEl) titleEl.textContent = step.title || `Step ${i+1}`;
+  if (stepEyebrowEl) stepEyebrowEl.textContent = `Step ${i+1} of ${steps.length}`;
+  updateMenuState();
   if (progressEl) pbsgSetProgress(i + 1, steps.length);
   updateRunningScore();
 
