@@ -1461,7 +1461,7 @@ class PB_Split_Guide_Plugin {
         Site-wide defaults for tutorial layout and analytics benchmarks. Librarians can override benchmarks per tutorial.
       </p>
 
-      <form method="post" action="options.php">
+      <form method="post" action="<?php echo esc_url( admin_url('options.php') ); ?>">
         <?php settings_fields('pbsg_guide_settings'); ?>
 
         <!-- ═══ Section 1: Layout ═══ -->
@@ -1835,13 +1835,54 @@ class PB_Split_Guide_Plugin {
         /* ── Reset button ── */
         var defaults = <?php echo wp_json_encode(self::BENCHMARK_FALLBACKS); ?>;
         document.getElementById('pbsg_admin_reset').addEventListener('click', function(){
-          slider.value = <?php echo self::RATIO_DEFAULT; ?>;
-          slider.dispatchEvent(new Event('input'));
-          benchInputs.forEach(function(el) {
-            var key = el.getAttribute('data-key');
-            if (defaults[key] !== undefined) el.value = defaults[key];
+          if (!window.PbsgModal) {
+            // Fallback if modal primitive somehow didn't load — block rather than silently reset.
+            alert('Cannot reset — modal unavailable. Reload the page and try again.');
+            return;
+          }
+          window.PbsgModal.open({
+            variant: 'destructive',
+            icon:    (window.pbsgModalIcons && window.pbsgModalIcons.refresh) || '',
+            heading: 'Reset all Guide Settings?',
+            subtitle: 'This will revert every section on this page to its factory default.',
+            bodyLabel: 'The following will be reset and saved immediately',
+            bullets: [
+              '<strong>Panel Layout</strong> — returns to <?php echo (int) self::RATIO_DEFAULT; ?>% left / <?php echo (int) (100 - self::RATIO_DEFAULT); ?>% right.',
+              '<strong>Analytics Benchmarks</strong> — all thresholds restored to factory defaults.',
+              '<strong>Permissions</strong> — cross-editing <strong>on</strong>, ownership transfer <strong>on</strong>.'
+            ],
+            caveat: "<strong>This cannot be undone.</strong> Any customizations you've made across the three panels will be overwritten.",
+            confirmLabel: 'Reset and save',
+            onConfirm: function () {
+              // 1. Ratio slider
+              slider.value = <?php echo self::RATIO_DEFAULT; ?>;
+              slider.dispatchEvent(new Event('input'));
+
+              // 2. Benchmarks
+              benchInputs.forEach(function(el) {
+                var key = el.getAttribute('data-key');
+                if (defaults[key] !== undefined) el.value = defaults[key];
+              });
+              syncBenchJSON();
+
+              // 3. Permission toggles — both ON is the client default
+              var cross = document.getElementById('pbsg_cross_edit_toggle');
+              var xfer  = document.getElementById('pbsg_transfer_toggle');
+              if (cross) cross.checked = true;
+              if (xfer)  xfer.checked  = true;
+
+              // 4. Submit to persist.
+              //    NOTE: the form has <input name="submit"> from submit_button(),
+              //    which shadows form.submit (the method) on the element. Calling
+              //    the prototype method directly bypasses the shadow. This also
+              //    skips the submit event (native .submit() does not fire it), so
+              //    the per-toggle confirmation chain is naturally bypassed.
+              var form = document.querySelector('form[action$="options.php"]');
+              if (form) {
+                HTMLFormElement.prototype.submit.call(form);
+              }
+            }
           });
-          syncBenchJSON();
         });
       })();
       </script>
@@ -2155,7 +2196,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_split_guide_css',
       plugin_dir_url(__FILE__) . 'assets/split-guide.css',
       [],
-      '0.5.0.1'
+      '0.5.0.6'
     );
 
     // Only localize tracker data on published tutorials — prevents draft/preview pollution
@@ -2383,6 +2424,19 @@ class PB_Split_Guide_Plugin {
   $is_pages_list = ($hook === 'edit.php' && $screen && $screen->post_type === 'page');
   if (in_array($current_page, $cross_edit_screens, true) || $hook === 'post.php' || $hook === 'post-new.php' || $is_pages_list) {
     wp_enqueue_style(
+      'pbsg-modal',
+      plugin_dir_url(__FILE__) . 'assets/admin/pbsg-modal.css',
+      [],
+      '0.1.0'
+    );
+    wp_enqueue_script(
+      'pbsg-modal',
+      plugin_dir_url(__FILE__) . 'assets/admin/pbsg-modal.js',
+      [],
+      '0.1.0',
+      true
+    );
+    wp_enqueue_style(
       'pbsg-admin-cross-edit',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.css',
       [],
@@ -2391,10 +2445,16 @@ class PB_Split_Guide_Plugin {
     wp_enqueue_script(
       'pbsg-admin-cross-edit',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.js',
-      ['jquery'],
-      '0.6.0',
+      ['jquery', 'pbsg-modal'],
+      '0.7.2',
       true
     );
+    wp_localize_script('pbsg-admin-cross-edit', 'pbsgModalIcons', [
+      'lockClosed' => pbsg_icon('lock-closed'),
+      'lockOpen'   => pbsg_icon('lock-open'),
+      'shuffle'    => pbsg_icon('shuffle'),
+      'refresh'    => pbsg_icon('refresh'),
+    ]);
     // Check for pending bulk transfer from Pages list
     $bulk_transfer_ids = [];
     if ( isset($_GET['pbsg_bulk_transfer']) && $_GET['pbsg_bulk_transfer'] === '1' ) {

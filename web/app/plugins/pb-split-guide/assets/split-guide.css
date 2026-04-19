@@ -175,6 +175,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   border-radius: var(--pbsg-radius) !important;
   box-shadow: var(--pbsg-shadow) !important;
   overflow: hidden !important;
+  container-type: inline-size;
 }
 
 .pbsg-right {
@@ -204,28 +205,74 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 .pbsg-quiz-header {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  gap: 12px !important;
-
+  gap: 10px !important;
   flex: 0 0 auto !important;
+  min-width: 0 !important;
+}
+
+/* Title zone — eyebrow + title stacked vertically, takes remaining space */
+.pbsg-step-title-zone {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  line-height: 1.25 !important;
+  overflow: hidden !important;
+}
+
+.pbsg-step-eyebrow {
+  font-family: "Roboto Condensed", "Roboto", var(--pbsg-admin-font) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: var(--pbsg-primary, #517E1B) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.7px !important;
+  font-variant-numeric: tabular-nums !important;
 }
 
 .pbsg-step-title {
-  font-family: var(--pbsg-admin-font) !important;
-  font-size: 18px !important;
-  font-weight: 600 !important;
-  line-height: 1.3 !important;
-  color: var(--pbsg-text) !important;
+  font-family: "Lusitana", Georgia, serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #222 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
 }
 
+/* Focus Quiz icon slot */
+.pbsg-focus-icon { display: inline-flex !important; }
+.pbsg-focus-icon .pbsg-icon { width: 14px !important; height: 14px !important; }
+
+/* -------------------------------------------------------------
+   Toolbar responsive tiers — driven by .pbsg-left container queries.
+   Breakpoints mirror the bottom nav (Part 1 of 2026-04-16 spec) so
+   both control rows collapse at the same container widths.
+   ------------------------------------------------------------- */
+
+/* Tier 2 — drop button labels, keep icons + eyebrow + title */
+@container (max-width: 480px) {
+  .pbsg-menu-label,
+  .pbsg-focus-label { display: none !important; }
+  .pbsg-menu-btn,
+  .pbsg-focus-btn { padding: 7px 9px !important; }
+}
+
+/* Tier 3 — hide eyebrow + menu chevron, title truncates */
+@container (max-width: 300px) {
+  .pbsg-step-eyebrow { display: none !important; }
+  .pbsg-menu-arrow { display: none !important; }
+  .pbsg-step-title { font-size: 12px !important; }
+  .pbsg-quiz-header { gap: 6px !important; }
+}
+
+/* Tier 4 — hide title entirely; icons only */
+@container (max-width: 180px) {
+  .pbsg-step-title-zone { display: none !important; }
+  .pbsg-quiz-header { justify-content: space-between !important; gap: 4px !important; }
+}
 
 /* ===== Quiz pane Menu ===== */
-.pbsg-quiz-header-left{
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-  min-width: 0 !important;
-}
 
 .pbsg-menu-wrap{
   position: relative !important;
@@ -259,72 +306,139 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 
 .pbsg-menu-icon{ font-size: 14px !important; }
 .pbsg-menu-arrow{ font-size: 10px !important; margin-right: 0 !important; }
-.pbsg-menu-text{ font-size: 14px !important; }
+.pbsg-menu-label{ font-size: 14px !important; }
 
 .pbsg-menu-btn[aria-expanded="true"] .pbsg-menu-arrow{
   transform: rotate(180deg);
   transition: transform 0.2s ease;
 }
 
+/* ===== Dropdown container (unchanged positioning) ===== */
 .pbsg-menu-dropdown{
   position: absolute !important;
   top: calc(100% + 8px) !important;
   left: 0 !important;
   width: min(340px, 70vw) !important;
-  max-height: 420px !important;
-  overflow: auto !important;
   background: #fff !important;
   border: 1px solid var(--pbsg-border) !important;
   border-radius: var(--pbsg-radius) !important;
   box-shadow: 0 3px 8px rgba(0,0,0,.08) !important;
   display: none !important;
   z-index: 50 !important;
+  overflow: hidden !important;
 }
 
-.pbsg-menu-dropdown.is-open{
-  display: block !important;
+.pbsg-menu-dropdown.is-open{ display: block !important; }
+
+/* ===== Sticky mini-header ===== */
+.pbsg-menu-head{
+  background: #F8F8F8 !important;
+  border-bottom: 1px solid #F1F1F1 !important;
+  padding: 8px 12px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  font-family: "Roboto Condensed", "Roboto", var(--pbsg-admin-font) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: var(--pbsg-muted, #646970) !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.6px !important;
+  position: sticky !important;
+  top: 0 !important;
 }
 
+.pbsg-menu-head-position,
+.pbsg-menu-head-done { font-variant-numeric: tabular-nums !important; }
+
+.pbsg-menu-head-done{
+  color: var(--pbsg-primary, #517E1B) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+.pbsg-menu-head-done .pbsg-icon{ width: 12px !important; height: 12px !important; }
+
+/* ===== Scrollable list ===== */
 .pbsg-menu-list{
   list-style: none !important;
   margin: 0 !important;
-  padding: 8px !important;
+  padding: 6px !important;
+  max-height: 260px !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  position: relative !important;
 }
 
+/* ===== Item base ===== */
 .pbsg-menu-item{
   width: 100% !important;
-  text-align: left !important;
-  padding: 10px 12px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 10px !important;
   border: 1px solid transparent !important;
   background: transparent !important;
-  color: var(--pbsg-text) !important;
-  border-radius: 6px !important;
+  color: var(--pbsg-text, #333) !important;
+  border-radius: 4px !important;
   cursor: pointer !important;
-  font-size: 14px !important;
+  font-size: 13px !important;
   font-family: var(--pbsg-admin-font) !important;
+  text-align: left !important;
   outline: none !important;
 }
-
-.pbsg-menu-item:hover{
-  background: #f6f7f7 !important;
+.pbsg-menu-item:hover,
+.pbsg-menu-item:focus-visible { background: #FAFAFA !important; }
+.pbsg-menu-item:focus-visible {
+  outline: 2px solid var(--pbsg-primary, #8C2004) !important;
+  outline-offset: -2px !important;
 }
 
-.pbsg-menu-item.is-current{
-  font-weight: 600 !important;
-  background: #f0f0f1 !important;
-}
-
-.pbsg-menu-item.is-current:hover{
-  background-color: rgba(34, 34, 34, 0.2) !important;
-}
-
-.pbsg-menu-item.is-current{
+.pbsg-menu-item-label{ display: inline-flex !important; align-items: center !important; min-width: 0 !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+.pbsg-menu-item-num{
+  font-family: "Roboto Condensed", "Roboto", var(--pbsg-admin-font) !important;
+  font-variant-numeric: tabular-nums !important;
+  margin-right: 8px !important;
+  color: var(--pbsg-muted, #646970) !important;
   font-weight: 600 !important;
 }
 
-.pbsg-menu-item.is-disabled{
-  opacity: .45 !important;
-  cursor: not-allowed !important;
+/* ===== Check slot (right side) ===== */
+.pbsg-menu-item-check{ display: none !important; }
+.pbsg-menu-item-check .pbsg-icon{
+  width: 14px !important;
+  height: 14px !important;
+  color: var(--pbsg-primary, #517E1B) !important;
+}
+
+/* ===== Visited — muted text + subtle check ===== */
+.pbsg-menu-item.is-visited{ color: var(--pbsg-muted, #646970) !important; }
+.pbsg-menu-item.is-visited .pbsg-menu-item-check{ display: inline-flex !important; opacity: 0.8 !important; }
+
+/* ===== Current — green left-border accent ===== */
+.pbsg-menu-item.is-current{
+  background: #F1F1F1 !important;
+  border-left: 3px solid var(--pbsg-primary, #517E1B) !important;
+  padding-left: 7px !important;
+  font-weight: 700 !important;
+  color: #222 !important;
+}
+.pbsg-menu-item.is-current .pbsg-menu-item-num{ color: var(--pbsg-primary, #517E1B) !important; }
+
+/* ===== Disabled (preserves existing behavior for future steps) ===== */
+.pbsg-menu-item.is-disabled{ opacity: 0.5 !important; pointer-events: none !important; }
+
+/* ===== Overflow fade — toggled by JS on .pbsg-menu-list ===== */
+.pbsg-menu-list.has-overflow::after{
+  content: '' !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  display: block !important;
+  height: 26px !important;
+  margin-top: -26px !important;
+  background: linear-gradient(to bottom, rgba(255,255,255,0), #fff) !important;
+  pointer-events: none !important;
 }
 
 
@@ -347,19 +461,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 }
 
 /* Nav stays visible at the bottom */
-.pbsg-nav {
-  flex: 0 0 auto !important;
-  display: grid !important;
-  grid-template-columns: 1fr auto 1fr !important;
-  gap: 12px !important;
-  align-items: center !important;
-  padding-top: 16px !important;
-  border-top: 1px solid var(--pbsg-border) !important;
-  background: #fff !important;
-  position: sticky !important;
-  bottom: 0 !important;
-  z-index: 5 !important;
-}
+/* .pbsg-nav layout moved to container-query block near end of file */
 
 #pbsgProgress,
 .pbsg-progress {
@@ -373,7 +475,6 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
 
 #pbsgPrev,
 #pbsgNext {
-  width: 100% !important;
   min-height: 38px !important;
   padding: 9px 20px !important;
   font-family: var(--pbsg-admin-font) !important;
@@ -452,6 +553,7 @@ body.admin-bar.pbsg-standalone .pbsg-wrap {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
+  gap: 8px !important;
   min-height: 38px !important;
   padding: 9px 20px !important;
   background: #fff !important;
@@ -1175,52 +1277,199 @@ body.pbsg-standalone .pbsg-wrap{
   margin: 40px auto;
 }
 
+/* ================================================================
+   Summary / completion card — mirrors intro card design language
+   ================================================================ */
 .pbsg-summary-card {
-  background:#fff;
-  border: 1px solid var(--pbsg-border);
-  border-radius: var(--pbsg-radius);
-  padding: 36px 40px;
-  box-shadow: var(--pbsg-shadow);
+  background: #fff;
+  border: 1px solid var(--gots-border, #E0E0E0);
+  border-radius: 8px;
+  padding: 32px 36px;
+  max-width: 620px;
+  margin: 0 auto;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
 }
-
-.pbsg-summary-title{
-  text-align:center;
-  font-size: 24px;
-  font-weight: 700;
-  color: #222;
-  margin-bottom: 8px;
+.pbsg-summary-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gots-primary, #517E1B);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
 }
-
-.pbsg-attempt-summary ul{
-  margin: 20px 0;
-  padding-left: 20px;
-}
-
-.pbsg-attempt-summary li{
-  margin-bottom: 8px;
+.pbsg-summary-desc {
   font-size: 14px;
-  color: #333;
-  line-height: 1.6;
+  line-height: 1.5;
+  color: #555;
+  margin: 0 0 20px;
 }
 
-.pbsg-summary-actions{
-  margin-top: 28px;
-  text-align: center;
+/* ── Structured summary card — two-column (cover left, info right)
+      Applied only when the tutorial has a cover image. Mirrors the
+      intro card pattern at .pbsg-intro-card--structured so the two
+      bookends of a tutorial share the same visual rhythm. ───────── */
+.pbsg-summary-card--structured {
+  padding: 0;
+  overflow: hidden;
+  flex-direction: row;
+  max-width: 820px;
+}
+.pbsg-summary-cover {
+  flex: 0 0 auto;
+  min-height: 360px;
+  max-width: 45%;
+  margin: 0;
+}
+/* ID selector required to beat Pressbooks Aldine theme's `#content img { height: auto }` */
+#pbsgSummaryScreen .pbsg-summary-cover img {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  display: block;
+  border-radius: 0;
+  object-fit: cover;
+}
+.pbsg-summary-card--structured .pbsg-summary-info {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 36px;
+  display: flex;
+  flex-direction: column;
 }
 
-.pbsg-final-grade {
-  margin: 20px 0;
-  font-size: 28px;
+@media (max-width: 768px) {
+  .pbsg-summary-card--structured {
+    flex-direction: column;
+    max-width: 92vw;
+  }
+  .pbsg-summary-cover {
+    width: 100%;
+    height: 160px;
+    min-height: 0;
+    max-width: none;
+  }
+  #pbsgSummaryScreen .pbsg-summary-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .pbsg-summary-card--structured .pbsg-summary-info {
+    padding: 24px 20px;
+  }
+}
+
+/* Objectives block — bounded height + scroll when many questions */
+.pbsg-objectives-wrap {
+  margin: 0 0 18px;
+  border: 1px solid #F1F1F1;
+  border-radius: 6px;
+  background: #FCFCFC;
+  position: relative;
+}
+.pbsg-objectives-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gots-muted, #646970);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-bottom: 1px solid #F1F1F1;
+  background: #F8F8F8;
+}
+.pbsg-objectives-head .pbsg-objectives-count {
+  color: var(--gots-primary, #517E1B);
   font-weight: 700;
-  text-align: center;
+}
+.pbsg-summary-card .pbsg-objectives {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.pbsg-summary-card .pbsg-objectives::-webkit-scrollbar { width: 6px; }
+.pbsg-summary-card .pbsg-objectives::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 3px; }
+.pbsg-summary-card .pbsg-objectives li {
+  padding: 8px 14px 8px 34px;
+  position: relative;
+  font-size: 13px;
+  border-bottom: 1px solid #F1F1F1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  line-height: 1.35;
+}
+.pbsg-summary-card .pbsg-objectives li:last-child { border-bottom: none; }
+.pbsg-summary-card .pbsg-objectives li::before {
+  content: '\2713';
+  position: absolute;
+  left: 14px;
+  top: 8px;
+  color: var(--gots-primary, #517E1B);
+  font-weight: 700;
+  font-size: 13px;
+}
+.pbsg-summary-card .pbsg-objectives li.is-wrong::before {
+  content: '\2013';
+  color: var(--gots-muted, #646970);
+}
+.pbsg-summary-card .pbsg-objectives .pbsg-obj-label {
   color: #222;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pbsg-summary-card .pbsg-objectives .pbsg-obj-meta {
+  color: var(--gots-muted, #646970);
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-left: 10px;
 }
 
+/* Bottom fade when list overflows */
+.pbsg-objectives-wrap.has-overflow::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 6px;
+  bottom: 0;
+  height: 26px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #FCFCFC);
+  pointer-events: none;
+}
+
+/* Meta strip — same as intro */
+.pbsg-summary-meta {
+  display: flex;
+  gap: 18px;
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--gots-muted, #646970);
+  padding: 12px 16px;
+  background: var(--gots-bg, #F8F8F8);
+  border-radius: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.pbsg-summary-meta .pbsg-meta-item { display: inline-flex; align-items: center; gap: 8px; }
+.pbsg-summary-meta .pbsg-meta-sep { opacity: 0.35; }
+.pbsg-summary-meta strong { color: #222; font-weight: 600; }
+.pbsg-summary-meta .pbsg-meta-icon { width: 18px; height: 18px; flex-shrink: 0; }
+.pbsg-summary-meta .pbsg-meta-item.is-score { color: var(--gots-primary, #517E1B); }
+.pbsg-summary-meta .pbsg-meta-item.is-score strong { color: var(--gots-primary, #517E1B); }
+
+/* Action buttons — reuse .pbsg-btn-outline / existing primary */
 .pbsg-summary-actions {
   display: flex;
-  gap: 16px;
-  align-items: center;
-  justify-content: center;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
@@ -1419,21 +1668,42 @@ body.tutorial-active #colophon {
   z-index: 2;
 }
 
+/* Eyebrow — mirrors .pbsg-summary-eyebrow so the modal reads as
+   the same typographic system as the summary card that launched it */
+.pbsg-cert-modal-eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gots-primary, #517E1B);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-bottom: 6px;
+}
+
 .pbsg-cert-modal-dialog h3 {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
+  font-family: "Lusitana", Georgia, serif;
   font-size: 22px;
   font-weight: 700;
   color: #222;
+  line-height: 1.2;
+}
+
+/* Modal description — matches .pbsg-summary-desc body copy */
+.pbsg-cert-modal-desc {
+  font-size: 14px;
+  line-height: 1.5;
+  color: #555;
+  margin: 0 0 4px;
 }
 
 .pbsg-cert-label {
   display: block;
   margin: 18px 0 6px;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
-  color: #333;
+  color: var(--gots-primary, #517E1B);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.8px;
 }
 
 .pbsg-cert-input {
@@ -1589,10 +1859,6 @@ body.tutorial-active #colophon {
   font-size: 32px !important;
 }
 
-.pbsg-step-title {
-  font-size: 15px !important;
-}
-
 .pbsg-banner-text,
 #pbsgProgress,
 .pbsg-progress,
@@ -1612,18 +1878,6 @@ body.tutorial-active #colophon {
   padding: 6px 12px !important;
   font-size: 13px !important;
   font-weight: 400 !important;
-}
-
-.pbsg-menu-icon {
-  font-size: 13px !important;
-}
-
-.pbsg-menu-arrow {
-  font-size: 10px !important;
-}
-
-.pbsg-menu-text {
-  font-size: 13px !important;
 }
 
 .pbsg-left-inner {
@@ -1730,25 +1984,12 @@ body.tutorial-active #colophon {
   scroll-margin-top: 0 !important;
 }
 
-.pbsg-nav {
-  display: grid;
-  grid-template-columns: minmax(110px, 140px) 1fr minmax(110px, 140px);
-  align-items: center;
-  gap: 12px;
-}
+/* .pbsg-nav / .pbsg-nav-btn / .pbsg-nav-center layout moved to
+   container-query block near end of file. */
 
 .pbsg-nav-btn {
-  min-width: 110px;
   padding: 8px 18px;
   font-size: 15px;
-}
-
-.pbsg-nav-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  min-width: 0;
 }
 
 .pbsg-progress {
@@ -1762,5 +2003,78 @@ body.tutorial-active #colophon {
   white-space: nowrap;
   font-weight: 600;
   color: #2e7d32;
-  min-width: 200px;
+}
+
+/* ================================================================
+   Nav bar — container-query responsive wrap (4 tiers)
+   Tier 1 >480px : single row (default)
+   Tier 2 ≤480px : progress wraps above buttons; buttons share width
+   Tier 3 ≤300px : compact labels (2/10, 3/3 ✓)
+   Tier 4 ≤180px : stack buttons vertically, hide score
+   ================================================================ */
+.pbsg-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  row-gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gots-border, #E0E0E0);
+}
+.pbsg-nav-btn {
+  flex: 0 0 auto;
+  min-width: 100px;
+}
+.pbsg-nav-center {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-width: 0;
+  white-space: nowrap;
+  order: 0;
+  color: var(--gots-muted, #646970);
+}
+
+/* Long/short label swap primitives */
+.pbsg-progress-short,
+.pbsg-score-short { display: none; }
+
+/* Tier 2 — wrap progress above buttons.
+   Raised from 480px because the long labels "Page: N of M" + "Correct/Attempted X/Y"
+   plus two 100px buttons don't fit on one row below ~600px — leaving the nav-center
+   floating and forcing Next to wrap. */
+@container (max-width: 600px) {
+  .pbsg-nav-center {
+    flex-basis: 100%;
+    order: -1;
+    justify-content: space-between;
+  }
+  .pbsg-nav-btn { flex: 1 1 0; }
+}
+
+/* Tier 3 — compact labels; muted for progress, green for score */
+@container (max-width: 300px) {
+  .pbsg-progress-long,
+  .pbsg-score-long { display: none; }
+  .pbsg-progress-short,
+  .pbsg-score-short { display: inline; }
+  .pbsg-progress-short {
+    color: var(--gots-muted, #646970);
+    font-family: "Roboto Condensed", "Roboto", sans-serif;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+  }
+  .pbsg-score-short {
+    color: var(--gots-primary, #517E1B);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Tier 4 — stack buttons, hide score */
+@container (max-width: 180px) {
+  .pbsg-running-score { display: none; }
+  .pbsg-nav-btn { flex-basis: 100%; min-width: 0; }
 }

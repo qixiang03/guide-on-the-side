@@ -20,7 +20,7 @@ jobs:
     steps:
       # 1: Check out the repository code so the workflow can access it
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2: Set up the PHP environment matching your local dev (PHP 8.2)
       - name: Setup PHP
@@ -46,7 +46,7 @@ jobs:
       # This ensures a persistent "Test Log" is available for the Review Process
       - name: Archive Test Logs
         if: always() # Ensure logs are uploaded even if tests fail
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: phpunit-test-log
           path: build/logs/junit.xml
@@ -54,7 +54,7 @@ jobs:
       # NEW: Automatically comment a Testing Log stub on the PR with CI evidence
       - name: Comment Testing Log Stub on PR
         if: ${{ always() && github.event_name == 'pull_request' }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const prNumber = context.payload.pull_request.number;

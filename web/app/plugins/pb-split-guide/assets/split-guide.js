@@ -8,6 +8,31 @@ const openLink = document.getElementById('pbsgOpenLink');
 const fallback = document.getElementById('pbsgTutorialFallback');
 const fallbackLink = document.getElementById('pbsgFallbackLink');
 
+// ── Dual-label nav updaters ──
+//
+// The nav template renders both a long label ("Page: 2 of 10",
+// "Correct/Attempted 3/5") and a short label ("2/10", "3/5") inside the
+// progress and running-score elements. CSS container queries decide which
+// variant is visible at any given width. Because both copies live in the
+// DOM simultaneously, the helpers below MUST use querySelectorAll + forEach
+// so the long and short variants stay in sync. Do not swap to querySelector
+// on a single span — one of the two copies will go stale.
+function pbsgSetProgress(current, total) {
+  document.querySelectorAll('#pbsgProgress .pbsg-progress-current').forEach(function (el) {
+    el.textContent = current;
+  });
+  document.querySelectorAll('#pbsgProgress .pbsg-progress-total').forEach(function (el) {
+    el.textContent = total;
+  });
+}
+
+function pbsgSetScore(correct, attempted) {
+  var value = correct + '/' + attempted;
+  document.querySelectorAll('#pbsgRunningScore .pbsg-score-value').forEach(function (el) {
+    el.textContent = value;
+  });
+}
+
 let tutorialPopup;
 let popupPollInterval = null;
 
@@ -201,6 +226,16 @@ const startTutorialBtn = document.getElementById('pbsgStartTutorial');
 // --------------------
 const menuBtn = document.getElementById('pbsgMenuBtn');
 const menuDd  = document.getElementById('pbsgMenuDropdown');
+
+const stepEyebrowEl = document.getElementById('pbsgStepEyebrow');
+const menuListEl    = document.getElementById('pbsgMenuList');
+const menuHeadCurrentEl = menuDd ? menuDd.querySelector('.pbsg-menu-head-current') : null;
+const menuHeadTotalEl   = menuDd ? menuDd.querySelector('.pbsg-menu-head-total')   : null;
+const menuHeadDoneEl    = menuDd ? menuDd.querySelector('.pbsg-menu-head-done-count') : null;
+
+// Tracks which step indices the user has visited in this session.
+// In-memory only — no persistence, no storage, no PII.
+const visitedSteps = new Set();
 
 
 const h5pFrameHost = h5pFrame ? h5pFrame.parentElement : null;
@@ -423,14 +458,52 @@ function getH5PStyleCSS() {
             color: #8C2004 !important;
           }
 
-          /* Button container — push buttons right */
+          /* H5P's Question.js truncates the retry button to an icon-only
+             2.235em square when it decides the button row is too wide
+             (see question.js:674 — it calls $button.html('').addClass('truncated')
+             which wipes the label from the DOM). Next to our wide "Show
+             solution" button, that truncated retry looks like a broken
+             square. Override the size clamp and re-inject the saved label
+             via ::after + aria-label (H5P stores the original text there
+             at question.js:671 before wiping). */
+          .h5p-joubelui-button.truncated {
+            width: auto !important;
+            height: auto !important;
+            border-radius: 6px !important;
+          }
+          .h5p-question-try-again.truncated::after {
+            content: attr(aria-label);
+            display: inline;
+            font: inherit;
+            margin-left: 0;
+            vertical-align: baseline;
+          }
+
+          /* Button container — push buttons right.
+             H5P toggles .h5p-question-visible, .has-scorebar, and .wrap on
+             this element, each of which ships its own width/display rules
+             (see H5P.Question-1.5/styles/question.css:186-206). Match all
+             variants so our right-alignment wins regardless of state. */
           .h5p-question .h5p-question-buttons,
+          .h5p-question-buttons.h5p-question-visible,
+          .h5p-question-buttons.has-scorebar,
+          .h5p-question-buttons.has-scorebar.wrap,
           .h5p-actions,
           .h5p-joubelui-button-container {
             display: flex !important;
+            flex-wrap: wrap !important;
             justify-content: flex-end !important;
+            align-items: center !important;
             gap: 10px !important;
             margin-top: 14px !important;
+            width: auto !important;
+            max-width: 100% !important;
+          }
+
+          /* When H5P inserts a scorebar sibling inside the buttons container,
+             push it to the left so buttons stay right-aligned */
+          .h5p-question-buttons .h5p-joubelui-score-bar {
+            margin-right: auto !important;
           }
 
           /* ── Feedback callouts ───────────────────────────── */
@@ -562,15 +635,33 @@ function bindMenu(){
 function updateMenuState(){
   if (!menuDd) return;
 
+  // Record current step as visited (current position is trivially visited).
+  if (Number.isFinite(i)) visitedSteps.add(i);
+
   const items = menuDd.querySelectorAll('.pbsg-menu-item');
-  items.forEach(el=>{
+  items.forEach(el => {
     const idx = parseInt(el.dataset.stepIndex, 10);
     const isCurrent = idx === i;
-    const isFuture = idx > i;
+    const isFuture  = idx > i;
+    const isVisited = visitedSteps.has(idx) && !isCurrent;
 
-    el.classList.toggle('is-current', isCurrent);
+    el.classList.toggle('is-current',  isCurrent);
+    el.classList.toggle('is-visited',  isVisited);
     el.classList.toggle('is-disabled', inBranch || isFuture);
   });
+
+  // Sticky header counters
+  if (menuHeadCurrentEl) menuHeadCurrentEl.textContent = String((i | 0) + 1);
+  if (menuHeadTotalEl)   menuHeadTotalEl.textContent   = String(steps.length);
+  if (menuHeadDoneEl)    menuHeadDoneEl.textContent    = String(visitedSteps.size);
+
+  // Overflow fade — toggle after layout settles
+  if (menuListEl) {
+    // rAF so we read scrollHeight after any new class-driven layout change.
+    requestAnimationFrame(() => {
+      menuListEl.classList.toggle('has-overflow', menuListEl.scrollHeight > menuListEl.clientHeight + 1);
+    });
+  }
 }
 
 // Expose a jump function that uses your existing render()
@@ -1106,7 +1197,6 @@ const certModalCancel = document.getElementById('pbsgCertModalCancel');
 const certModalClose = document.getElementById('pbsgCertModalClose');
 const certModalError = document.getElementById('pbsgCertModalError');
 const certHint = document.getElementById('pbsgCertHint');
-const finalGradeEl = document.getElementById('pbsgFinalGrade');
 const retakeBtn = document.getElementById('pbsgRetakeTutorial');
 
 function lockCert(locked, msg){
@@ -1149,18 +1239,25 @@ function getFinalGradePercent(){
   return ((passed / total) * 100).toFixed(2);
 }
 
+function formatDurationMs(ms) {
+  if (!ms || ms < 0) ms = 0;
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}m ${s.toString().padStart(2, '0')}s`;
+}
+
 function updateRunningScore() {
   if (!runningScoreEl) return;
 
   const correct = passedQuizStepsCount();
   const attempted = attemptedQuizStepsCount();
 
-  // Use innerHTML so the Marginalia check icon renders as inline SVG.
-  // Numeric values are safe (produced by Number coercion above).
-  const checkIcon = (typeof PBSG_ICONS !== 'undefined')
-    ? PBSG_ICONS.render('check', 'pbsg-icon--ok')
-    : '';
-  runningScoreEl.innerHTML = `Correct/Attempted ${correct}/${attempted} ${checkIcon}`;
+  // The template pre-renders the "Correct/Attempted" label and the check
+  // icon inside both long and short score spans, so we only need to update
+  // the numeric value spans. pbsgSetScore keeps the long/short variants in
+  // sync.
+  pbsgSetScore(correct, attempted);
 }
 
 function resetTutorialToStart(){
@@ -1247,6 +1344,8 @@ let attemptCounts = {};
 steps.forEach((_, idx) => {
   attemptCounts[idx] = 0;
 });
+
+const pbsgTutorialStartedAt = Date.now();
 
 async function markCompletedOnce() {
   if (!window.PBSG_CERT?.isLoggedIn) return false;
@@ -1589,9 +1688,11 @@ function render(){
   renderTutorial(step);
 
   //titleEl.textContent = step.title || `Step ${i+1}`;
-  
-  if (titleEl) titleEl.textContent = '';
-  if (progressEl) progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
+
+  if (titleEl) titleEl.textContent = step.title || `Step ${i+1}`;
+  if (stepEyebrowEl) stepEyebrowEl.textContent = `Step ${i+1} of ${steps.length}`;
+  updateMenuState();
+  if (progressEl) pbsgSetProgress(i + 1, steps.length);
   updateRunningScore();
 
   
@@ -1962,10 +2063,8 @@ function renderBranchStep() {
   renderTutorial(effectiveTutorialStep);
 
   
-  const branchTotal = Array.isArray(branch.questions) ? branch.questions.length : 0;
   const letter = String.fromCharCode(65 + branchStepIndex); // A, B, C...
   const mainNumber = branchParentIndex + 1;
-  const branchCurrent = branchStepIndex + 1;
 
   // Total tutorial pages — used as the denominator so the student sees their
   // overall position in the tutorial (e.g. "Page: 2A of 10") rather than just
@@ -1973,7 +2072,7 @@ function renderBranchStep() {
   const totalPages = Array.isArray(steps) ? steps.length : 0;
   const pageText = `Page: ${mainNumber}${letter} of ${totalPages}`;
 
-  if (progressEl) progressEl.textContent = pageText;
+  if (progressEl) pbsgSetProgress(`${mainNumber}${letter}`, totalPages);
   updateRunningScore();
   if (progressLabelEl) progressLabelEl.textContent = pageText;
 
@@ -2134,11 +2233,21 @@ retakeBtn.onclick = () => {
 const focusTutBtn = document.getElementById('pbsgFocusTutorial');
 const focusQuizBtn = document.getElementById('pbsgFocusQuiz');
 
+function setFocusBtnLabel(btn, text){
+  if (!btn) return;
+  const label = btn.querySelector('.pbsg-focus-label');
+  if (label) {
+    label.textContent = text;
+  } else {
+    btn.textContent = text;
+  }
+}
+
 function clearFocus(){
   document.body.classList.remove('pbsg-focus-tutorial','pbsg-focus-quiz');
-  focusTutBtn.textContent='Focus Tutorial';
-  focusQuizBtn.textContent='Focus Quiz';
-  
+  setFocusBtnLabel(focusTutBtn, 'Focus Tutorial');
+  setFocusBtnLabel(focusQuizBtn, 'Focus Quiz');
+
   // Remove the inert attribute from both panes when exiting focus mode
   const leftPane = document.querySelector('.pbsg-left');
   const rightPane = document.querySelector('.pbsg-right');
@@ -2148,21 +2257,21 @@ function clearFocus(){
 
 function toggleFocus(mode){
   const cls = mode==='tutorial'?'pbsg-focus-tutorial':'pbsg-focus-quiz';
-  if(document.body.classList.contains(cls)){ 
-    clearFocus(); 
+  if(document.body.classList.contains(cls)){
+    clearFocus();
   } else {
     clearFocus();
     document.body.classList.add(cls);
-    
+
     const leftPane = document.querySelector('.pbsg-left');
     const rightPane = document.querySelector('.pbsg-right');
-    
+
     if(mode==='tutorial') {
-      focusTutBtn.textContent='Exit Focus';
+      setFocusBtnLabel(focusTutBtn, 'Exit Focus');
       // Tutorial is active (right pane), make quiz pane (left pane) inert
       if (leftPane) leftPane.setAttribute('inert', '');
     } else {
-      focusQuizBtn.textContent='Exit Focus';
+      setFocusBtnLabel(focusQuizBtn, 'Exit Focus');
       // Quiz is active (left pane), make tutorial pane (right pane) inert
       if (rightPane) rightPane.setAttribute('inert', '');
     }
@@ -2235,30 +2344,88 @@ function notifyParentBranchCompleted() {
 }
 
 function showSummaryScreen(){
-
   const mainContent = document.getElementById('pbsgMainContent');
   const summaryScreen = document.getElementById('pbsgSummaryScreen');
-  const attemptBox = document.getElementById('pbsgAttemptSummary');
 
-  if(mainContent) mainContent.style.display = 'none';
-  if(summaryScreen) summaryScreen.style.display = '';
+  if (mainContent) mainContent.style.display = 'none';
+  if (summaryScreen) summaryScreen.style.display = '';
 
-  if(attemptBox){
-    let html = '<ul>';
-
-    steps.forEach((step, idx)=>{
-      const tries = attemptCounts[idx] || 0;
-      const label = step.title || `Question ${idx+1}`;
-      html += `<li><strong>${label}</strong>: tried ${tries} time${tries===1?'':'s'}</li>`;
-    });
-
-    html += '</ul>';
-    attemptBox.innerHTML = html;
+  // Duration
+  const durationEl = document.getElementById('pbsgSummaryDuration');
+  if (durationEl) {
+    durationEl.textContent = formatDurationMs(Date.now() - pbsgTutorialStartedAt);
   }
 
-  if (finalGradeEl) {
-    const grade = getFinalGradePercent();
-    finalGradeEl.innerHTML = `<p><strong>Final Score:</strong> ${grade}%</p>`;
+  const totalQ = requiredQuizStepsCount();
+  const correctQ = passedQuizStepsCount();
+
+  const wrap = document.getElementById('pbsgObjectivesWrap');
+  const list = document.getElementById('pbsgSummaryQuestions');
+  const correctHead = document.getElementById('pbsgSummaryCorrect');
+  const totalHead = document.getElementById('pbsgSummaryTotal');
+  const correctMeta = document.getElementById('pbsgSummaryCorrect2');
+  const totalMeta = document.getElementById('pbsgSummaryTotal2');
+  const correctItem = document.getElementById('pbsgSummaryCorrectItem');
+  const scoreItem = document.getElementById('pbsgSummaryScoreItem');
+  const scoreEl = document.getElementById('pbsgSummaryScore');
+  const metaSeps = document.querySelectorAll('.pbsg-summary-meta [data-pbsg-meta-sep]');
+
+  if (totalQ > 0) {
+    // Build objectives list
+    if (list) {
+      list.innerHTML = '';
+      let qIdx = 0;
+      steps.forEach((step, idx) => {
+        if (!step.h5p_id) return;
+        qIdx += 1;
+        const tries = attemptCounts[idx] || 0;
+        const passed = passedSteps.has(idx);
+        const li = document.createElement('li');
+        if (!passed) li.classList.add('is-wrong');
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'pbsg-obj-label';
+        const strong = document.createElement('strong');
+        strong.textContent = `Question ${qIdx}`;
+        labelSpan.appendChild(strong);
+
+        const metaSpan = document.createElement('span');
+        metaSpan.className = 'pbsg-obj-meta';
+        metaSpan.textContent = `${tries} attempt${tries === 1 ? '' : 's'}`;
+
+        li.appendChild(labelSpan);
+        li.appendChild(metaSpan);
+        list.appendChild(li);
+      });
+    }
+
+    if (correctHead) correctHead.textContent = String(correctQ);
+    if (totalHead) totalHead.textContent = String(totalQ);
+    if (correctMeta) correctMeta.textContent = String(correctQ);
+    if (totalMeta) totalMeta.textContent = String(totalQ);
+    if (scoreEl) scoreEl.textContent = `${getFinalGradePercent()}%`;
+
+    if (wrap) wrap.hidden = false;
+    if (correctItem) correctItem.hidden = false;
+    if (scoreItem) scoreItem.hidden = false;
+    metaSeps.forEach(sep => { sep.hidden = false; });
+
+    // Overflow indicator — measure after layout settles
+    if (wrap && list) {
+      requestAnimationFrame(() => {
+        if (list.scrollHeight > list.clientHeight + 1) {
+          wrap.classList.add('has-overflow');
+        } else {
+          wrap.classList.remove('has-overflow');
+        }
+      });
+    }
+  } else {
+    // No quizzes — keep objectives + correct/score hidden, leave duration visible
+    if (wrap) wrap.hidden = true;
+    if (correctItem) correctItem.hidden = true;
+    if (scoreItem) scoreItem.hidden = true;
+    metaSeps.forEach(sep => { sep.hidden = true; });
   }
 }
 

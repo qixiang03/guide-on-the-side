@@ -21,7 +21,7 @@ wp_enqueue_style(
     'pbsg_split_guide_css',
     plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.css',
     array(),
-    '0.5.0.1'
+    filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide.css' )
 );
 
 // Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
@@ -133,7 +133,7 @@ foreach ($steps as $s) {
 
   // For non-embeddable document URLs, generate Google Viewer URL
   if ($tutorial_type === 'url' && !empty($tutorial['url']) && !$tutorial['embeddable'] && $tutorial['is_document_url']) {
-    $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
+    $tutorial['viewer_url'] = 'https://docs.google.com/viewerng/viewer?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
   }
 
   $s['tutorial'] = $tutorial;
@@ -306,43 +306,63 @@ $s['branch'] = $branch;
     <div class="pbsg-left-inner">
 
       <div class="pbsg-quiz-header">
-  <div class="pbsg-quiz-header-left">
-    <!-- Menu button -->
-    <div class="pbsg-menu-wrap">
-      <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
-        <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
-        <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
-        <span class="pbsg-menu-text">Menu</span>
-      </button>
 
-      <!-- Dropdown -->
-      <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
-        <div class="pbsg-menu-list">
-          <?php foreach ($steps_enriched as $idx => $step): ?>
-            
-              <button
-                type="button"
-                class="pbsg-menu-item"
-                data-step-index="<?php echo esc_attr($idx); ?>"
-                role="menuitem"
-              >
-                <?php
-                  $num = $idx + 1;
-                  $label = !empty($step['title']) ? $step['title'] : "Page $num";
-                  echo esc_html($num . '. ' . $label);
-                ?>
-              </button>
-            
-          <?php endforeach; ?>
-        </div>
+  <!-- Menu button + dropdown -->
+  <div class="pbsg-menu-wrap">
+    <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
+      <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
+      <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
+      <span class="pbsg-menu-label">Menu</span>
+    </button>
+
+    <!-- Dropdown -->
+    <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
+      <div class="pbsg-menu-head">
+        <span class="pbsg-menu-head-position">
+          Steps &middot; <span class="pbsg-menu-head-current">1</span> of <span class="pbsg-menu-head-total"><?php echo (int) count($steps_enriched); ?></span>
+        </span>
+        <span class="pbsg-menu-head-done">
+          <span class="pbsg-menu-head-done-count">0</span>
+          <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?>
+        </span>
+      </div>
+      <div class="pbsg-menu-list" id="pbsgMenuList">
+        <?php foreach ($steps_enriched as $idx => $step): ?>
+          <?php
+            $num = $idx + 1;
+            $label = !empty($step['title']) ? $step['title'] : "Step $num";
+          ?>
+          <button
+            type="button"
+            class="pbsg-menu-item"
+            data-step-index="<?php echo esc_attr($idx); ?>"
+            role="menuitem"
+          >
+            <span class="pbsg-menu-item-label">
+              <span class="pbsg-menu-item-num"><?php echo esc_html($num . '.'); ?></span>
+              <?php echo esc_html($label); ?>
+            </span>
+            <span class="pbsg-menu-item-check" aria-hidden="true">
+              <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?>
+            </span>
+          </button>
+        <?php endforeach; ?>
       </div>
     </div>
-
-    <!-- Current step title -->
-    <div id="pbsgStepTitle" class="pbsg-step-title"></div>
   </div>
 
-  <button type="button" class="pbsg-focus-btn" id="pbsgFocusQuiz">Focus Quiz</button>
+  <!-- Title zone (eyebrow + title) -->
+  <div class="pbsg-step-title-zone">
+    <span class="pbsg-step-eyebrow" id="pbsgStepEyebrow" aria-hidden="true"></span>
+    <span class="pbsg-step-title" id="pbsgStepTitle"></span>
+  </div>
+
+  <!-- Focus Quiz button -->
+  <button type="button" class="pbsg-focus-btn" id="pbsgFocusQuiz" aria-label="Focus Quiz">
+    <span class="pbsg-focus-icon"><?php echo pbsg_icon('maximize'); ?></span>
+    <span class="pbsg-focus-label">Focus Quiz</span>
+  </button>
+
 </div>
 
       <div class="pbsg-iframe-wrap">
@@ -357,14 +377,18 @@ $s['branch'] = $branch;
       </div>
 
       <div class="pbsg-nav">
-        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev">Prev</button>
-
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev"><?php esc_html_e('Prev', 'pb-split-guide'); ?></button>
         <div class="pbsg-nav-center">
-          <span id="pbsgProgress" class="pbsg-progress"></span>
-          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">Correct/Attempted 0/0 <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+          <span id="pbsgProgress" class="pbsg-progress">
+            <span class="pbsg-progress-long"><?php esc_html_e('Page:', 'pb-split-guide'); ?> <span class="pbsg-progress-current">1</span> <?php esc_html_e('of', 'pb-split-guide'); ?> <span class="pbsg-progress-total">1</span></span>
+            <span class="pbsg-progress-short"><span class="pbsg-progress-current">1</span>/<span class="pbsg-progress-total">1</span></span>
+          </span>
+          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">
+            <span class="pbsg-score-long"><?php esc_html_e('Correct/Attempted', 'pb-split-guide'); ?> <span class="pbsg-score-value">0/0</span> <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+            <span class="pbsg-score-short"><span class="pbsg-score-value">0/0</span> <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+          </span>
         </div>
-
-        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext">Next</button>
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext"><?php esc_html_e('Next', 'pb-split-guide'); ?></button>
       </div>
 
     </div>
@@ -464,37 +488,70 @@ window.PBSG_CERT = {
 
 
 <div id="pbsgSummaryScreen" class="pbsg-summary-screen" style="display:none;">
-  <div class="pbsg-summary-card">
+  <div class="pbsg-summary-card<?php echo $cover_image_url ? ' pbsg-summary-card--structured' : ''; ?>">
 
-    <h2 class="pbsg-summary-title">Tutorial Summary</h2>
-
-    <div class="pbsg-summary-message">
-      <p>You have completed this tutorial.</p>
-    </div>
-
-    <div id="pbsgAttemptSummary" class="pbsg-attempt-summary"></div>
-
-    <div id="pbsgFinalGrade" class="pbsg-final-grade"></div>
-
-    <?php if ($is_logged_in): ?>
-      <div class="pbsg-summary-actions">
-        <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload">
-          Generate Certificate
-        </button>
-
-        <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial">
-          Close Tutorial
-        </button>
-      </div>
-    <?php else: ?>
-      <div class="pbsg-summary-actions">
-        <p>Please log in to generate your certificate.</p>
-        <button type="button" class="button" id="pbsgRetakeTutorial">
-          Close Tutorial
-        </button>
+    <?php if ($cover_image_url): ?>
+      <div class="pbsg-summary-cover">
+        <img src="<?php echo esc_url($cover_image_url); ?>" alt="" />
       </div>
     <?php endif; ?>
 
+    <div class="pbsg-summary-info">
+
+      <div class="pbsg-summary-eyebrow"><?php esc_html_e('Completed', 'pb-split-guide'); ?></div>
+      <p class="pbsg-summary-desc" id="pbsgSummaryDesc">
+        <?php
+          /* translators: %d: number of steps */
+          printf(
+            esc_html__("You've completed all %d steps of this tutorial.", 'pb-split-guide'),
+            (int) count($steps_enriched)
+          );
+        ?>
+      </p>
+
+      <div class="pbsg-objectives-wrap" id="pbsgObjectivesWrap" hidden>
+        <div class="pbsg-objectives-head">
+          <span><?php esc_html_e('Questions', 'pb-split-guide'); ?></span>
+          <span class="pbsg-objectives-count">
+            <span id="pbsgSummaryCorrect">0</span>
+            /
+            <span id="pbsgSummaryTotal">0</span>
+            <?php esc_html_e('correct', 'pb-split-guide'); ?>
+          </span>
+        </div>
+        <ul class="pbsg-objectives" id="pbsgSummaryQuestions" tabindex="0"></ul>
+      </div>
+
+      <div class="pbsg-summary-meta">
+        <span class="pbsg-meta-item">
+          <?php echo pbsg_icon('stopwatch', 'pbsg-meta-icon'); ?>
+          <strong id="pbsgSummaryDuration">—</strong>
+        </span>
+        <span class="pbsg-meta-sep" data-pbsg-meta-sep hidden>·</span>
+        <span class="pbsg-meta-item" id="pbsgSummaryCorrectItem" hidden>
+          <?php echo pbsg_icon('check', 'pbsg-meta-icon'); ?>
+          <strong><span id="pbsgSummaryCorrect2">0</span> / <span id="pbsgSummaryTotal2">0</span> <?php esc_html_e('correct', 'pb-split-guide'); ?></strong>
+        </span>
+        <span class="pbsg-meta-sep" data-pbsg-meta-sep hidden>·</span>
+        <span class="pbsg-meta-item is-score" id="pbsgSummaryScoreItem" hidden>
+          <?php echo pbsg_icon('chart-bar', 'pbsg-meta-icon'); ?>
+          <strong id="pbsgSummaryScore">—</strong>
+        </span>
+      </div>
+
+      <?php if ($is_logged_in): ?>
+        <div class="pbsg-summary-actions">
+          <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload"><?php esc_html_e('Generate Certificate', 'pb-split-guide'); ?></button>
+          <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial"><?php esc_html_e('Close Tutorial', 'pb-split-guide'); ?></button>
+        </div>
+      <?php else: ?>
+        <div class="pbsg-summary-actions">
+          <p><?php esc_html_e('Please log in to generate your certificate.', 'pb-split-guide'); ?></p>
+          <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial"><?php esc_html_e('Close Tutorial', 'pb-split-guide'); ?></button>
+        </div>
+      <?php endif; ?>
+
+    </div>
   </div>
 </div>
 
@@ -504,8 +561,9 @@ window.PBSG_CERT = {
   <div class="pbsg-cert-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgCertModalTitle">
     <button type="button" class="pbsg-cert-modal-close" id="pbsgCertModalClose" aria-label="Close">×</button>
 
-    <h3 id="pbsgCertModalTitle">Generate Certificate</h3>
-    <p>Please enter your name as it should appear on the certificate.</p>
+    <div class="pbsg-cert-modal-eyebrow"><?php esc_html_e('Certificate', 'pb-split-guide'); ?></div>
+    <h3 id="pbsgCertModalTitle"><?php esc_html_e('Generate Certificate', 'pb-split-guide'); ?></h3>
+    <p class="pbsg-cert-modal-desc"><?php esc_html_e('Please enter your name as it should appear on the certificate.', 'pb-split-guide'); ?></p>
 
     <label for="pbsgCertModalName" class="pbsg-cert-label">Student Name</label>
     <input id="pbsgCertModalName" type="text" class="pbsg-cert-input" placeholder="Enter your full name" />
