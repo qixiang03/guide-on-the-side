@@ -2041,8 +2041,11 @@ body.tutorial-active #colophon {
 .pbsg-progress-short,
 .pbsg-score-short { display: none; }
 
-/* Tier 2 — wrap progress above buttons */
-@container (max-width: 480px) {
+/* Tier 2 — wrap progress above buttons.
+   Raised from 480px because the long labels "Page: N of M" + "Correct/Attempted X/Y"
+   plus two 100px buttons don't fit on one row below ~600px — leaving the nav-center
+   floating and forcing Next to wrap. */
+@container (max-width: 600px) {
   .pbsg-nav-center {
     flex-basis: 100%;
     order: -1;

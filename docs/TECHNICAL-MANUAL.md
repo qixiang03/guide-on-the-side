@@ -26,6 +26,7 @@ For end-user instructions, see the User Workflow Guide. For deployment specifics
 7. [Deployment (Staging Server)](#7-deployment-staging-server)
 8. [Extending the Plugin](#8-extending-the-plugin)
 9. [Troubleshooting](#9-troubleshooting)
+10. [CI/CD & Maintenance](#10-cicd--maintenance)
 
 ---
 
@@ -732,6 +733,64 @@ TCPDF must be installed: `cd web/app/plugins/pb-split-guide && lando composer re
 ### 9.6 Cross-Site Option Confusion
 
 A common debugging mistake: checking `wp_options` for settings that are actually in `wp_sitemeta` (network-wide) or `wp_39_options` (site 39). Always include `--url=` in WP-CLI commands to target the right site. H5P hub settings are split across both — `h5p_hub_is_enabled` is per-site, `h5p_content_type_cache_updated_at` is network-wide.
+
+---
+
+## 10. CI/CD & Maintenance
+
+The project ships with a single GitHub Actions workflow (`.github/workflows/ci.yml`) that runs PHPUnit on every push to `main` and every PR targeting `main`. Three things in this workflow drift over time and need occasional attention. None are urgent — this section exists so the next maintainer knows what the warnings mean when they appear.
+
+### 10.1 GitHub Actions runtime deprecations
+
+GitHub retires Node.js runtimes on a rolling basis. When a retirement approaches, the Actions log prints a warning like:
+
+> Node.js 20 actions are deprecated. The following actions are running on Node.js 20 and may not work as expected: `actions/checkout@v4`, `actions/github-script@v7`, `actions/upload-artifact@v4`. Actions will be forced to run with Node.js 24 by default starting [date].
+
+**What to do:** bump the `uses:` pins in `.github/workflows/ci.yml` to the latest major. Each bump is a one-line change and the action maintainers publish migration notes in their release pages (`github.com/actions/checkout/releases`, etc.). Example migration from the Node-20 → Node-24 cycle:
+
+| Before | After |
+|---|---|
+| `actions/checkout@v4` | `actions/checkout@v5` |
+| `actions/upload-artifact@v4` | `actions/upload-artifact@v5` |
+| `actions/github-script@v7` | `actions/github-script@v8` |
+
+`shivammathur/setup-php` handles its own runtime upgrades — you don't need to touch it.
+
+**Cadence:** expect one deprecation cycle roughly every 18–24 months. The warnings appear months before the hard cutoff, so there is no reason to rush.
+
+### 10.2 `composer.lock` and rolling advisory packages
+
+`composer.lock` at the **repo root** and at `web/app/plugins/pb-split-guide/composer.lock` are both committed. CI uses `composer install` (not `composer update`) so that builds are reproducible against the exact SHAs recorded in the lockfiles.
+
+`require-dev` includes `roave/security-advisories: dev-latest`, a metadata-only deny-list package that consists entirely of `conflict` entries against vulnerable package versions. Because it tracks a moving branch, running `composer update` (locally or in CI) can intermittently fail if upstream publishes a new advisory against a currently-locked PHPUnit or other dev package. This is not a security problem in your installed tree — it is a resolver conflict against upstream's latest advisory list.
+
+**If `composer update` starts failing:**
+1. Read the conflict report. It names the exact package + version that was just flagged.
+2. If a newer patch of that package exists and satisfies the other constraints, bump it: `composer update phpunit/phpunit`.
+3. If no compatible patch exists yet, wait — the advisory usually resolves upstream within days as either the affected package ships a fix or Roave narrows the conflict.
+4. In the meantime, `composer install` (from the committed lockfile) will keep working.
+
+**Do not** remove `roave/security-advisories` to sidestep the warning — it is the mechanism that stops known-vulnerable versions from entering the lockfile in the first place.
+
+### 10.3 Refreshing dependencies deliberately
+
+When you *want* to pick up upstream updates (e.g. a new Pressbooks `dev-dev` push, a WordPress core bump, a new H5P release), do it in a dedicated PR:
+
+```bash
+# Root project
+composer update --with-all-dependencies
+
+# Plugin (TCPDF)
+composer update --working-dir=web/app/plugins/pb-split-guide
+```
+
+Commit both updated lockfiles and run the full PHPUnit suite locally before pushing. The CI run on the PR is the authoritative check.
+
+### 10.4 Things that intentionally do **not** run in CI
+
+- **No linter step.** PHPCS (`pressbooks/coding-standards`) is installed but not invoked by the workflow. Run `vendor/bin/phpcs` locally if you want to check style before committing.
+- **No deployment step.** Deployment to the staging box (§ 7) is manual: SSH, pull, `composer install`, clear caches. This is intentional — the staging server has no public CI credentials and the UPEI network will not accept automated SSH from GitHub-hosted runners without a VPN.
+- **No coverage reporting.** `coverage: none` is set on the PHP setup step to keep runs fast. If coverage is needed later, install Xdebug in the runner and change to `coverage: xdebug`, then add a `--coverage-clover` flag to the PHPUnit command.
 
 ---
 
