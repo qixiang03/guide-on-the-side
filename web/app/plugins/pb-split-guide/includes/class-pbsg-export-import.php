@@ -206,6 +206,43 @@ class PBSG_Export_Import {
 			return;
 		}
 
+		$h5p_library_ids = []; // keyed by original_id
+		$h5p_missing     = [];
+		if ( ! empty( $h5p_contents_in ) ) {
+			global $wpdb;
+			foreach ( $h5p_contents_in as $entry ) {
+				$lib  = $entry['library'] ?? [];
+				$name = isset( $lib['name'] ) ? (string) $lib['name'] : '';
+				$maj  = isset( $lib['major_version'] ) ? (int) $lib['major_version'] : -1;
+				$min  = isset( $lib['minor_version'] ) ? (int) $lib['minor_version'] : -1;
+
+				$row = $wpdb->get_row(
+					$wpdb->prepare(
+						"SELECT id FROM {$wpdb->prefix}h5p_libraries
+						  WHERE name = %s AND major_version = %d AND minor_version = %d
+						  LIMIT 1",
+						$name, $maj, $min
+					),
+					ARRAY_A
+				);
+				if ( $row && ! empty( $row['id'] ) ) {
+					$h5p_library_ids[ (int) $entry['original_id'] ] = (int) $row['id'];
+				} else {
+					$h5p_missing[] = "{$name} {$maj}.{$min}";
+				}
+			}
+
+			if ( ! empty( $h5p_missing ) ) {
+				$h5p_missing = array_values( array_unique( $h5p_missing ) );
+				wp_send_json_error( [
+					'message' => 'The target server is missing these H5P libraries required by this tutorial: '
+						. implode( ', ', $h5p_missing )
+						. '. Install them via H5P → Libraries and try again.',
+				] );
+				return;
+			}
+		}
+
 		// Re-upload attachments, building token → new attachment ID map
 		$id_map = [];
 

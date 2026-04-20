@@ -140,6 +140,48 @@ final class PBSGExportImportH5PTest extends TestCase
         $this->assertSame(0, $this->wpdb->insert_id, 'no DB writes should happen before preflight');
     }
 
+    public function test_import_aborts_when_library_missing_listing_all_misses(): void
+    {
+        $this->declareH5PPluginAlias();
+        WPStubs::$returns['current_user_can'] = true;
+        $this->wpdb->returns['h5p_library_resolutions'] = [
+            'H5P.MultiChoice|1|16' => 9001,
+        ];
+
+        $package = $this->packageWithH5PContents([
+            ['name' => 'H5P.MultiChoice',  'major_version' => 1, 'minor_version' => 16],
+            ['name' => 'H5P.Blanks',       'major_version' => 1, 'minor_version' => 14],
+            ['name' => 'H5P.DragQuestion', 'major_version' => 1, 'minor_version' => 14],
+        ]);
+        $this->runImportWithPackage($package);
+
+        $this->assertTrue(WPStubs::wasCalled('wp_send_json_error'));
+        $msg = WPStubs::callArgs('wp_send_json_error', 0)[0]['message'];
+        $this->assertStringContainsString('H5P.Blanks 1.14', $msg);
+        $this->assertStringContainsString('H5P.DragQuestion 1.14', $msg);
+        $this->assertStringNotContainsString('H5P.MultiChoice', $msg);
+        $this->assertSame([], $this->fakeCore->saveContentCalls, 'no saveContent calls before full resolution');
+    }
+
+    public function test_import_proceeds_when_all_libraries_resolve(): void
+    {
+        $this->declareH5PPluginAlias();
+        WPStubs::$returns['current_user_can'] = true;
+        WPStubs::$returns['get_current_user_id'] = 1;
+        WPStubs::$returns['wp_insert_post'] = 5555;
+        $this->wpdb->returns['h5p_library_resolutions'] = [
+            'H5P.MultiChoice|1|16' => 9001,
+        ];
+        $this->fakeCore->saveContentReturns = [777];
+
+        $package = $this->packageWithH5PContents([
+            ['name' => 'H5P.MultiChoice', 'major_version' => 1, 'minor_version' => 16],
+        ]);
+        $this->runImportWithPackage($package);
+
+        $this->assertFalse(WPStubs::wasCalled('wp_send_json_error'));
+    }
+
     public function test_export_tokenizes_step_h5p_id_integers(): void
     {
         $this->primeExportFixtures(
@@ -217,6 +259,46 @@ final class PBSGExportImportH5PTest extends TestCase
         $decoded = json_decode((string) $raw, true);
         $this->assertIsArray($decoded, 'export output must be valid JSON');
         return $decoded;
+    }
+
+    private function declareH5PPluginAlias(): void
+    {
+        if (!class_exists('H5P_Plugin', false)) {
+            class_alias(FakeH5PPlugin::class, 'H5P_Plugin');
+        }
+    }
+
+    /** @param list<array{name:string,major_version:int,minor_version:int}> $libraries */
+    private function packageWithH5PContents(array $libraries): array
+    {
+        $h5p = [];
+        foreach ($libraries as $i => $lib) {
+            $h5p[] = [
+                'original_id' => $i + 1,
+                'title'       => 'Q' . ($i + 1),
+                'parameters'  => '{"q":"?"}',
+                'disable'     => 1,
+                'library'     => $lib,
+            ];
+        }
+        return [
+            'pbsg_version' => PBSG_Export_Import::EXPORT_VERSION,
+            'title'        => 'T',
+            'header_note'  => '',
+            'post_content' => '',
+            'steps'        => [],
+            'attachments'  => [],
+            'h5p_contents' => $h5p,
+        ];
+    }
+
+    private function runImportWithPackage(array $package): void
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'pbsgexp');
+        file_put_contents($tmp, wp_json_encode($package));
+        $_FILES['pbsg_import_file'] = ['error' => UPLOAD_ERR_OK, 'tmp_name' => $tmp];
+        try { PBSG_Export_Import::handle_import(); } catch (WPDieException $e) {}
+        @unlink($tmp);
     }
 
     /** @return array<string,mixed> */
