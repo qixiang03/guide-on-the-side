@@ -112,6 +112,34 @@ final class PBSGExportImportH5PTest extends TestCase
         $this->assertSame('{"q":"?"}', $entry['parameters']);
     }
 
+    public function test_import_aborts_when_h5p_contents_present_but_plugin_inactive(): void
+    {
+        unset($GLOBALS['H5P_Plugin']);
+        WPStubs::$returns['class_exists'] = ['H5P_Plugin' => false];
+        WPStubs::$returns['current_user_can'] = true;
+
+        $package = [
+            'pbsg_version'  => PBSG_Export_Import::EXPORT_VERSION,
+            'title'         => 'With quiz',
+            'header_note'   => '', 'post_content' => '', 'steps' => [], 'attachments' => [],
+            'h5p_contents'  => [[
+                'original_id' => 1, 'title' => 'Q', 'parameters' => '{}', 'disable' => 1,
+                'library' => ['name' => 'H5P.MultiChoice', 'major_version' => 1, 'minor_version' => 16],
+            ]],
+        ];
+        $tmp = tempnam(sys_get_temp_dir(), 'pbsgexp');
+        file_put_contents($tmp, wp_json_encode($package));
+        $_FILES['pbsg_import_file'] = ['error' => UPLOAD_ERR_OK, 'tmp_name' => $tmp];
+
+        try { PBSG_Export_Import::handle_import(); } catch (WPDieException $e) {}
+        @unlink($tmp);
+
+        $this->assertTrue(WPStubs::wasCalled('wp_send_json_error'));
+        $msg = WPStubs::callArgs('wp_send_json_error', 0)[0]['message'];
+        $this->assertStringContainsString('H5P plugin', $msg);
+        $this->assertSame(0, $this->wpdb->insert_id, 'no DB writes should happen before preflight');
+    }
+
     public function test_export_tokenizes_step_h5p_id_integers(): void
     {
         $this->primeExportFixtures(

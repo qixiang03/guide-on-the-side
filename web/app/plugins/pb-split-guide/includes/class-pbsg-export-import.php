@@ -197,6 +197,15 @@ class PBSG_Export_Import {
 		$steps        = is_array( $package['steps'] ) ? $package['steps'] : [];
 		$cover_token  = $package['cover_id'] ?? null;
 
+		$h5p_contents_in = is_array( $package['h5p_contents'] ?? null ) ? $package['h5p_contents'] : [];
+
+		if ( ! empty( $h5p_contents_in ) && ! class_exists( 'H5P_Plugin' ) ) {
+			wp_send_json_error( [
+				'message' => 'This tutorial contains H5P quizzes. Install and activate the H5P plugin on this server before importing.',
+			] );
+			return;
+		}
+
 		// Re-upload attachments, building token → new attachment ID map
 		$id_map = [];
 
