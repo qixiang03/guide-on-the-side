@@ -335,6 +335,16 @@ class PBSG_Export_Import {
 				$step['branch_tutorial_attachment_id'] = $new_id;
 				if ( ! $new_id ) $step['branch_tutorial_type'] = '';
 			}
+
+			foreach ( $step as $key => $value ) {
+				if ( is_string( $key )
+					&& substr( $key, -strlen( 'h5p_id' ) ) === 'h5p_id'
+					&& is_string( $value )
+					&& strpos( $value, 'h5p_' ) === 0
+				) {
+					$step[ $key ] = $h5p_id_map[ $value ] ?? 0;
+				}
+			}
 		}
 		unset( $step );
 

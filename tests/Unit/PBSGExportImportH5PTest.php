@@ -228,6 +228,37 @@ final class PBSGExportImportH5PTest extends TestCase
         $this->assertStringContainsString('simulated saveContent failure', $msg);
     }
 
+    public function test_import_remaps_step_h5p_id_tokens_to_new_ids(): void
+    {
+        $this->declareH5PPluginAlias();
+        WPStubs::$returns['current_user_can'] = true;
+        WPStubs::$returns['get_current_user_id'] = 1;
+        WPStubs::$returns['wp_insert_post'] = 6000;
+        $this->wpdb->returns['h5p_library_resolutions'] = [
+            'H5P.MultiChoice|1|16' => 9001,
+            'H5P.Blanks|1|14'      => 9002,
+        ];
+        $this->fakeCore->saveContentReturns = [501, 502];
+
+        $package = $this->packageWithH5PContents([
+            ['name' => 'H5P.MultiChoice', 'major_version' => 1, 'minor_version' => 16],
+            ['name' => 'H5P.Blanks',      'major_version' => 1, 'minor_version' => 14],
+        ]);
+        $package['steps'] = [
+            ['title' => 'A', 'h5p_id' => 'h5p_1'],
+            ['title' => 'B', 'h5p_id' => 'h5p_2'],
+            ['title' => 'C', 'h5p_id' => 0],
+        ];
+        $this->runImportWithPackage($package);
+
+        $this->assertTrue(WPStubs::wasCalled('wp_insert_post'));
+        $postarr = WPStubs::callArgs('wp_insert_post', 0)[0];
+        $steps = json_decode($postarr['meta_input']['_pbsg_steps_json'], true);
+        $this->assertSame(501, $steps[0]['h5p_id']);
+        $this->assertSame(502, $steps[1]['h5p_id']);
+        $this->assertSame(0,   $steps[2]['h5p_id']);
+    }
+
     public function test_export_tokenizes_step_h5p_id_integers(): void
     {
         $this->primeExportFixtures(
