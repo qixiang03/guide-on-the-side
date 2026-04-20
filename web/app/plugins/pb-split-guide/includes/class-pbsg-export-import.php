@@ -128,6 +128,15 @@ class PBSG_Export_Import {
 			if ( $baid && isset( $attachments[ $baid ] ) ) {
 				$step['branch_tutorial_attachment_id'] = 'att_' . $baid;
 			}
+
+			foreach ( $step as $key => $value ) {
+				if ( is_string( $key )
+					&& substr( $key, -strlen( 'h5p_id' ) ) === 'h5p_id'
+					&& is_int( $value ) && $value > 0
+				) {
+					$step[ $key ] = 'h5p_' . $value;
+				}
+			}
 		}
 		unset( $step );
 

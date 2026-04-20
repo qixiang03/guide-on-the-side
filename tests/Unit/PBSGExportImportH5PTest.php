@@ -112,6 +112,28 @@ final class PBSGExportImportH5PTest extends TestCase
         $this->assertSame('{"q":"?"}', $entry['parameters']);
     }
 
+    public function test_export_tokenizes_step_h5p_id_integers(): void
+    {
+        $this->primeExportFixtures(
+            postId: 103,
+            stepsJson: wp_json_encode([
+                ['title' => 'One',  'h5p_id' => 42],
+                ['title' => 'Two',  'h5p_id' => 43],
+                ['title' => 'Text', 'h5p_id' => 0],
+            ]),
+            h5pRows: [
+                42 => $this->h5pRow(42, 'H5P.MultiChoice', 1, 16, '{}'),
+                43 => $this->h5pRow(43, 'H5P.Blanks',      1, 14, '{}'),
+            ],
+        );
+
+        $json = $this->captureExport(103);
+
+        $this->assertSame('h5p_42', $json['steps'][0]['h5p_id']);
+        $this->assertSame('h5p_43', $json['steps'][1]['h5p_id']);
+        $this->assertSame(0,        $json['steps'][2]['h5p_id']);
+    }
+
     /* ---------- helpers ---------- */
 
     /** @param array<int, array<string,mixed>> $h5pRows keyed by content id */
