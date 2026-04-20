@@ -54,4 +54,132 @@ final class PBSGExportImportH5PTest extends TestCase
         $this->assertSame('1.1', PBSG_Export_Import::EXPORT_VERSION);
         $this->assertInstanceOf(FakeH5PCore::class, $GLOBALS['H5P_Plugin']->get_h5p_instance('core'));
     }
+
+    public function test_export_includes_h5p_contents_entry_per_referenced_quiz(): void
+    {
+        $this->primeExportFixtures(
+            postId: 100,
+            stepsJson: wp_json_encode([
+                ['title' => 'Q1', 'h5p_id' => 42],
+                ['title' => 'Q2', 'h5p_id' => 43],
+            ]),
+            h5pRows: [
+                42 => $this->h5pRow(42, 'H5P.MultiChoice', 1, 16, '{"question":"A?"}'),
+                43 => $this->h5pRow(43, 'H5P.Blanks',      1, 14, '{"text":"___ capital"}'),
+            ],
+        );
+
+        $json = $this->captureExport(100);
+
+        $this->assertCount(2, $json['h5p_contents']);
+        $ids = array_column($json['h5p_contents'], 'original_id');
+        $this->assertEqualsCanonicalizing([42, 43], $ids);
+    }
+
+    public function test_export_deduplicates_shared_quiz(): void
+    {
+        $this->primeExportFixtures(
+            postId: 101,
+            stepsJson: wp_json_encode([
+                ['title' => 'A', 'h5p_id' => 42],
+                ['title' => 'B', 'h5p_id' => 42],
+            ]),
+            h5pRows: [ 42 => $this->h5pRow(42, 'H5P.MultiChoice', 1, 16, '{"q":"?"}') ],
+        );
+
+        $json = $this->captureExport(101);
+
+        $this->assertCount(1, $json['h5p_contents']);
+        $this->assertSame(42, $json['h5p_contents'][0]['original_id']);
+    }
+
+    public function test_export_records_library_name_major_minor_not_numeric_id(): void
+    {
+        $this->primeExportFixtures(
+            postId: 102,
+            stepsJson: wp_json_encode([['title' => 'X', 'h5p_id' => 7]]),
+            h5pRows: [ 7 => $this->h5pRow(7, 'H5P.MultiChoice', 1, 16, '{"q":"?"}', disable: 3) ],
+        );
+
+        $json = $this->captureExport(102);
+
+        $entry = $json['h5p_contents'][0];
+        $this->assertSame('H5P.MultiChoice', $entry['library']['name']);
+        $this->assertSame(1,  $entry['library']['major_version']);
+        $this->assertSame(16, $entry['library']['minor_version']);
+        $this->assertArrayNotHasKey('library_id', $entry);
+        $this->assertSame(3, $entry['disable']);
+        $this->assertSame('{"q":"?"}', $entry['parameters']);
+    }
+
+    /* ---------- helpers ---------- */
+
+    /** @param array<int, array<string,mixed>> $h5pRows keyed by content id */
+    private function primeExportFixtures(int $postId, string $stepsJson, array $h5pRows): void
+    {
+        $_POST['nonce'] = 'n';
+        $_POST['post_id'] = (string) $postId;
+
+        // The WPStubs::current_user_can stub returns the preset value directly
+        // (it does not consult a resolver), so set it to true for the happy path.
+        WPStubs::$returns['current_user_can'] = true;
+        WPStubs::$returns['current_user_can_resolver'] = static fn (): bool => true;
+
+        WPStubs::$returns['get_post'] = (object) [
+            'ID' => $postId, 'post_title' => "Tutorial {$postId}", 'post_content' => '',
+        ];
+
+        // get_post_meta stub uses a flat key -> value map, not nested by post_id.
+        WPStubs::$returns['get_post_meta'] = [
+            '_pbsg_steps_json'     => $stepsJson,
+            '_pbsg_header_note'    => '',
+            '_pbsg_cover_image_id' => 0,
+        ];
+
+        $this->wpdb->returns['h5p_content_rows'] = $h5pRows;
+    }
+
+    /** @return array<string,mixed> */
+    private function captureExport(int $postId): array
+    {
+        // Swallow the "headers already sent" warning that the real header()
+        // emits in a CLI/PHPUnit context — the JSON body is still echoed
+        // before exit/die, and that's what we're validating.
+        set_error_handler(static function (int $severity, string $message): bool {
+            if (strpos($message, 'Cannot modify header information') !== false) {
+                return true;
+            }
+            if (strpos($message, 'headers already sent') !== false) {
+                return true;
+            }
+            return false;
+        });
+
+        ob_start();
+        try {
+            PBSG_Export_Import::handle_export();
+        } catch (WPDieException $e) {
+        } finally {
+            $raw = ob_get_clean();
+            restore_error_handler();
+        }
+
+        $decoded = json_decode((string) $raw, true);
+        $this->assertIsArray($decoded, 'export output must be valid JSON');
+        return $decoded;
+    }
+
+    /** @return array<string,mixed> */
+    private function h5pRow(int $id, string $libName, int $major, int $minor, string $parameters, int $disable = 1): array
+    {
+        return [
+            'id'            => $id,
+            'title'         => "Quiz {$id}",
+            'parameters'    => $parameters,
+            'disable'       => $disable,
+            'library_name'  => $libName,
+            'major_version' => $major,
+            'minor_version' => $minor,
+        ];
+    }
 }

@@ -114,6 +114,16 @@ class MockWpdb
     {
         $this->calls[] = ['method' => 'get_row', 'args' => [$query, $output]];
         $this->queries[] = $query;
+
+        // H5P content row lookup — keyed by content id extracted from query
+        if (isset($this->returns['h5p_content_rows'])
+            && preg_match('/wp_h5p_contents/i', $query)
+            && preg_match('/= (\d+)/', $query, $m)
+        ) {
+            $id = (int) $m[1];
+            return $this->returns['h5p_content_rows'][$id] ?? null;
+        }
+
         return $this->findReturn('get_row', $query, null);
     }
 

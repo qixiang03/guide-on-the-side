@@ -58,6 +58,51 @@ class PBSG_Export_Import {
 		if ( $cover_id ) $att_ids[] = $cover_id;
 		$att_ids = array_unique( array_filter( $att_ids ) );
 
+		// Collect all H5P content IDs referenced in steps + branches
+		$h5p_ids = [];
+		foreach ( $steps as $step ) {
+			foreach ( $step as $key => $value ) {
+				if ( is_string( $key )
+					&& substr( $key, -strlen( 'h5p_id' ) ) === 'h5p_id'
+					&& is_numeric( $value )
+					&& (int) $value > 0
+				) {
+					$h5p_ids[] = (int) $value;
+				}
+			}
+		}
+		$h5p_ids = array_values( array_unique( $h5p_ids ) );
+
+		// Fetch each referenced H5P content row joined to its library
+		global $wpdb;
+		$h5p_contents = [];
+		foreach ( $h5p_ids as $hid ) {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT c.id, c.title, c.parameters, c.disable,
+					        l.name AS library_name, l.major_version, l.minor_version
+					   FROM {$wpdb->prefix}h5p_contents c
+					   JOIN {$wpdb->prefix}h5p_libraries l ON l.id = c.library_id
+					  WHERE c.id = %d",
+					$hid
+				),
+				ARRAY_A
+			);
+			if ( ! $row ) continue;
+
+			$h5p_contents[] = [
+				'original_id' => (int) $row['id'],
+				'title'       => (string) $row['title'],
+				'library'     => [
+					'name'          => (string) $row['library_name'],
+					'major_version' => (int) $row['major_version'],
+					'minor_version' => (int) $row['minor_version'],
+				],
+				'parameters'  => (string) $row['parameters'],
+				'disable'     => (int) $row['disable'],
+			];
+		}
+
 		// Encode each attachment as base64
 		$attachments = [];
 		foreach ( $att_ids as $aid ) {
@@ -94,6 +139,7 @@ class PBSG_Export_Import {
 			'header_note'  => $header_note,
 			'cover_id'     => $cover_id ? ( 'att_' . $cover_id ) : null,
 			'steps'        => $steps,
+			'h5p_contents' => $h5p_contents,
 			'attachments'  => array_values( $attachments ),
 		];
 
@@ -105,7 +151,7 @@ class PBSG_Export_Import {
 		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
 		header( 'Content-Length: ' . strlen( $json ) );
 		echo $json; // phpcs:ignore
-		exit;
+		wp_die( '' );
 	}
 
 	// ── IMPORT ───────────────────────────────────────────────────────────────
