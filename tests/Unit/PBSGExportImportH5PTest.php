@@ -259,6 +259,55 @@ final class PBSGExportImportH5PTest extends TestCase
         $this->assertSame(0,   $steps[2]['h5p_id']);
     }
 
+    public function test_v1_0_file_without_h5p_contents_still_imports(): void
+    {
+        // No H5P_Plugin aliased — v1.0 files without quizzes must not require it.
+        WPStubs::$returns['current_user_can'] = true;
+        WPStubs::$returns['get_current_user_id'] = 7;
+        WPStubs::$returns['wp_insert_post'] = 7777;
+
+        $package = [
+            'pbsg_version' => '1.0',
+            'title'        => 'Legacy',
+            'header_note'  => '',
+            'post_content' => '<p>Hello</p>',
+            'steps'        => [['title' => 'Only text', 'h5p_id' => 0]],
+            'attachments'  => [],
+        ];
+        $this->runImportWithPackage($package);
+
+        $this->assertTrue(WPStubs::wasCalled('wp_insert_post'));
+        $this->assertFalse(WPStubs::wasCalled('wp_send_json_error'));
+        $this->assertSame([], $this->fakeCore->saveContentCalls);
+    }
+
+    public function test_v1_0_corrupt_base64_attachment_is_skipped_not_fatal(): void
+    {
+        WPStubs::$returns['current_user_can'] = true;
+        WPStubs::$returns['get_current_user_id'] = 7;
+        WPStubs::$returns['wp_insert_post'] = 7778;
+
+        $package = [
+            'pbsg_version' => '1.0',
+            'title'        => 'Legacy with bad blob',
+            'header_note'  => '',
+            'post_content' => '',
+            'steps'        => [],
+            'attachments'  => [
+                [
+                    'original_id' => 1,
+                    'filename'    => 'broken.pdf',
+                    'mime_type'   => 'application/pdf',
+                    'data'        => '%%%not-valid-base64%%%',
+                ],
+            ],
+        ];
+        $this->runImportWithPackage($package);
+
+        $this->assertTrue(WPStubs::wasCalled('wp_insert_post'));
+        $this->assertFalse(WPStubs::wasCalled('wp_send_json_error'));
+    }
+
     public function test_export_tokenizes_step_h5p_id_integers(): void
     {
         $this->primeExportFixtures(
