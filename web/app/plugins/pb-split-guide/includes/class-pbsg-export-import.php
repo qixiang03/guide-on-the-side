@@ -6,11 +6,20 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Stretch Goal 4: package a tutorial as a portable JSON file and re-import it
  * on a different server.
  *
- * Export format:
- *   - All post meta (_pbsg_steps_json, _pbsg_header_note, post_content)
- *   - All uploaded attachments referenced by steps, base64-encoded
- *   - Attachment IDs replaced by portable tokens "att_<original_id>" so the
- *     importer can remap them after re-uploading on the target server.
+ * Export format (v1.1):
+ *   - pbsg_version = "1.1"
+ *   - title, post_content, header_note
+ *   - cover_id as "att_<id>" token
+ *   - steps[] with *_id fields tokenized:
+ *       - tutorial_attachment_id, branch_tutorial_attachment_id → "att_<id>"
+ *       - h5p_id (and any *_h5p_id) → "h5p_<id>"
+ *   - attachments[] — every referenced upload, base64-encoded
+ *   - h5p_contents[] — every referenced wp_h5p_contents row, keyed by library
+ *     (name + major + minor) rather than numeric library_id, parameters passed
+ *     through verbatim as a JSON string.
+ *
+ * Backward-compat: v1.0 packages (no h5p_contents key) still import cleanly —
+ * steps' integer h5p_id survives unchanged, matching legacy behavior.
  */
 class PBSG_Export_Import {
 
