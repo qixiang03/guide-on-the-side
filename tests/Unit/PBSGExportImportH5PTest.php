@@ -182,6 +182,52 @@ final class PBSGExportImportH5PTest extends TestCase
         $this->assertFalse(WPStubs::wasCalled('wp_send_json_error'));
     }
 
+    public function test_import_calls_saveContent_with_resolved_library_and_verbatim_parameters(): void
+    {
+        $this->declareH5PPluginAlias();
+        WPStubs::$returns['current_user_can'] = true;
+        WPStubs::$returns['get_current_user_id'] = 1;
+        WPStubs::$returns['wp_insert_post'] = 4242;
+        $this->wpdb->returns['h5p_library_resolutions'] = [
+            'H5P.MultiChoice|1|16' => 9001,
+        ];
+        $this->fakeCore->saveContentReturns = [111];
+
+        $package = $this->packageWithH5PContents([
+            ['name' => 'H5P.MultiChoice', 'major_version' => 1, 'minor_version' => 16],
+        ]);
+        $package['h5p_contents'][0]['parameters'] = '{"question":"<em>A?</em>","answers":[{"text":"X"}]}';
+        $this->runImportWithPackage($package);
+
+        $this->assertCount(1, $this->fakeCore->saveContentCalls);
+        $call = $this->fakeCore->saveContentCalls[0];
+        $this->assertSame(9001, $call['library']['libraryId']);
+        $this->assertSame('H5P.MultiChoice', $call['library']['name']);
+        $this->assertSame(1, $call['library']['majorVersion']);
+        $this->assertSame(16, $call['library']['minorVersion']);
+        $this->assertSame('{"question":"<em>A?</em>","answers":[{"text":"X"}]}', $call['parameters']);
+        $this->assertSame(1, $call['disable']);
+    }
+
+    public function test_import_aborts_with_orphan_warning_on_saveContent_error(): void
+    {
+        $this->declareH5PPluginAlias();
+        WPStubs::$returns['current_user_can'] = true;
+        $this->wpdb->returns['h5p_library_resolutions'] = [
+            'H5P.MultiChoice|1|16' => 9001,
+        ];
+        $this->fakeCore->failNext = true;
+
+        $package = $this->packageWithH5PContents([
+            ['name' => 'H5P.MultiChoice', 'major_version' => 1, 'minor_version' => 16],
+        ]);
+        $this->runImportWithPackage($package);
+
+        $this->assertTrue(WPStubs::wasCalled('wp_send_json_error'));
+        $msg = WPStubs::callArgs('wp_send_json_error', 0)[0]['message'];
+        $this->assertStringContainsString('simulated saveContent failure', $msg);
+    }
+
     public function test_export_tokenizes_step_h5p_id_integers(): void
     {
         $this->primeExportFixtures(

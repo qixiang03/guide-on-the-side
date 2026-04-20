@@ -243,6 +243,46 @@ class PBSG_Export_Import {
 			}
 		}
 
+		$h5p_id_map = []; // "h5p_<original_id>" => new int id
+		if ( ! empty( $h5p_contents_in ) ) {
+			$h5p_core = $GLOBALS['H5P_Plugin']->get_h5p_instance( 'core' );
+			foreach ( $h5p_contents_in as $entry ) {
+				$orig_id = (int) ( $entry['original_id'] ?? 0 );
+				if ( $orig_id <= 0 ) continue;
+
+				$params_str = (string) ( $entry['parameters'] ?? '' );
+				if ( json_decode( $params_str, true ) === null && json_last_error() !== JSON_ERROR_NONE ) {
+					wp_send_json_error( [
+						'message' => "Quiz {$orig_id} has invalid parameters JSON: " . json_last_error_msg(),
+					] );
+					return;
+				}
+
+				$new_id = $h5p_core->saveContent( [
+					'library'    => [
+						'libraryId'    => $h5p_library_ids[ $orig_id ] ?? 0,
+						'name'         => (string) $entry['library']['name'],
+						'majorVersion' => (int) $entry['library']['major_version'],
+						'minorVersion' => (int) $entry['library']['minor_version'],
+					],
+					'parameters' => $params_str,
+					'disable'    => (int) ( $entry['disable'] ?? 0 ),
+					'title'      => (string) ( $entry['title'] ?? '' ),
+				] );
+
+				if ( is_wp_error( $new_id ) ) {
+					wp_send_json_error( [
+						'message' => 'H5P saveContent failed for quiz '
+							. $orig_id . ': ' . $new_id->get_error_message()
+							. '. Earlier quizzes in this import may have been created — delete them via H5P admin.',
+					] );
+					return;
+				}
+
+				$h5p_id_map[ 'h5p_' . $orig_id ] = (int) $new_id;
+			}
+		}
+
 		// Re-upload attachments, building token → new attachment ID map
 		$id_map = [];
 
