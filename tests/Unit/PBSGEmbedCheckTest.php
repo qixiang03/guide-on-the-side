@@ -388,4 +388,94 @@ final class PBSGEmbedCheckTest extends TestCase
 
         $this->assertTrue($result['embeddable']);
     }
+
+    // ── Host deny-list (known iframe-blockers) ──
+
+    public function test_default_deny_list_includes_libraryupei(): void
+    {
+        $result = PBSG_Embed_Check::check('https://libraryupei.ca/some-page');
+
+        $this->assertFalse($result['embeddable']);
+    }
+
+    public function test_deny_list_skips_head_request(): void
+    {
+        WPStubs::$returns['wp_remote_head'] = [
+            'headers' => ['x-frame-options' => 'ALLOWALL'],
+            'response' => ['code' => 200],
+        ];
+
+        PBSG_Embed_Check::check('https://libraryupei.ca/page');
+
+        $this->assertFalse(
+            WPStubs::wasCalled('wp_remote_head'),
+            'Host in deny-list must bypass the HEAD request entirely'
+        );
+    }
+
+    public function test_filter_can_extend_deny_list(): void
+    {
+        WPStubs::$returns['filters'] = [
+            'pbsg_embed_denied_hosts' => static function (array $hosts): array {
+                $hosts[] = 'blocked.example.com';
+                return $hosts;
+            },
+        ];
+
+        $result = PBSG_Embed_Check::check('https://blocked.example.com/resource');
+
+        $this->assertFalse($result['embeddable']);
+    }
+
+    public function test_non_denied_host_still_performs_head_check(): void
+    {
+        WPStubs::$returns['wp_remote_head'] = [
+            'headers' => [],
+            'response' => ['code' => 200],
+        ];
+
+        PBSG_Embed_Check::check('https://example.com/page');
+
+        $this->assertTrue(WPStubs::wasCalled('wp_remote_head'));
+    }
+
+    // ── check_cached(): transient-backed re-check ──
+
+    public function test_check_cached_stores_result_in_transient(): void
+    {
+        WPStubs::$returns['wp_remote_head'] = [
+            'headers' => ['x-frame-options' => 'DENY'],
+            'response' => ['code' => 200],
+        ];
+
+        $result = PBSG_Embed_Check::check_cached('https://example.com/blocked', 3600);
+
+        $this->assertFalse($result['embeddable']);
+        $this->assertTrue(
+            WPStubs::wasCalled('set_transient'),
+            'check_cached() must persist result in a transient'
+        );
+    }
+
+    public function test_check_cached_returns_cached_without_http(): void
+    {
+        // Seed the transient cache — URL hash-based key.
+        $url   = 'https://example.com/cached';
+        $key   = 'pbsg_embed_' . md5($url);
+        WPStubs::$returns['transients'] = [
+            $key => ['embeddable' => false, 'is_document_url' => false],
+        ];
+        WPStubs::$returns['wp_remote_head'] = [
+            'headers' => [],
+            'response' => ['code' => 200],
+        ];
+
+        $result = PBSG_Embed_Check::check_cached($url, 3600);
+
+        $this->assertFalse($result['embeddable']);
+        $this->assertFalse(
+            WPStubs::wasCalled('wp_remote_head'),
+            'Cached hit must not trigger an HTTP request'
+        );
+    }
 }

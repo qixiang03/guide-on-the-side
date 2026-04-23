@@ -788,6 +788,34 @@ if (!function_exists('wp_remote_head')) {
     }
 }
 
+if (!function_exists('wp_remote_get')) {
+    function wp_remote_get(string $url, array $args = [])
+    {
+        WPStubs::record('wp_remote_get', [$url, $args]);
+        $override = WPStubs::returnFor('wp_remote_get', null);
+        if ($override !== null) {
+            return $override;
+        }
+        return new WP_Error('http_request_failed', 'Stubbed — no real HTTP in tests');
+    }
+}
+
+if (!function_exists('apply_filters')) {
+    /**
+     * Filter stub. Tests seed callbacks via WPStubs::$returns['filters'][$tag].
+     * Defaults to pass-through (returns $value unchanged).
+     */
+    function apply_filters(string $tag, $value, ...$args)
+    {
+        WPStubs::record('apply_filters', array_merge([$tag, $value], $args));
+        $filters = WPStubs::returnFor('filters', []);
+        if (isset($filters[$tag]) && is_callable($filters[$tag])) {
+            return call_user_func_array($filters[$tag], array_merge([$value], $args));
+        }
+        return $value;
+    }
+}
+
 if (!function_exists('wp_remote_retrieve_headers')) {
     function wp_remote_retrieve_headers($response): array
     {
