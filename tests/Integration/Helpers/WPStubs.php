@@ -837,6 +837,16 @@ if (!function_exists('wp_remote_retrieve_header')) {
     }
 }
 
+if (!function_exists('wp_remote_retrieve_response_code')) {
+    function wp_remote_retrieve_response_code($response): int
+    {
+        if (is_wp_error($response)) {
+            return 0;
+        }
+        return (int) ($response['response']['code'] ?? 0);
+    }
+}
+
 if (!function_exists('add_shortcode')) {
     function add_shortcode(string $tag, callable $callback): void
     {

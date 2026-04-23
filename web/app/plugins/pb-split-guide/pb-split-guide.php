@@ -32,6 +32,13 @@ require_once plugin_dir_path(__FILE__) . 'accessibility-dashboard/class-pbsg-acc
 
 
 class PB_Split_Guide_Plugin {
+  /**
+   * Plugin version. Used as the asset cache-bust key when `filemtime()` is
+   * unavailable (read errors, restricted permissions, sync-conflict quirks).
+   * Bump when shipping frontend asset changes.
+   */
+  const VERSION = '0.5.1';
+
   const TEMPLATE_SLUG = 'split-guide-template.php';
 
   /** Some installs (e.g. Pressbooks) store {@see TEMPLATE_SLUG} with a templates/ prefix. */
@@ -104,6 +111,12 @@ class PB_Split_Guide_Plugin {
     add_action('wp_ajax_pbsg_get_transfer_targets', [$this, 'ajax_get_transfer_targets']);
     add_action('wp_ajax_pbsg_rename_h5p', [$this, 'ajax_rename_h5p']);
     add_action('wp_ajax_pbsg_duplicate_h5p', [$this, 'ajax_duplicate_h5p']);
+
+    // Just-in-time embeddability probe used by split-guide.js before
+    // setting iframe.src. Available to logged-out users because tutorials
+    // may be viewed publicly. Nonce + SSRF guard enforced in the handler.
+    add_action('wp_ajax_pbsg_probe_embed',        [$this, 'ajax_probe_embed']);
+    add_action('wp_ajax_nopriv_pbsg_probe_embed', [$this, 'ajax_probe_embed']);
 
     // Bulk action: Transfer Ownership on the Tutorials (Pages) list table
     add_filter('bulk_actions-edit-page', [$this, 'register_transfer_bulk_action']);
@@ -2050,10 +2063,41 @@ class PB_Split_Guide_Plugin {
       }
 
       // ── Embeddability check for URL-type tutorial resources ──
+      // Main step, branch-level tutorial, AND each branch question. Without
+      // the branch/per-question passes, the student-side renderer has no
+      // `embeddable` flag for branch tutorials and always takes Tier 1
+      // (iframe) — meaning the popup/viewer fallbacks and the host deny-list
+      // only protect the main step.
+      // Use check_cached() (not check()) at save-time so the transient is
+      // warm for the first student view. resolve_flags() at view-time hits
+      // check_cached() as its single source of truth, so warming the cache
+      // here avoids a 5-8s synchronous HEAD+GET on the first page load.
       if (!empty($step['tutorial_type']) && $step['tutorial_type'] === 'url' && !empty($step['tutorial_url'])) {
-        $embed_result        = PBSG_Embed_Check::check($step['tutorial_url']);
+        $embed_result        = PBSG_Embed_Check::check_cached($step['tutorial_url']);
         $step['embeddable']      = $embed_result['embeddable'];
         $step['is_document_url'] = $embed_result['is_document_url'];
+      }
+
+      if (!empty($step['branch']) && is_array($step['branch'])) {
+        if (!empty($step['branch']['tutorial_type']) && $step['branch']['tutorial_type'] === 'url' && !empty($step['branch']['tutorial_url'])) {
+          $b_embed = PBSG_Embed_Check::check_cached($step['branch']['tutorial_url']);
+          $step['branch']['tutorial_embeddable']      = $b_embed['embeddable'];
+          $step['branch']['tutorial_is_document_url'] = $b_embed['is_document_url'];
+        }
+
+        if (!empty($step['branch']['questions']) && is_array($step['branch']['questions'])) {
+          foreach ($step['branch']['questions'] as &$bq_ref) {
+            if (is_array($bq_ref)
+                && !empty($bq_ref['tutorial_type'])
+                && $bq_ref['tutorial_type'] === 'url'
+                && !empty($bq_ref['tutorial_url'])) {
+              $q_embed = PBSG_Embed_Check::check_cached($bq_ref['tutorial_url']);
+              $bq_ref['tutorial_embeddable']      = $q_embed['embeddable'];
+              $bq_ref['tutorial_is_document_url'] = $q_embed['is_document_url'];
+            }
+          }
+          unset($bq_ref);
+        }
       }
 
       // Strip transient data from stored JSON
@@ -2185,6 +2229,37 @@ class PB_Split_Guide_Plugin {
     }
   }
 
+  /**
+   * Resolve a cache-bust version string for a plugin-relative asset path.
+   *
+   * Prefers `filemtime()` (best cache-bust granularity) but gracefully falls
+   * back to {@see PB_Split_Guide_Plugin::VERSION} when the file cannot be
+   * stat'd — unreadable permissions, broken symlinks, iCloud-sync conflict
+   * files, etc. Previously a failed `filemtime()` returned `false` which
+   * WordPress passes through to the browser as no version, allowing stale
+   * cached assets to persist.
+   *
+   * @param string $relative Path relative to the plugin directory (e.g. "assets/split-guide.js").
+   * @return string Non-empty version string safe for wp_enqueue_*.
+   */
+  private static function asset_version(string $relative): string {
+    $abs = plugin_dir_path(__FILE__) . ltrim($relative, '/');
+    $mtime = @filemtime($abs);
+    if ($mtime !== false && $mtime > 0) {
+      return (string) $mtime;
+    }
+    return self::VERSION;
+  }
+
+  /**
+   * Front-end asset loading for tutorial pages.
+   *
+   * Defense in depth: the template file (split-guide-template.php) also
+   * enqueues the same handles. WordPress deduplicates by handle, so the two
+   * paths are redundant. This ensures that if the template is bypassed by a
+   * theme filter, child-theme override, or a multisite subsite where the
+   * plugin's template_include filter doesn't fire, the assets still ship.
+   */
   public function enqueue_assets() {
     if (!is_page()) return;
 
@@ -2192,25 +2267,53 @@ class PB_Split_Guide_Plugin {
     $selected = get_post_meta($page_id, '_wp_page_template', true);
     if (!self::is_split_guide_template($selected)) return;
 
+    $base_url = plugin_dir_url(__FILE__);
+
     wp_enqueue_style(
       'pbsg_split_guide_css',
-      plugin_dir_url(__FILE__) . 'assets/split-guide.css',
+      $base_url . 'assets/split-guide.css',
       [],
-      '0.5.0.6'
+      self::asset_version('assets/split-guide.css')
     );
 
-    // Only localize tracker data on published tutorials — prevents draft/preview pollution
+    // Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
+    wp_enqueue_script(
+      'pbsg_icons_js',
+      $base_url . 'assets/pbsg-icons.js',
+      [],
+      self::asset_version('assets/pbsg-icons.js'),
+      true
+    );
+
+    wp_enqueue_script(
+      'pbsg-split-guide',
+      $base_url . 'assets/split-guide.js',
+      ['pbsg_icons_js'],
+      self::asset_version('assets/split-guide.js'),
+      true
+    );
+
+    // Only load analytics tracker on published tutorials — prevents draft/preview pollution
     if ( get_post_status( $page_id ) === 'publish' ) {
+        wp_enqueue_script(
+            'pbsg-tracker',
+            $base_url . 'assets/split-guide-tracker.js',
+            [],
+            self::asset_version('assets/split-guide-tracker.js'),
+            true
+        );
+
         $steps_json = get_post_meta( $page_id, '_pbsg_steps_json', true );
         $steps_data = json_decode( $steps_json, true );
         $total_steps = is_array( $steps_data ) ? count( $steps_data ) : 1;
 
+        // Must come AFTER wp_enqueue_script — localize attaches to a registered handle.
         wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
             'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
             'tutorialPageId' => $page_id,
             'totalSteps'     => $total_steps,
         ) );
-    } 
+    }
   }
 
   /**
@@ -3032,6 +3135,147 @@ class PB_Split_Guide_Plugin {
     }
 
     wp_send_json_success($data);
+  }
+
+  /**
+   * AJAX: Just-in-time embeddability probe.
+   *
+   * Called by split-guide.js immediately before setting iframe.src for a
+   * URL-type tutorial step. Runs PBSG_Embed_Check::check_cached() (HEAD+GET
+   * with 1-hour transient cache) and returns the verdict so the client can
+   * render the popup-fallback card when the target can't be iframed.
+   *
+   * This closes the gap where:
+   *   • The save-time meta said `embeddable=true` (e.g. old tutorial, or
+   *     HEAD succeeded at save-time but the server now 4xx's),
+   *   • The browser's `load` event fires even for XFO/CSP-blocked frames
+   *     (Chrome behaviour), so a purely client-side heuristic can't tell
+   *     a block apart from a legitimate cross-origin render.
+   *
+   * Defenses:
+   *   • Nonce verification (anti-CSRF).
+   *   • Scheme must be http(s) — rejects javascript:, data:, file:, etc.
+   *   • Hostname must not be loopback/private/link-local/.local/.test
+   *     (anti-SSRF). DNS is resolved to also check the resolved IP so a
+   *     public hostname that resolves to a private address is rejected.
+   */
+  public function ajax_probe_embed() {
+    // 1. Nonce (scoped to this action).
+    check_ajax_referer('pbsg_probe_embed', 'nonce');
+
+    $raw = isset($_POST['url']) ? wp_unslash($_POST['url']) : '';
+    $url = esc_url_raw(trim((string) $raw));
+
+    if ($url === '') {
+      wp_send_json_error(['message' => 'Missing url.'], 400);
+    }
+
+    // 2. Scheme guard — http(s) only.
+    $parts = wp_parse_url($url);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+      wp_send_json_error(['message' => 'Invalid url.'], 400);
+    }
+    $scheme = strtolower((string) $parts['scheme']);
+    if ($scheme !== 'http' && $scheme !== 'https') {
+      wp_send_json_error(['message' => 'Unsupported scheme.'], 400);
+    }
+
+    // 3. Host + DNS guard — block loopback/private/link-local/dev-only hosts.
+    $host = strtolower((string) $parts['host']);
+    if ($this->pbsg_host_is_ssrf_risk($host)) {
+      // Treat as non-embeddable instead of erroring — the client still
+      // needs a verdict, and a dev-only host shouldn't be framed in a
+      // public tutorial anyway.
+      wp_send_json_success([
+        'embeddable'      => false,
+        'is_document_url' => false,
+        'source'          => 'ssrf_guard',
+      ]);
+    }
+
+    // 4. Delegate to the cached embed-check.
+    $verdict = PBSG_Embed_Check::check_cached($url);
+
+    wp_send_json_success([
+      'embeddable'      => !empty($verdict['embeddable']),
+      'is_document_url' => !empty($verdict['is_document_url']),
+      'source'          => 'probe',
+    ]);
+  }
+
+  /**
+   * Return true if the hostname is a loopback, private-range, link-local,
+   * or dev-only (.local/.test) address. Used by ajax_probe_embed() to
+   * reject SSRF-style URLs before dispatching an outbound HTTP request.
+   *
+   * Resolves the host via gethostbyname()/dns_get_record() so a public
+   * name that points at a private IP (DNS-rebinding style) is caught.
+   * Resolution failure is treated as risky.
+   *
+   * @param string $host Lowercased hostname from parse_url().
+   * @return bool True = reject, false = safe to probe.
+   */
+  private function pbsg_host_is_ssrf_risk(string $host): bool {
+    if ($host === '') {
+      return true;
+    }
+
+    // Dev-only TLDs and bare loopback names.
+    if ($host === 'localhost' || $host === 'ip6-localhost' || $host === 'ip6-loopback') {
+      return true;
+    }
+    if (str_ends_with($host, '.local') || str_ends_with($host, '.test') ||
+        str_ends_with($host, '.localhost') || str_ends_with($host, '.internal')) {
+      return true;
+    }
+
+    // Collect candidate IPs: the host itself if it IS an IP literal,
+    // otherwise all A/AAAA records.
+    $ips = [];
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+      $ips[] = $host;
+    } else {
+      // gethostbynamel returns IPv4 addresses; supplement with AAAA via
+      // dns_get_record if available.
+      if (function_exists('gethostbynamel')) {
+        $v4 = @gethostbynamel($host);
+        if (is_array($v4)) {
+          $ips = array_merge($ips, $v4);
+        }
+      }
+      if (function_exists('dns_get_record')) {
+        $aaaa = @dns_get_record($host, DNS_AAAA);
+        if (is_array($aaaa)) {
+          foreach ($aaaa as $rec) {
+            if (!empty($rec['ipv6'])) {
+              $ips[] = $rec['ipv6'];
+            }
+          }
+        }
+      }
+    }
+
+    // No resolvable IPs — [Inference] could be a legitimate host whose DNS
+    // is briefly unreachable from the PHP worker, or could be a dead link.
+    // Either way, skip the outbound request to avoid retry storms.
+    if (empty($ips)) {
+      return true;
+    }
+
+    foreach ($ips as $ip) {
+      // FILTER_FLAG_NO_PRIV_RANGE: reject RFC1918 + RFC4193 (ULA).
+      // FILTER_FLAG_NO_RES_RANGE : reject loopback, link-local, reserved.
+      $ok = filter_var(
+        $ip,
+        FILTER_VALIDATE_IP,
+        FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+      );
+      if ($ok === false) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**
