@@ -290,7 +290,7 @@ final class PBSG_Embed_Check {
             return '';
         }
 
-        return 'https://docs.google.com/viewerng/viewer?url=' . rawurlencode( $file_url ) . '&embedded=true';
+        return 'https://docs.google.com/viewer?url=' . rawurlencode( $file_url ) . '&embedded=true';
     }
 
     /**
