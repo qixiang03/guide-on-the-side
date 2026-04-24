@@ -1278,12 +1278,20 @@ function branchSummary(s) {
     renderStepCards(); // re-render to update correct/incorrect styling
   });
   $(document).on('click', '.pbsg-add-answer', function () {
-    const idx = parseInt($(this).data('idx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.answers = steps[idx].quiz.answers || []; steps[idx].quiz.answers.push({ text: '', correct: false }); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.answers = steps[idx].quiz.answers || []; steps[idx].quiz.answers.push({ text: '', correct: false }); setSteps(steps); renderStepCards(true); }
   });
   $(document).on('click', '.pbsg-answer-remove', function () {
-    const idx = parseInt($(this).data('idx'), 10), ai = parseInt($(this).data('aidx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.answers && steps[idx].quiz.answers.length > 2) { steps[idx].quiz.answers.splice(ai, 1); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10), ai = parseInt($(this).data('aidx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.answers && steps[idx].quiz.answers.length > 2) { steps[idx].quiz.answers.splice(ai, 1); setSteps(steps); renderStepCards(true); }
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -1318,12 +1326,20 @@ function branchSummary(s) {
   // ═══════════════════════════════════════════════════════════
   $(document).on('input', '.pbsg-sc-correct-input, .pbsg-sc-wrong-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
   $(document).on('click', '.pbsg-add-sc-wrong', function () {
-    const idx = parseInt($(this).data('idx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.wrong_answers = steps[idx].quiz.wrong_answers || []; steps[idx].quiz.wrong_answers.push(''); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.wrong_answers = steps[idx].quiz.wrong_answers || []; steps[idx].quiz.wrong_answers.push(''); setSteps(steps); renderStepCards(true); }
   });
   $(document).on('click', '.pbsg-sc-wrong-remove', function () {
-    const idx = parseInt($(this).data('idx'), 10), wi = parseInt($(this).data('widx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.wrong_answers && steps[idx].quiz.wrong_answers.length > 1) { steps[idx].quiz.wrong_answers.splice(wi, 1); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10), wi = parseInt($(this).data('widx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.wrong_answers && steps[idx].quiz.wrong_answers.length > 1) { steps[idx].quiz.wrong_answers.splice(wi, 1); setSteps(steps); renderStepCards(true); }
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -1961,7 +1977,7 @@ function syncBranchResourceMode(stepIdx, value) {
       q.answers.push({ text: '', correct: false });
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('click', '.pbsg-branch-mc-remove-answer', function () {
@@ -1978,7 +1994,7 @@ function syncBranchResourceMode(stepIdx, value) {
       }
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('input', '.pbsg-branch-blanks-sentence', function () {
@@ -2081,7 +2097,7 @@ function syncBranchResourceMode(stepIdx, value) {
       q.wrong_answers.push('');
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('click', '.pbsg-branch-sc-wrong-remove', function () {
@@ -2095,7 +2111,7 @@ function syncBranchResourceMode(stepIdx, value) {
       if (!q.wrong_answers.length) q.wrong_answers = [''];
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('change', '.pbsg-branch-resource-type-toggle input[type="radio"]', function () {
