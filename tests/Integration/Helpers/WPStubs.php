@@ -477,6 +477,14 @@ if (!function_exists('wp_enqueue_style')) {
     }
 }
 
+if (!function_exists('wp_add_inline_style')) {
+    function wp_add_inline_style(string $handle, string $data): bool
+    {
+        WPStubs::record('wp_add_inline_style', [$handle, $data]);
+        return true;
+    }
+}
+
 if (!function_exists('wp_enqueue_script')) {
     function wp_enqueue_script(string $handle, string $src = '', array $deps = [], $ver = false, $in_footer = false): void
     {

@@ -31,6 +31,14 @@
   --pbsg-radius: 8px;
   --pbsg-radius-sm: 6px;
   --pbsg-shadow: 0 1px 1px rgba(0,0,0,.04);
+
+  /* Style template defaults (fallbacks when wp_add_inline_style hasn't run) */
+  --pbsg-font-family: Roboto, sans-serif;
+  --pbsg-heading-font: Lusitana, serif;
+  --pbsg-font-size: 16px;
+  --pbsg-text-color: #333333;
+  --pbsg-accent-color: #8C2004;
+  --pbsg-button-color: #517E1B;
 }
 
 /* ---------- 1) Hide theme chrome for this template ---------- */

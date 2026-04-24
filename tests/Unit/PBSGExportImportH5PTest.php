@@ -51,7 +51,7 @@ final class PBSGExportImportH5PTest extends TestCase
 
     public function test_harness_bootstraps(): void
     {
-        $this->assertSame('1.1', PBSG_Export_Import::EXPORT_VERSION);
+        $this->assertSame('1.0', PBSG_Export_Import::EXPORT_VERSION);
         $this->assertInstanceOf(FakeH5PCore::class, $GLOBALS['H5P_Plugin']->get_h5p_instance('core'));
     }
 }

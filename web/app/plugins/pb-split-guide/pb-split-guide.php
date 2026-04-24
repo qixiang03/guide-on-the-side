@@ -74,6 +74,17 @@ class PB_Split_Guide_Plugin {
   const OPTION_CROSS_EDIT    = 'pbsg_cross_edit_enabled';
   const OPTION_TRANSFER      = 'pbsg_ownership_transfer_enabled';
 
+  // Style template defaults (WYSIWYG CSS Template System)
+  const OPTION_STYLE_DEFAULTS = 'pbsg_style_defaults';
+  const STYLE_DEFAULTS = [
+      'font_family'   => 'Roboto, sans-serif',
+      'heading_font'  => 'Lusitana, serif',
+      'font_size'     => '16px',
+      'text_color'    => '#333333',
+      'accent_color'  => '#8C2004',
+      'button_color'  => '#517E1B',
+  ];
+
   // Hardcoded fallback benchmark defaults (used when no option saved)
   const BENCHMARK_FALLBACKS = [
     'completion_rate_green'  => 70,
@@ -735,12 +746,20 @@ class PB_Split_Guide_Plugin {
             <div class="pbsg-intro-fields">
               <div class="pbsg-field">
                 <label for="pbsg_intro_description" class="pbsg-field-label">Description</label>
-                <textarea
-                  id="pbsg_intro_description"
-                  name="pbsg_intro_description"
-                  rows="3"
-                  placeholder="Brief overview of what this tutorial covers..."
-                ><?php echo esc_textarea($intro_desc); ?></textarea>
+                <?php
+                wp_editor($intro_desc, 'pbsg_intro_description', [
+                    'textarea_name' => 'pbsg_intro_description',
+                    'textarea_rows' => 4,
+                    'media_buttons' => false,
+                    'teeny'         => false,
+                    'tinymce'       => [
+                        'toolbar1' => 'bold,italic,underline,|,bullist,numlist,|,link,|,fontselect,fontsizeselect,forecolor',
+                        'toolbar2' => '',
+                        'plugins'  => 'lists,link,textcolor',
+                    ],
+                    'quicktags'     => ['buttons' => 'strong,em,link,ul,ol,li'],
+                ]);
+                ?>
               </div>
 
               <div class="pbsg-field">
@@ -1376,6 +1395,11 @@ class PB_Split_Guide_Plugin {
       'sanitize_callback' => 'rest_sanitize_boolean',
       'default'           => true,
     ]);
+    register_setting('pbsg_guide_settings', self::OPTION_STYLE_DEFAULTS, [
+      'type'              => 'string',
+      'sanitize_callback' => [$this, 'sanitize_style_defaults'],
+      'default'           => wp_json_encode(self::STYLE_DEFAULTS),
+    ]);
   }
 
   public function sanitize_ratio($value) {
@@ -1394,6 +1418,52 @@ class PB_Split_Guide_Plugin {
       $clean[$key] = isset($decoded[$key]) ? max(0, intval($decoded[$key])) : $fallback;
     }
     return wp_json_encode($clean);
+  }
+
+  /**
+   * Sanitize style defaults — whitelist fonts/sizes, validate hex colours.
+   */
+  public function sanitize_style_defaults($value) {
+    $decoded = is_string($value) ? json_decode($value, true) : $value;
+    if (!is_array($decoded)) $decoded = [];
+
+    $allowed_fonts = [
+        'Roboto, sans-serif',
+        'Lusitana, serif',
+        'Georgia, serif',
+        'Arial, sans-serif',
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    ];
+    $allowed_sizes = ['14px', '16px', '18px', '20px'];
+
+    $clean = [];
+    $clean['font_family'] = in_array($decoded['font_family'] ?? '', $allowed_fonts, true)
+        ? $decoded['font_family'] : self::STYLE_DEFAULTS['font_family'];
+    $clean['heading_font'] = in_array($decoded['heading_font'] ?? '', $allowed_fonts, true)
+        ? $decoded['heading_font'] : self::STYLE_DEFAULTS['heading_font'];
+    $clean['font_size'] = in_array($decoded['font_size'] ?? '', $allowed_sizes, true)
+        ? $decoded['font_size'] : self::STYLE_DEFAULTS['font_size'];
+    $clean['text_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $decoded['text_color'] ?? '')
+        ? $decoded['text_color'] : self::STYLE_DEFAULTS['text_color'];
+    $clean['accent_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $decoded['accent_color'] ?? '')
+        ? $decoded['accent_color'] : self::STYLE_DEFAULTS['accent_color'];
+    $clean['button_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $decoded['button_color'] ?? '')
+        ? $decoded['button_color'] : self::STYLE_DEFAULTS['button_color'];
+
+    return wp_json_encode($clean);
+  }
+
+  /**
+   * Resolve the effective style defaults.
+   * Saved option → hardcoded fallback.
+   */
+  public static function resolve_style_defaults(): array {
+    $raw = get_option(self::OPTION_STYLE_DEFAULTS, '');
+    $decoded = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($decoded)) {
+        return self::STYLE_DEFAULTS;
+    }
+    return array_merge(self::STYLE_DEFAULTS, $decoded);
   }
 
   /**
@@ -1467,6 +1537,7 @@ class PB_Split_Guide_Plugin {
     $current_ratio = max(self::RATIO_MIN, min(self::RATIO_MAX, $current_ratio));
 
     $bench = self::resolve_benchmarks(); // site defaults (no tutorial ID)
+    $style = self::resolve_style_defaults();
     ?>
     <div class="wrap">
       <h1><?php esc_html_e('Guide Settings', 'pb-split-guide'); ?></h1>
@@ -1804,6 +1875,107 @@ class PB_Split_Guide_Plugin {
           </div>
         </div>
 
+        <!-- Section 4: Style Defaults -->
+        <div class="pbsg-admin-settings-card" style="
+          background: #fff; border: 1px solid #E0E0E0; border-radius: 8px;
+          padding: 24px; max-width: 720px; margin-bottom: 24px;
+        ">
+          <h2 style="margin-top:0; font-size:18px; display:flex; align-items:center; gap:8px;"><?php echo pbsg_icon('pencil'); ?> Style Defaults</h2>
+          <p class="description" style="margin-bottom: 16px;">
+            Site-wide font and colour defaults for all tutorials. Per-tutorial overrides will be available in the tutorial editor.
+          </p>
+
+          <!-- Hidden input carries the JSON blob -->
+          <input type="hidden" id="pbsg_style_defaults_json"
+                 name="<?php echo esc_attr(self::OPTION_STYLE_DEFAULTS); ?>"
+                 value="<?php echo esc_attr(wp_json_encode($style)); ?>" />
+
+          <table class="form-table" role="presentation" style="margin-bottom:20px;">
+            <tr>
+              <th scope="row"><label for="pbsg_style_font_family">Body Font</label></th>
+              <td>
+                <select id="pbsg_style_font_family" class="pbsg-style-input" data-key="font_family">
+                  <option value="Roboto, sans-serif" <?php selected($style['font_family'], 'Roboto, sans-serif'); ?>>Roboto</option>
+                  <option value="Lusitana, serif" <?php selected($style['font_family'], 'Lusitana, serif'); ?>>Lusitana</option>
+                  <option value="Georgia, serif" <?php selected($style['font_family'], 'Georgia, serif'); ?>>Georgia</option>
+                  <option value="Arial, sans-serif" <?php selected($style['font_family'], 'Arial, sans-serif'); ?>>Arial</option>
+                  <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['font_family'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System Default</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><label for="pbsg_style_heading_font">Heading Font</label></th>
+              <td>
+                <select id="pbsg_style_heading_font" class="pbsg-style-input" data-key="heading_font">
+                  <option value="Lusitana, serif" <?php selected($style['heading_font'], 'Lusitana, serif'); ?>>Lusitana</option>
+                  <option value="Roboto, sans-serif" <?php selected($style['heading_font'], 'Roboto, sans-serif'); ?>>Roboto</option>
+                  <option value="Georgia, serif" <?php selected($style['heading_font'], 'Georgia, serif'); ?>>Georgia</option>
+                  <option value="Arial, sans-serif" <?php selected($style['heading_font'], 'Arial, sans-serif'); ?>>Arial</option>
+                  <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['heading_font'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System Default</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><label for="pbsg_style_font_size">Font Size</label></th>
+              <td>
+                <select id="pbsg_style_font_size" class="pbsg-style-input" data-key="font_size">
+                  <option value="14px" <?php selected($style['font_size'], '14px'); ?>>14px</option>
+                  <option value="16px" <?php selected($style['font_size'], '16px'); ?>>16px</option>
+                  <option value="18px" <?php selected($style['font_size'], '18px'); ?>>18px</option>
+                  <option value="20px" <?php selected($style['font_size'], '20px'); ?>>20px</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><label for="pbsg_style_text_color">Text Colour</label></th>
+              <td>
+                <input type="text" id="pbsg_style_text_color" class="pbsg-style-input pbsg-color-field"
+                       data-key="text_color"
+                       value="<?php echo esc_attr($style['text_color']); ?>"
+                       data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['text_color']); ?>" />
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><label for="pbsg_style_accent_color">Accent Colour</label></th>
+              <td>
+                <input type="text" id="pbsg_style_accent_color" class="pbsg-style-input pbsg-color-field"
+                       data-key="accent_color"
+                       value="<?php echo esc_attr($style['accent_color']); ?>"
+                       data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['accent_color']); ?>" />
+              </td>
+            </tr>
+            <tr>
+              <th scope="row"><label for="pbsg_style_button_color">Button Colour</label></th>
+              <td>
+                <input type="text" id="pbsg_style_button_color" class="pbsg-style-input pbsg-color-field"
+                       data-key="button_color"
+                       value="<?php echo esc_attr($style['button_color']); ?>"
+                       data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['button_color']); ?>" />
+              </td>
+            </tr>
+          </table>
+
+          <!-- Live preview -->
+          <div id="pbsg_style_preview" style="
+            border: 1px solid #E0E0E0; border-radius: 6px; padding: 20px;
+            background: #F8F8F8;
+          ">
+            <h3 id="pbsg_preview_heading" style="margin-top:0; margin-bottom:8px;">Preview Heading</h3>
+            <p id="pbsg_preview_body" style="margin-bottom:8px;">
+              This is sample body text showing how your tutorials will look with the selected fonts and colours.
+            </p>
+            <a href="#" id="pbsg_preview_link" onclick="return false;" style="margin-right:12px;">Sample Link</a>
+            <button type="button" id="pbsg_preview_button" style="
+              padding: 6px 16px; border: none; border-radius: 4px;
+              color: #fff; cursor: pointer; font-size: 14px;
+            ">Sample Button</button>
+          </div>
+
+          <div style="margin-top:12px;">
+            <button type="button" class="button" id="pbsg_style_reset">Reset Style Defaults</button>
+          </div>
+        </div>
+
         <!-- Save -->
         <div style="max-width:720px; display:flex; gap:10px;">
           <?php submit_button(__('Save Settings', 'pb-split-guide'), 'primary', 'submit', false); ?>
@@ -1845,6 +2017,87 @@ class PB_Split_Guide_Plugin {
           el.addEventListener('input', syncBenchJSON);
         });
 
+        /* ── Style Defaults — field sync + live preview ── */
+        var styleHidden = document.getElementById('pbsg_style_defaults_json');
+        var styleInputs = document.querySelectorAll('.pbsg-style-input');
+        var styleDefaults = <?php echo wp_json_encode(self::STYLE_DEFAULTS); ?>;
+
+        function getStyleValue(key) {
+          var el = document.querySelector('.pbsg-style-input[data-key="' + key + '"]');
+          return el ? el.value : styleDefaults[key];
+        }
+
+        function syncStyleJSON() {
+          var obj = {};
+          styleInputs.forEach(function(el) {
+            obj[el.getAttribute('data-key')] = el.value;
+          });
+          styleHidden.value = JSON.stringify(obj);
+        }
+
+        function updateStylePreview() {
+          var heading = document.getElementById('pbsg_preview_heading');
+          var body    = document.getElementById('pbsg_preview_body');
+          var link    = document.getElementById('pbsg_preview_link');
+          var btn     = document.getElementById('pbsg_preview_button');
+
+          heading.style.fontFamily = getStyleValue('heading_font');
+          heading.style.color      = getStyleValue('text_color');
+          body.style.fontFamily    = getStyleValue('font_family');
+          body.style.fontSize      = getStyleValue('font_size');
+          body.style.color         = getStyleValue('text_color');
+          link.style.fontFamily    = getStyleValue('font_family');
+          link.style.color         = getStyleValue('accent_color');
+          btn.style.backgroundColor = getStyleValue('button_color');
+          btn.style.fontFamily     = getStyleValue('font_family');
+        }
+
+        styleInputs.forEach(function(el) {
+          el.addEventListener('change', function() { syncStyleJSON(); updateStylePreview(); });
+          el.addEventListener('input', function()  { syncStyleJSON(); updateStylePreview(); });
+        });
+
+        // Initialize color pickers (jQuery wp-color-picker).
+        // Wrapped in jQuery.ready because wp-color-picker JS loads in the
+        // footer, after this inline script runs.
+        if (typeof jQuery !== 'undefined') {
+          jQuery(function() {
+            if (jQuery.fn.wpColorPicker) {
+              jQuery('.pbsg-color-field').wpColorPicker({
+                change: function(event, ui) {
+                  jQuery(event.target).val(ui.color.toString());
+                  syncStyleJSON();
+                  updateStylePreview();
+                },
+                clear: function(event) {
+                  jQuery(event.target).val(jQuery(event.target).data('default-color'));
+                  syncStyleJSON();
+                  updateStylePreview();
+                }
+              });
+            }
+          });
+        }
+
+        // Style-only reset button
+        document.getElementById('pbsg_style_reset').addEventListener('click', function() {
+          styleInputs.forEach(function(el) {
+            var key = el.getAttribute('data-key');
+            if (styleDefaults[key] !== undefined) {
+              el.value = styleDefaults[key];
+              // Also update the color picker widget if applicable
+              if (typeof jQuery !== 'undefined' && jQuery(el).hasClass('pbsg-color-field') && jQuery.fn.wpColorPicker) {
+                jQuery(el).wpColorPicker('color', styleDefaults[key]);
+              }
+            }
+          });
+          syncStyleJSON();
+          updateStylePreview();
+        });
+
+        // Initialize preview on page load
+        updateStylePreview();
+
         /* ── Reset button ── */
         var defaults = <?php echo wp_json_encode(self::BENCHMARK_FALLBACKS); ?>;
         document.getElementById('pbsg_admin_reset').addEventListener('click', function(){
@@ -1862,9 +2115,10 @@ class PB_Split_Guide_Plugin {
             bullets: [
               '<strong>Panel Layout</strong> — returns to <?php echo (int) self::RATIO_DEFAULT; ?>% left / <?php echo (int) (100 - self::RATIO_DEFAULT); ?>% right.',
               '<strong>Analytics Benchmarks</strong> — all thresholds restored to factory defaults.',
-              '<strong>Permissions</strong> — cross-editing <strong>on</strong>, ownership transfer <strong>on</strong>.'
+              '<strong>Permissions</strong> — cross-editing <strong>on</strong>, ownership transfer <strong>on</strong>.',
+              '<strong>Style Defaults</strong> — fonts, sizes, and colours restored to factory defaults.'
             ],
-            caveat: "<strong>This cannot be undone.</strong> Any customizations you've made across the three panels will be overwritten.",
+            caveat: "<strong>This cannot be undone.</strong> Any customizations you've made across all panels will be overwritten.",
             confirmLabel: 'Reset and save',
             onConfirm: function () {
               // 1. Ratio slider
@@ -1884,7 +2138,20 @@ class PB_Split_Guide_Plugin {
               if (cross) cross.checked = true;
               if (xfer)  xfer.checked  = true;
 
-              // 4. Submit to persist.
+              // 4. Style Defaults — reset all to factory
+              styleInputs.forEach(function(el) {
+                var key = el.getAttribute('data-key');
+                if (styleDefaults[key] !== undefined) {
+                  el.value = styleDefaults[key];
+                  if (typeof jQuery !== 'undefined' && jQuery(el).hasClass('pbsg-color-field') && jQuery.fn.wpColorPicker) {
+                    jQuery(el).wpColorPicker('color', styleDefaults[key]);
+                  }
+                }
+              });
+              syncStyleJSON();
+              updateStylePreview();
+
+              // 5. Submit to persist.
               //    NOTE: the form has <input name="submit"> from submit_button(),
               //    which shadows form.submit (the method) on the element. Calling
               //    the prototype method directly bypasses the shadow. This also
@@ -2161,7 +2428,7 @@ class PB_Split_Guide_Plugin {
 
     // Save structured intro fields (Phase 7)
     $intro_desc = isset($_POST['pbsg_intro_description'])
-      ? sanitize_textarea_field(wp_unslash($_POST['pbsg_intro_description'])) : '';
+      ? wp_kses_post(wp_unslash($_POST['pbsg_intro_description'])) : '';
     update_post_meta($post_id, self::META_INTRO_DESC, $intro_desc);
 
     $intro_objectives_raw = isset($_POST['pbsg_intro_objectives'])
@@ -2275,6 +2542,19 @@ class PB_Split_Guide_Plugin {
       [],
       self::asset_version('assets/split-guide.css')
     );
+
+    // Inject site-level style defaults as CSS custom properties
+    $style_defaults = self::resolve_style_defaults();
+    $inline_css = sprintf(
+        ':root{--pbsg-font-family:%s;--pbsg-heading-font:%s;--pbsg-font-size:%s;--pbsg-text-color:%s;--pbsg-accent-color:%s;--pbsg-button-color:%s;}',
+        esc_attr($style_defaults['font_family']),
+        esc_attr($style_defaults['heading_font']),
+        esc_attr($style_defaults['font_size']),
+        esc_attr($style_defaults['text_color']),
+        esc_attr($style_defaults['accent_color']),
+        esc_attr($style_defaults['button_color'])
+    );
+    wp_add_inline_style('pbsg_split_guide_css', $inline_css);
 
     // Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
     wp_enqueue_script(
@@ -2493,8 +2773,10 @@ class PB_Split_Guide_Plugin {
     }
   } // end post editor assets
 
-  // Slider CSS + JS on Guide Settings page (benchmark sliders)
+  // Slider CSS + JS on Guide Settings page (benchmark sliders + style defaults)
   if (isset($_GET['page']) && $_GET['page'] === 'pbsg-guide-settings') {
+    wp_enqueue_style('wp-color-picker');
+    wp_enqueue_script('wp-color-picker');
     wp_enqueue_style(
       'pbsg-admin',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
