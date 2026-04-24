@@ -234,8 +234,11 @@ final class PBSG_Steps_Normalizer
             $raw_quiz = isset($s['quiz']) && is_array($s['quiz']) ? $s['quiz'] : null;
             $has_quiz = $raw_quiz && !empty(self::sanitize_key($raw_quiz['type'] ?? ''));
 
+            // Rich-text instructions count as content (don't drop steps that only have instructions)
+            $has_instructions = isset($s['instructions_html']) && trim((string)$s['instructions_html']) !== '';
+
             // Skip empty rows
-            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '') || $has_quiz || ($branch !== null);
+            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '') || $has_quiz || ($branch !== null) || $has_instructions;
             if (!$has_any) continue;
 
             $clean_step = [

@@ -875,7 +875,7 @@ function branchSummary(s) {
         handle: '.pbsg-drag-handle',
         animation: 200,
         ghostClass: 'sortable-ghost',
-        onEnd: function () { reorderFromDOM(); renderStepCards(); }
+        onEnd: function () { syncAllEditors(); reorderFromDOM(); renderStepCards(true); }
       });
     }
 
@@ -2563,7 +2563,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       };
 
       setSteps(steps);
-      renderStepCards();
+      renderStepCards(true);
     }
   });
 
@@ -2649,7 +2649,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       steps[idx]._editing_h5p = true;
       setSteps(steps);
       collapsedSteps.delete(idx);
-      renderStepCards();
+      renderStepCards(true);
     }).fail(function () {
       alert('Failed to fetch H5P content.');
       renderStepCards();
@@ -2864,11 +2864,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   // ═══════════════════════════════════════════════════════════
   // Issue 7d: Validate Fill in Blanks has at least one *blank* before save
   $(document).on('click', '#publish, #save-post', function (e) {
-    // Sync intro description TinyMCE → textarea before WP serializes the form
-    var introContent = pbsgGetTinyMCEContent('pbsg_intro_description');
-    if (introContent !== null && introContent !== undefined) {
-      $('#pbsg_intro_description').val(introContent);
-    }
+    // Intro description is a plain textarea — no TinyMCE sync needed.
     // Atomic sync: flush all TinyMCE editors + form fields in one pass
     syncAllEditors();
 
@@ -2877,26 +2873,94 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     let valid = true;
     const caseRiskStepNums = [];
 
+    // Clear previous save-time validation errors
+    $('.pbsg-save-error').remove();
+    $('.pbsg-field--error').removeClass('pbsg-field--error');
+
+    function showError($field, msg) {
+      valid = false;
+      $field.addClass('pbsg-field--error');
+      $field.append('<div class="pbsg-save-error">' + msg + '</div>');
+    }
+
+    let $firstError = null;
+
     steps.forEach((s, idx) => {
       if (!s || !s.quiz) return;
 
-      // Validate Fill in Blanks has at least one *blank*
+      const $card = $(`#pbsg-step-${idx}`);
+      $card.removeClass('pbsg-step-card--collapsed');
+      collapsedSteps.delete(idx);
+
+      const $questionWrap = $card.find('.pbsg-quiz-question-wrap');
+      const $answersField = $card.find('.pbsg-answers-list').closest('.pbsg-field');
+      const $scCorrectField = $card.find('.pbsg-sc-correct-row').closest('.pbsg-field');
+      const $scWrongField = $card.find('.pbsg-sc-wrong-list').closest('.pbsg-field');
+
+      // ── Multiple Selection validation ──
+      if (s.quiz.type === 'multichoice') {
+        const q = (s.quiz.question || '').replace(/<[^>]*>/g, '').trim();
+        const answers = Array.isArray(s.quiz.answers) ? s.quiz.answers : [];
+        const filled = answers.filter(a => (a.text || '').trim());
+        const hasCorrect = answers.some(a => a.correct);
+        const hasAnyContent = q || filled.length > 0;
+
+        // Completely empty quiz → skip validation, PHP will skip H5P creation
+        if (hasAnyContent) {
+          if (!q) {
+            showError($questionWrap, 'Question text is required.');
+          }
+          if (filled.length < 2) {
+            showError($answersField.length ? $answersField : $questionWrap, 'At least 2 answer options are needed.');
+          } else if (!hasCorrect) {
+            showError($answersField.length ? $answersField : $questionWrap, 'Check at least one answer as correct.');
+          }
+        }
+      }
+
+      // ── Single Selection validation ──
+      if (s.quiz.type === 'singlechoice') {
+        const q = (s.quiz.question || '').replace(/<[^>]*>/g, '').trim();
+        const correct = (s.quiz.correct_answer || '').trim();
+        const wrongs = Array.isArray(s.quiz.wrong_answers) ? s.quiz.wrong_answers : [];
+        const filledWrongs = wrongs.filter(w => (w || '').trim());
+        const hasAnyContent = q || correct || filledWrongs.length > 0;
+
+        if (hasAnyContent) {
+          if (!q) {
+            showError($questionWrap, 'Question text is required.');
+          }
+          if (!correct) {
+            showError($scCorrectField.length ? $scCorrectField : $questionWrap, 'A correct answer is required.');
+          }
+          if (filledWrongs.length < 1) {
+            showError($scWrongField.length ? $scWrongField : $questionWrap, 'At least 1 wrong answer is needed.');
+          }
+        }
+      }
+
+      // ── Fill in Blanks validation ──
       if (s.quiz.type === 'blanks') {
         const sentence = s.quiz.sentence || '';
         const blanks = (sentence.match(/\*[^*]+\*/g) || []).length;
         if (sentence.trim().length > 0 && blanks === 0) {
-          valid = false;
-          // Expand the step card so user can see the error
-          $(`#pbsg-step-${idx}`).removeClass('pbsg-step-card--collapsed');
-          collapsedSteps.delete(idx);
-          // Highlight the error
-          $(`#pbsg-step-${idx} .pbsg-blanks-sentence`).css('border-color', '#8C2004');
-          alert('Step ' + (idx + 1) + ': Fill in the Blanks requires at least one *blank* word wrapped in asterisks.');
+          const $blanksField = $card.find('.pbsg-blanks-sentence').closest('.pbsg-field');
+          showError($blanksField.length ? $blanksField : $questionWrap, 'Wrap at least one word in *asterisks* to create a blank.');
         } else if (s.quiz.case_sensitive && blanks > 0 && blanksCaseSensitiveRiskyAnswers(sentence)) {
           caseRiskStepNums.push(idx + 1);
         }
       }
+
+      // Track the first error for scrolling
+      if (!valid && !$firstError) {
+        $firstError = $card.find('.pbsg-save-error').first();
+      }
     });
+
+    // Scroll to first error
+    if ($firstError && $firstError.length) {
+      $('html, body').animate({ scrollTop: $firstError.offset().top - 100 }, 300);
+    }
 
     if (!valid) {
       e.preventDefault();
@@ -2931,8 +2995,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-layout-body');
     var $chevron = $('#pbsg-layout-chevron');
     var isVisible = $body.is(':visible');
-    
-    $body.toggle();
+
+    $body.stop(true, true).slideToggle(200);
     $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
     $(this).attr('aria-expanded', !isVisible);
   });
@@ -3155,8 +3219,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-benchmark-body');
     var $chevron = $('#pbsg-benchmark-chevron');
     var isVisible = $body.is(':visible');
-    
-    $body.toggle();
+
+    $body.stop(true, true).slideToggle(200);
     $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
     $(this).attr('aria-expanded', !isVisible);
   });
@@ -3170,8 +3234,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-close-url-body');
     var $chevron = $('#pbsg-close-url-chevron');
     var isVisible = $body.is(':visible');
-    
-    $body.toggle();
+
+    $body.stop(true, true).slideToggle(200);
     $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
     $(this).attr('aria-expanded', !isVisible);
   });
@@ -3336,11 +3400,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   // ═══════════════════════════════════════════════════════════
   renderStepCards();
 
-  // Initialize TinyMCE on the intro description textarea
-  // (NOT using wp_editor() in PHP — it breaks Pressbooks footer script output)
-  if (document.getElementById('pbsg_intro_description')) {
-    pbsgInitTinyMCE('pbsg_intro_description');
-  }
+  // Intro description stays as a plain textarea (no TinyMCE) —
+  // the structured intro card uses esc_html() and is already curated.
 
     // Pre-load H5P metadata for ownership rendering
     if (PBSG_ADMIN.h5pAvailable) {

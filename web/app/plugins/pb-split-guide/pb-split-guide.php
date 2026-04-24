@@ -2355,8 +2355,15 @@ class PB_Split_Guide_Plugin {
         }
       }
 
-      // Strip transient data from stored JSON
-      unset($step['quiz'], $step['_editing_h5p']);
+      // Strip transient editing flag
+      unset($step['_editing_h5p']);
+
+      // Only strip quiz data if H5P content was successfully created/updated.
+      // If H5P is unavailable or creation failed, preserve quiz so the
+      // librarian's work isn't silently lost.
+      if (!empty($step['h5p_id']) && $step['h5p_id'] > 0) {
+        unset($step['quiz']);
+      }
     }
     unset($step);
 
@@ -2376,7 +2383,10 @@ class PB_Split_Guide_Plugin {
       });
     }
 
-    update_post_meta($post_id, self::META_STEPS, wp_json_encode($clean));
+    // wp_slash: WordPress's update_metadata() calls wp_unslash() on meta
+    // values, which strips JSON's \" escapes (e.g. href="..." in HTML).
+    // Pre-slashing ensures the stored JSON remains valid.
+    update_post_meta($post_id, self::META_STEPS, wp_slash(wp_json_encode($clean)));
 
     // Invalidate H5P usage map — links may have changed
     PBSG_H5P_Usage_Map::invalidate();
@@ -2416,7 +2426,7 @@ class PB_Split_Guide_Plugin {
 
     // Save structured intro fields (Phase 7)
     $intro_desc = isset($_POST['pbsg_intro_description'])
-      ? wp_kses_post(wp_unslash($_POST['pbsg_intro_description'])) : '';
+      ? sanitize_text_field(wp_unslash($_POST['pbsg_intro_description'])) : '';
     update_post_meta($post_id, self::META_INTRO_DESC, $intro_desc);
 
     $intro_objectives_raw = isset($_POST['pbsg_intro_objectives'])
@@ -2678,7 +2688,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'thickbox', 'pbsg_icons_js'],
-      '0.8.0',
+      '0.8.4',
       true
     );
 
@@ -2795,7 +2805,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'pbsg_icons_js'],
-      '0.8.0',
+      '0.8.4',
       true
     );
     wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
