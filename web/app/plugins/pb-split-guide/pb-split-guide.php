@@ -746,24 +746,12 @@ class PB_Split_Guide_Plugin {
             <div class="pbsg-intro-fields">
               <div class="pbsg-field">
                 <label for="pbsg_intro_description" class="pbsg-field-label">Description</label>
-                <?php
-                $__sd = self::resolve_style_defaults();
-                wp_editor($intro_desc, 'pbsg_intro_description', [
-                    'textarea_name' => 'pbsg_intro_description',
-                    'textarea_rows' => 4,
-                    'media_buttons' => false,
-                    'teeny'         => false,
-                    'tinymce'       => [
-                        'toolbar1'        => 'bold,italic,underline,|,bullist,numlist,|,link,|,fontselect,fontsizeselect,forecolor',
-                        'toolbar2'        => '',
-                        'plugins'         => 'lists,link,textcolor',
-                        'content_style'   => 'body { font-family: ' . esc_attr($__sd['font_family']) . '; font-size: ' . esc_attr($__sd['font_size']) . '; color: ' . esc_attr($__sd['text_color']) . '; }',
-                        'font_formats'    => 'Roboto=Roboto, sans-serif;Lusitana=Lusitana, serif;Georgia=Georgia, serif;Arial=Arial, sans-serif;System=system-ui, sans-serif',
-                        'fontsize_formats' => '14px 16px 18px 20px',
-                    ],
-                    'quicktags'     => ['buttons' => 'strong,em,link,ul,ol,li'],
-                ]);
-                ?>
+                <textarea
+                  id="pbsg_intro_description"
+                  name="pbsg_intro_description"
+                  rows="4"
+                  class="pbsg-wysiwyg-target"
+                ><?php echo esc_textarea($intro_desc); ?></textarea>
               </div>
 
               <div class="pbsg-field">
@@ -1468,6 +1456,14 @@ class PB_Split_Guide_Plugin {
         return self::STYLE_DEFAULTS;
     }
     return array_merge(self::STYLE_DEFAULTS, $decoded);
+  }
+
+  /**
+   * Clean up plugin options on uninstall.
+   * Registered via register_uninstall_hook().
+   */
+  public static function uninstall(): void {
+    delete_option(self::OPTION_STYLE_DEFAULTS);
   }
 
   /**
@@ -2682,7 +2678,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'thickbox', 'pbsg_icons_js'],
-      '0.7.2',
+      '0.8.0',
       true
     );
 
@@ -2734,7 +2730,13 @@ class PB_Split_Guide_Plugin {
 
     wp_localize_script('pbsg_admin_js', 'pbsgStyleDefaults', self::resolve_style_defaults());
 
-    wp_enqueue_editor();
+    // Load TinyMCE editor scripts. We enqueue the 'editor' handle directly instead
+    // of calling wp_enqueue_editor() because wp_enqueue_editor() in Pressbooks breaks
+    // admin footer script output. The 'editor' handle pulls in TinyMCE and wp.editor.
+    wp_enqueue_script('wp-tinymce');
+    wp_enqueue_script('editor');
+    wp_enqueue_script('quicktags');
+    wp_enqueue_style('editor-buttons');
 
     // Extra inline script: force the template on Add New Tutorial page.
     if ($hook === 'post-new.php') {
@@ -2793,7 +2795,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'pbsg_icons_js'],
-      '0.7.2',
+      '0.8.0',
       true
     );
     wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
@@ -2830,7 +2832,7 @@ class PB_Split_Guide_Plugin {
       'pbsg-admin-cross-edit',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.js',
       ['jquery', 'pbsg-modal'],
-      '0.7.2',
+      '0.8.0',
       true
     );
     wp_localize_script('pbsg-admin-cross-edit', 'pbsgModalIcons', [
@@ -3686,6 +3688,7 @@ new PB_Split_Guide_Plugin();
 register_activation_hook( __FILE__, array( 'PBSG_Roles', 'activate' ) );
 register_activation_hook( __FILE__, array( 'PBSG_Analytics', 'create_tables' ) );
 register_deactivation_hook( __FILE__, array( 'PBSG_Roles', 'deactivate' ) );
+register_uninstall_hook( __FILE__, array( 'PB_Split_Guide_Plugin', 'uninstall' ) );
 
 PBSG_Roles::init();
 PBSG_Analytics::init();
