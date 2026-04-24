@@ -1384,6 +1384,61 @@ function branchSummary(s) {
   }
 
   // ═══════════════════════════════════════════════════════════
+  //  Atomic sync: flush ALL editors to JSON in a single pass
+  // ═══════════════════════════════════════════════════════════
+  function syncAllEditors() {
+    const steps = getSteps().map(norm);
+    steps.forEach(function (step, idx) {
+      const $card = $(`#pbsg-step-${idx}`);
+      if (!$card.length) return;
+
+      // Instructions (TinyMCE)
+      step.instructions_html = pbsgGetTinyMCEContent('pbsg_instructions_' + idx) || '';
+
+      // Quiz
+      if (step.quiz) {
+        switch (step.quiz.type) {
+          case 'multichoice': {
+            step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
+            const a = [];
+            $card.find('.pbsg-answers-list > div').each(function () {
+              a.push({
+                text: $(this).find('.pbsg-answer-input').val() || '',
+                correct: $(this).find('.pbsg-answer-check').is(':checked')
+              });
+            });
+            step.quiz.answers = a;
+            break;
+          }
+          case 'blanks': {
+            step.quiz.sentence = $card.find('.pbsg-blanks-sentence').val() || '';
+            step.quiz.case_sensitive = $card.find('.pbsg-blanks-case').is(':checked');
+            step.quiz.accept_typos = $card.find('.pbsg-blanks-typos').is(':checked');
+            break;
+          }
+          case 'singlechoice': {
+            step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
+            step.quiz.correct_answer = $card.find('.pbsg-sc-correct-input').val() || '';
+            const w = [];
+            $card.find('.pbsg-sc-wrong-input').each(function () { w.push($(this).val() || ''); });
+            step.quiz.wrong_answers = w;
+            break;
+          }
+        }
+      }
+
+      // Resource (inline — avoids syncResource's separate read-modify-write)
+      if (step.tutorial_type !== 'file') {
+        const url = $card.find('.pbsg-resource-url').val() || '';
+        step.tutorial_url = url;
+        step.tutorial_type = url ? 'url' : '';
+        step.url = url;
+      }
+    });
+    setSteps(steps);
+  }
+
+  // ═══════════════════════════════════════════════════════════
   //  Resource Panel Events
   // ═══════════════════════════════════════════════════════════
   // Issue 6: Fix resource panel — don't clear URL on toggle, only on successful file select
@@ -2798,20 +2853,20 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     if (introContent !== null && introContent !== undefined) {
       $('#pbsg_intro_description').val(introContent);
     }
+    // Atomic sync: flush all TinyMCE editors + form fields in one pass
+    syncAllEditors();
+
+    // Re-read for validation
     const steps = getSteps().map(norm);
     let valid = true;
     const caseRiskStepNums = [];
 
     steps.forEach((s, idx) => {
-      syncInstructions(idx);
-      syncQuiz(idx);
-      syncResource(idx);
-      const step = getSteps().map(norm)[idx];
-      if (!step || !step.quiz) return;
+      if (!s || !s.quiz) return;
 
       // Validate Fill in Blanks has at least one *blank*
-      if (step.quiz.type === 'blanks') {
-        const sentence = step.quiz.sentence || '';
+      if (s.quiz.type === 'blanks') {
+        const sentence = s.quiz.sentence || '';
         const blanks = (sentence.match(/\*[^*]+\*/g) || []).length;
         if (sentence.trim().length > 0 && blanks === 0) {
           valid = false;
@@ -2821,7 +2876,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
           // Highlight the error
           $(`#pbsg-step-${idx} .pbsg-blanks-sentence`).css('border-color', '#8C2004');
           alert('Step ' + (idx + 1) + ': Fill in the Blanks requires at least one *blank* word wrapped in asterisks.');
-        } else if (step.quiz.case_sensitive && blanks > 0 && blanksCaseSensitiveRiskyAnswers(sentence)) {
+        } else if (s.quiz.case_sensitive && blanks > 0 && blanksCaseSensitiveRiskyAnswers(sentence)) {
           caseRiskStepNums.push(idx + 1);
         }
       }
