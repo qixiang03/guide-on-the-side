@@ -2086,3 +2086,22 @@ body.tutorial-active #colophon {
   .pbsg-running-score { display: none; }
   .pbsg-nav-btn { flex-basis: 100%; min-width: 0; }
 }
+
+/* ── Instructions body (per-step rich text from WYSIWYG editor) ── */
+.pbsg-instructions-body {
+  border-left: 3px solid var(--pbsg-accent-color, #517E1B);
+  padding: 6px 12px;
+  margin-bottom: 14px;
+  font-family: var(--pbsg-font-family, Roboto, sans-serif);
+  font-size: var(--pbsg-font-size, 16px);
+  color: var(--pbsg-text-color, #333);
+  line-height: 1.6;
+}
+
+.pbsg-instructions-body:empty {
+  display: none;
+}
+
+.pbsg-instructions-body a {
+  color: var(--pbsg-accent-color, #8C2004);
+}

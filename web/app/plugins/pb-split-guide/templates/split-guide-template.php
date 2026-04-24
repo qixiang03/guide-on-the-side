@@ -162,6 +162,9 @@ foreach ($steps as $s) {
 
   $s['tutorial'] = $tutorial;
 
+  // Sanitize rich-text instructions for safe frontend rendering
+  $s['instructions_html'] = wp_kses_post($s['instructions_html'] ?? '');
+
   $branch = null;
 
 if (!empty($s['branch']) && is_array($s['branch'])) {
@@ -459,6 +462,9 @@ $s['branch'] = $branch;
   </button>
 
 </div>
+
+      <!-- Instructions body (populated per-step by split-guide.js) -->
+      <div class="pbsg-instructions-body" id="pbsgInstructionsBody" style="display:none;"></div>
 
       <div class="pbsg-iframe-wrap">
         <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe" tabindex="0"></iframe>

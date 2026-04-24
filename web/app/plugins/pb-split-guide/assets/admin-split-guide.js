@@ -72,29 +72,53 @@ jQuery(function ($) {
   // ═══════════════════════════════════════════════════════════
   const PBSG_TINYMCE_TOOLBAR = 'bold italic underline | bullist numlist | link | fontselect fontsizeselect forecolor';
 
+  function pbsgInitTinyMCEDirect(editorId) {
+    // Remove existing instance if any (re-init after reorder)
+    var existing = tinymce.get(editorId);
+    if (existing) existing.remove();
+
+    var defaults = window.pbsgStyleDefaults || {};
+    tinymce.init({
+      selector: '#' + editorId,
+      menubar: false,
+      statusbar: false,
+      toolbar: PBSG_TINYMCE_TOOLBAR,
+      plugins: 'lists link textcolor',
+      content_style: 'body { font-family: ' + (defaults.font_family || 'Roboto, sans-serif') + '; font-size: ' + (defaults.font_size || '16px') + '; color: ' + (defaults.text_color || '#333333') + '; }',
+      font_formats: 'Roboto=Roboto, sans-serif;Lusitana=Lusitana, serif;Georgia=Georgia, serif;Arial=Arial, sans-serif;System=system-ui, sans-serif',
+      fontsize_formats: '14px 16px 18px 20px',
+      branding: false,
+      height: 120,
+      setup: function(editor) {
+        editor.on('change keyup', function() {
+          editor.save(); // sync content to the textarea
+        });
+      }
+    });
+  }
+
+  // TinyMCE may load after jQuery ready (footer scripts). Retry until available.
   function pbsgInitTinyMCE(editorId) {
-    const defaults = window.pbsgStyleDefaults || {};
-    if (typeof wp !== 'undefined' && wp.editor && wp.editor.initialize) {
-      wp.editor.initialize(editorId, {
-        tinymce: {
-          wpautop: false,
-          toolbar1: PBSG_TINYMCE_TOOLBAR,
-          toolbar2: '',
-          plugins: 'lists,link,textcolor',
-          content_style: 'body { font-family: ' + (defaults.font_family || 'Roboto, sans-serif') + '; font-size: ' + (defaults.font_size || '16px') + '; color: ' + (defaults.text_color || '#333333') + '; }',
-          font_formats: 'Roboto=Roboto, sans-serif;Lusitana=Lusitana, serif;Georgia=Georgia, serif;Arial=Arial, sans-serif;System=system-ui, sans-serif',
-          fontsize_formats: '14px 16px 18px 20px',
-        },
-        quicktags: { buttons: 'strong,em,link,ul,ol,li' },
-        mediaButtons: false,
-      });
+    if (typeof tinymce !== 'undefined') {
+      pbsgInitTinyMCEDirect(editorId);
+      return;
     }
+    var tries = 0;
+    var timer = setInterval(function() {
+      tries++;
+      if (typeof tinymce !== 'undefined') {
+        clearInterval(timer);
+        pbsgInitTinyMCEDirect(editorId);
+      } else if (tries > 40) {
+        clearInterval(timer);
+      }
+    }, 200);
   }
 
   function pbsgRemoveTinyMCE(editorId) {
-    if (typeof wp !== 'undefined' && wp.editor && wp.editor.remove) {
-      wp.editor.remove(editorId);
-    }
+    if (typeof tinymce === 'undefined') return;
+    var editor = tinymce.get(editorId);
+    if (editor) editor.remove();
   }
 
   function pbsgGetTinyMCEContent(editorId) {
@@ -129,7 +153,7 @@ jQuery(function ($) {
       $('#pbsg_steps_json').val() || '',
       $('#pbsg_intro_title').val() || '',
       $('#pbsg_intro_subtitle').val() || '',
-      $('#pbsg_intro_description').val() || '',
+      pbsgGetTinyMCEContent('pbsg_intro_description') || $('#pbsg_intro_description').val() || '',
     ];
     return parts.join('|||');
   }
@@ -2742,6 +2766,11 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   // ═══════════════════════════════════════════════════════════
   // Issue 7d: Validate Fill in Blanks has at least one *blank* before save
   $(document).on('click', '#publish, #save-post', function (e) {
+    // Sync intro description TinyMCE → textarea before WP serializes the form
+    var introContent = pbsgGetTinyMCEContent('pbsg_intro_description');
+    if (introContent !== null && introContent !== undefined) {
+      $('#pbsg_intro_description').val(introContent);
+    }
     const steps = getSteps().map(norm);
     let valid = true;
     const caseRiskStepNums = [];
@@ -3208,6 +3237,12 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   //  Init
   // ═══════════════════════════════════════════════════════════
   renderStepCards();
+
+  // Initialize TinyMCE on the intro description textarea
+  // (NOT using wp_editor() in PHP — it breaks Pressbooks footer script output)
+  if (document.getElementById('pbsg_intro_description')) {
+    pbsgInitTinyMCE('pbsg_intro_description');
+  }
 
     // Pre-load H5P metadata for ownership rendering
     if (PBSG_ADMIN.h5pAvailable) {

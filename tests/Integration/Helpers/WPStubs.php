@@ -678,6 +678,14 @@ if (!function_exists('get_option')) {
     }
 }
 
+if (!function_exists('delete_option')) {
+    function delete_option(string $option): bool
+    {
+        WPStubs::record('delete_option', [$option]);
+        return true;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Date / time stubs                                                 */
 /* ------------------------------------------------------------------ */

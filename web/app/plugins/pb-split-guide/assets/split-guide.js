@@ -1305,6 +1305,7 @@ function attachH5PWatcher(stepIndex){
 }
 
 const titleEl = document.getElementById('pbsgStepTitle');
+const instructionsEl = document.getElementById('pbsgInstructionsBody');
 const progressEl = document.getElementById('pbsgProgress');
 const runningScoreEl = document.getElementById('pbsgRunningScore');
 const progressFillEl = document.getElementById('pbsgProgressFill');
@@ -1890,6 +1891,19 @@ function render(){
 
   if (titleEl) titleEl.textContent = step.title || `Step ${i+1}`;
   if (stepEyebrowEl) stepEyebrowEl.textContent = `Step ${i+1} of ${steps.length}`;
+
+  // Render per-step instructions (rich text from WYSIWYG editor)
+  if (instructionsEl) {
+    const html = step.instructions_html || '';
+    if (html.trim()) {
+      instructionsEl.innerHTML = html;
+      instructionsEl.style.display = '';
+    } else {
+      instructionsEl.innerHTML = '';
+      instructionsEl.style.display = 'none';
+    }
+  }
+
   updateMenuState();
   if (progressEl) pbsgSetProgress(i + 1, steps.length);
   updateRunningScore();
