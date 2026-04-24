@@ -2,7 +2,7 @@
 
 **Plugin**: PB Split Guide (pb-split-guide) v0.5.0
 **For**: UPEI Library — Pressbooks Interactive Tutorial System
-**Last Updated**: April 9, 2026
+**Last Updated**: April 24, 2026
 
 ---
 
@@ -419,6 +419,9 @@ On activation, the plugin automatically:
 
 This page controls site-wide defaults that apply to all tutorials. Librarians can override some of these settings per-tutorial in the tutorial editor.
 
+![Guide Settings page showing Default Panel Layout slider and Performance Benchmarks](images/guide-settings-live.png)
+*Figure 1: Guide Settings — Default Panel Layout and Performance Benchmarks*
+
 #### Default Layout Ratio
 
 Controls the left/right pane split for the tutorial split-screen view.
@@ -466,6 +469,9 @@ Librarians can override benchmarks per-tutorial in the tutorial editor.
 
 **Location**: My Tutorials → Manage Librarians (admin only — requires `pbsg_manage_librarians` capability)
 
+![Manage Librarians page showing registered librarians table with actions](images/manage-librarians-live.png)
+*Figure 2: Manage Librarians — Registered librarian accounts with Edit Profile and Manage actions*
+
 #### Creating a Librarian
 
 1. Go to **Manage Librarians**
@@ -507,6 +513,9 @@ When they log in, librarians are taken directly to **My Tutorials** instead of t
 **Location**: Tutorial Analytics (visible to librarians and admins — requires `pbsg_view_analytics` capability)
 
 The dashboard shows aggregate tutorial performance data. All analytics are **privacy-first**: no individual student is ever identified, no cookies are stored, and no login is required from students. This complies with PIPEDA privacy requirements.
+
+![Analytics Dashboard showing KPI cards, time-series chart, device breakdown, and Needs Attention panel](images/analytics-dashboard.png)
+*Figure 3: Tutorial Analytics — Overview tab with KPI cards, Views & Completions chart, and Needs Attention alerts*
 
 #### Tabs
 
@@ -578,6 +587,9 @@ Students interact with quizzes directly — no login required. Their answers are
 
 Tutorials can be exported as portable packages and imported on other Pressbooks servers. This is useful for sharing tutorials between institutions (e.g., UPEI → Dalhousie).
 
+![My Tutorials page showing tutorial cards with Export buttons and the Import Tutorial panel](images/my-tutorials.png)
+*Figure 4: My Tutorials — Tutorial cards with Open, Edit, Transfer, and Export actions; Import Tutorial panel at top*
+
 #### Exporting a Tutorial
 
 1. Go to **My Tutorials**
@@ -599,6 +611,39 @@ The export package includes:
 4. A new tutorial is created with all the original content and media
 
 > **Note**: H5P quiz content references are included in the export, but the target server must have the same H5P content types installed (Multiple Choice, Fill-in-the-Blank) for quizzes to work after import.
+
+---
+
+### Upload File Size Limits
+
+File uploads (PDFs, images, audio, video) are governed by a chain of limits. The effective maximum is the **smallest** of these three values:
+
+![Upload File Size Limits showing three-layer chain and WordPress Multisite settings](images/upload-limits.png)
+*Figure 5: Upload File Size Limits — Three-layer chain (PHP, Nginx, WordPress Multisite) and Network Settings configuration*
+
+| Layer | Setting | Default | Where to Change |
+|-------|---------|---------|-----------------|
+| PHP | `upload_max_filesize` | 128M | `config_services/php.ini` (local) or `/etc/php/php.ini` (production) |
+| Nginx | `client_max_body_size` | 128M | `config_services/nginx.conf` line 27 (local) or `/etc/nginx/nginx.conf` (production) |
+| WordPress Multisite | Max upload file size | 100 MB (102400 KB) | Network Admin > Settings > Upload Settings |
+
+The WordPress Multisite setting is typically the bottleneck. To change it:
+
+1. Log in as a **Network Admin** (Super Admin)
+2. Go to **Settings** > **Network Settings**
+3. Scroll to **Upload Settings**
+4. Change **Max upload file size** from `102400` to the desired value in KB (e.g., `131072` for 128 MB)
+5. Click **Save Changes**
+
+The plugin's upload zone label ("Max file size: X MB") updates automatically — it reads `wp_max_upload_size()` which returns the effective minimum of all three layers.
+
+> **Important**: After changing PHP or Nginx values, restart the web server (`lando restart` locally, or `sudo systemctl restart php-fpm nginx` on production). WordPress Multisite changes take effect immediately.
+
+#### Allowed File Types
+
+The allowed file types for upload are also controlled in Network Settings under **Upload file types**. The default list includes common formats: `jpg jpeg png gif mov avi mpg mp3 mp4 pdf doc docx ppt pptx xls xlsx wav webm ogv flv`.
+
+To add new file types (e.g., `.svg`), append them to the space-separated list in the same Network Settings panel.
 
 ---
 

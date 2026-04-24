@@ -355,6 +355,18 @@ if (!function_exists('wp_unslash')) {
     }
 }
 
+if (!function_exists('wp_slash')) {
+    // No-op in tests: real WP pairs wp_slash() with update_metadata()'s
+    // internal wp_unslash(), yielding a net round-trip identity. The
+    // update_post_meta() stub is a pure recorder (no unslash), so a no-op
+    // wp_slash here matches that observable behavior and avoids breaking
+    // tests that json_decode() recorded meta values.
+    function wp_slash($value)
+    {
+        return $value;
+    }
+}
+
 if (!function_exists('esc_attr')) {
     function esc_attr(string $text): string
     {
