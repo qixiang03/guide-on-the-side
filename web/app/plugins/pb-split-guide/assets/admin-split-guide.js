@@ -135,7 +135,15 @@ jQuery(function ($) {
     catch (e) { return []; }
   }
 
-  function setSteps(steps) { $('#pbsg_steps_json').val(JSON.stringify(steps || [])); markDirty(); }
+  function setSteps(steps) {
+    try {
+      $('#pbsg_steps_json').val(JSON.stringify(steps || []));
+    } catch (e) {
+      console.error('[PBSG] Failed to serialize steps:', e);
+      return;
+    }
+    markDirty();
+  }
 
   // ═══════════════════════════════════════════════════════════
   //  Unsaved-changes detection
@@ -744,18 +752,21 @@ function branchSummary(s) {
   // ═══════════════════════════════════════════════════════════
   function quizName(t) { return { multichoice: 'Multiple Selection', blanks: 'Fill in Blanks', singlechoice: 'Single Selection' }[t] || ''; }
 
-  function renderStepCards() {
+  function renderStepCards(skipSync) {
     const $c = $('#pbsg-steps-container');
     if (!$c.length) return;
 
     // Flush TinyMCE content into steps data before destroying editors
-    $c.find('.pbsg-step-card').each(function () {
-      const oldIdx = parseInt($(this).data('idx'), 10);
-      if (!isNaN(oldIdx)) {
-        syncInstructions(oldIdx);
-        syncQuiz(oldIdx);
-      }
-    });
+    // skipSync: caller already synced and mutated the JSON — trust it as-is
+    if (!skipSync) {
+      $c.find('.pbsg-step-card').each(function () {
+        const oldIdx = parseInt($(this).data('idx'), 10);
+        if (!isNaN(oldIdx)) {
+          syncInstructions(oldIdx);
+          syncQuiz(oldIdx);
+        }
+      });
+    }
 
     const steps = getSteps().map(norm);
 
