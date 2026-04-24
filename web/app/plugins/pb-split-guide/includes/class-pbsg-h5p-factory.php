@@ -236,13 +236,16 @@ final class PBSG_H5P_Factory
 
     private static function build_multichoice_params(array $quiz): array
     {
-        $question = '<p>' . ($quiz['question'] ?? '') . '</p>';
+        $raw_q    = $quiz['question'] ?? '';
+        $question = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $raw_q) ? $raw_q : '<p>' . $raw_q . '</p>';
 
         $answers = [];
         foreach (($quiz['answers'] ?? []) as $a) {
             $is_correct = !empty($a['correct']);
+            $raw_text   = $a['text'] ?? '';
+            $answer_text = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $raw_text) ? $raw_text : '<p>' . $raw_text . '</p>';
             $answers[] = [
-                'text'            => '<p>' . ($a['text'] ?? '') . '</p>',
+                'text'            => $answer_text,
                 'correct'         => $is_correct,
                 'tipsAndFeedback' => [
                     'tip'               => '',
@@ -279,14 +282,16 @@ final class PBSG_H5P_Factory
      */
     private static function build_singlechoice_params(array $quiz): array
     {
-        $question = '<p>' . ($quiz['question'] ?? '') . '</p>';
+        $raw_q    = $quiz['question'] ?? '';
+        $question = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $raw_q) ? $raw_q : '<p>' . $raw_q . '</p>';
         $correct  = $quiz['correct_answer'] ?? '';
         $wrongs   = $quiz['wrong_answers'] ?? [];
 
         $answers = [];
         // Correct answer
+        $correct_text = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $correct) ? $correct : '<p>' . $correct . '</p>';
         $answers[] = [
-            'text'            => '<p>' . $correct . '</p>',
+            'text'            => $correct_text,
             'correct'         => true,
             'tipsAndFeedback' => [
                 'tip'               => '',
@@ -296,8 +301,9 @@ final class PBSG_H5P_Factory
         ];
         // Wrong answers
         foreach ($wrongs as $w) {
+            $wrong_text = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $w) ? $w : '<p>' . $w . '</p>';
             $answers[] = [
-                'text'            => '<p>' . $w . '</p>',
+                'text'            => $wrong_text,
                 'correct'         => false,
                 'tipsAndFeedback' => [
                     'tip'               => '',
@@ -373,12 +379,12 @@ final class PBSG_H5P_Factory
 
     private static function reverse_multichoice(array $params): array
     {
-        $question = strip_tags($params['question'] ?? '');
+        $question = self::unwrap_p($params['question'] ?? '');
 
         $answers = [];
         foreach (($params['answers'] ?? []) as $a) {
             $answers[] = [
-                'text'    => strip_tags($a['text'] ?? ''),
+                'text'    => self::unwrap_p($a['text'] ?? ''),
                 'correct' => !empty($a['correct']),
             ];
         }

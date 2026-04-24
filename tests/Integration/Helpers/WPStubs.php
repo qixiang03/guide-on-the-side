@@ -885,7 +885,13 @@ if (!function_exists('wp_kses_post')) {
     function wp_kses_post(string $data): string
     {
         WPStubs::record('wp_kses_post', [$data]);
-        return $data; // pass-through for tests
+        // Strip dangerous tags (script, iframe, object, embed, form) to
+        // mirror real wp_kses_post behaviour in tests.
+        return preg_replace(
+            '#<(script|iframe|object|embed|form|style|applet|base|link|meta|xml)[^>]*>.*?</\1>#si',
+            '',
+            $data
+        ) ?? $data;
     }
 }
 
