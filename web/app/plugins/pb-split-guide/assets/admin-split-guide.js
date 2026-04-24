@@ -91,7 +91,17 @@ jQuery(function ($) {
       height: 120,
       setup: function(editor) {
         editor.on('change keyup', function() {
-          editor.save(); // sync content to the textarea
+          editor.save();
+        });
+        editor.on('focus', function() {
+          var wrap = editor.getContainer();
+          if (wrap) wrap = wrap.closest('.pbsg-tinymce-wrap');
+          if (wrap) wrap.classList.add('pbsg-tinymce-wrap--focused');
+        });
+        editor.on('blur', function() {
+          var wrap = editor.getContainer();
+          if (wrap) wrap = wrap.closest('.pbsg-tinymce-wrap');
+          if (wrap) wrap.classList.remove('pbsg-tinymce-wrap--focused');
         });
       }
     });
@@ -817,7 +827,9 @@ function branchSummary(s) {
                 <label class="pbsg-field-label">
                   <span class="pbsg-panel-icon">${icon('document')}</span> Instructions (left pane)
                 </label>
-                <textarea id="pbsg_instructions_${idx}" class="pbsg-instructions-editor" data-idx="${idx}">${esc(s.instructions_html || '')}</textarea>
+                <div class="pbsg-tinymce-wrap">
+                  <textarea id="pbsg_instructions_${idx}" class="pbsg-instructions-editor" data-idx="${idx}">${esc(s.instructions_html || '')}</textarea>
+                </div>
               </div>
               <div class="pbsg-panel-label">
                 <span class="pbsg-panel-icon">${icon('puzzle')}</span> Quiz Question
@@ -982,7 +994,9 @@ function branchSummary(s) {
     return `
       <div class="pbsg-field pbsg-quiz-question-wrap">
         <label class="pbsg-field-label">Question</label>
-        <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
+        <div class="pbsg-tinymce-wrap">
+          <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
+        </div>
       </div>
       <div class="pbsg-field">
         <label class="pbsg-field-label">Answers <span class="pbsg-field-optional">&mdash; check the correct one(s)</span></label>
@@ -1107,7 +1121,9 @@ function branchSummary(s) {
     return `
       <div class="pbsg-field pbsg-quiz-question-wrap">
         <label class="pbsg-field-label">Question</label>
-        <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
+        <div class="pbsg-tinymce-wrap">
+          <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
+        </div>
       </div>
       <div class="pbsg-field">
         <label class="pbsg-field-label">Correct Answer</label>
