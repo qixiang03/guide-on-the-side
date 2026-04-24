@@ -236,13 +236,16 @@ final class PBSG_H5P_Factory
 
     private static function build_multichoice_params(array $quiz): array
     {
-        $question = '<p>' . ($quiz['question'] ?? '') . '</p>';
+        $raw_q    = $quiz['question'] ?? '';
+        $question = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $raw_q) ? $raw_q : '<p>' . $raw_q . '</p>';
 
         $answers = [];
         foreach (($quiz['answers'] ?? []) as $a) {
             $is_correct = !empty($a['correct']);
+            $raw_text   = $a['text'] ?? '';
+            $answer_text = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $raw_text) ? $raw_text : '<p>' . $raw_text . '</p>';
             $answers[] = [
-                'text'            => '<p>' . ($a['text'] ?? '') . '</p>',
+                'text'            => $answer_text,
                 'correct'         => $is_correct,
                 'tipsAndFeedback' => [
                     'tip'               => '',
@@ -279,14 +282,16 @@ final class PBSG_H5P_Factory
      */
     private static function build_singlechoice_params(array $quiz): array
     {
-        $question = '<p>' . ($quiz['question'] ?? '') . '</p>';
+        $raw_q    = $quiz['question'] ?? '';
+        $question = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $raw_q) ? $raw_q : '<p>' . $raw_q . '</p>';
         $correct  = $quiz['correct_answer'] ?? '';
         $wrongs   = $quiz['wrong_answers'] ?? [];
 
         $answers = [];
         // Correct answer
+        $correct_text = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $correct) ? $correct : '<p>' . $correct . '</p>';
         $answers[] = [
-            'text'            => '<p>' . $correct . '</p>',
+            'text'            => $correct_text,
             'correct'         => true,
             'tipsAndFeedback' => [
                 'tip'               => '',
@@ -296,8 +301,9 @@ final class PBSG_H5P_Factory
         ];
         // Wrong answers
         foreach ($wrongs as $w) {
+            $wrong_text = preg_match('/^\s*<(?:p|div|h[1-6])\b/i', $w) ? $w : '<p>' . $w . '</p>';
             $answers[] = [
-                'text'            => '<p>' . $w . '</p>',
+                'text'            => $wrong_text,
                 'correct'         => false,
                 'tipsAndFeedback' => [
                     'tip'               => '',
@@ -373,12 +379,12 @@ final class PBSG_H5P_Factory
 
     private static function reverse_multichoice(array $params): array
     {
-        $question = strip_tags($params['question'] ?? '');
+        $question = self::unwrap_p($params['question'] ?? '');
 
         $answers = [];
         foreach (($params['answers'] ?? []) as $a) {
             $answers[] = [
-                'text'    => strip_tags($a['text'] ?? ''),
+                'text'    => self::unwrap_p($a['text'] ?? ''),
                 'correct' => !empty($a['correct']),
             ];
         }
@@ -395,12 +401,12 @@ final class PBSG_H5P_Factory
      */
     private static function reverse_singlechoice_from_mc(array $params): array
     {
-        $question = strip_tags($params['question'] ?? '');
+        $question = self::unwrap_p($params['question'] ?? '');
         $correct  = '';
         $wrongs   = [];
 
         foreach (($params['answers'] ?? []) as $a) {
-            $text = strip_tags($a['text'] ?? '');
+            $text = self::unwrap_p($a['text'] ?? '');
             if (!empty($a['correct'])) {
                 $correct = $text;
             } else {
@@ -424,13 +430,13 @@ final class PBSG_H5P_Factory
         $choices = $params['choices'] ?? [];
         $first   = $choices[0] ?? [];
 
-        $question       = strip_tags($first['question'] ?? '');
+        $question       = self::unwrap_p($first['question'] ?? '');
         $all_answers    = $first['answers'] ?? [];
-        $correct_answer = !empty($all_answers) ? strip_tags($all_answers[0]) : '';
+        $correct_answer = !empty($all_answers) ? self::unwrap_p($all_answers[0]) : '';
 
         $wrong_answers = [];
         for ($i = 1; $i < count($all_answers); $i++) {
-            $wrong_answers[] = strip_tags($all_answers[$i]);
+            $wrong_answers[] = self::unwrap_p($all_answers[$i]);
         }
 
         return [
@@ -439,6 +445,23 @@ final class PBSG_H5P_Factory
             'correct_answer' => $correct_answer,
             'wrong_answers'  => $wrong_answers,
         ];
+    }
+
+    /**
+     * Strip a single outer <p>…</p> wrapper while preserving inner HTML.
+     * Used by reverse mappers to undo the <p> wrap added by build_*_params().
+     * Does NOT strip_tags — inner HTML (e.g. <b>, <i>) is intentionally kept.
+     *
+     * @param string $text Raw text possibly wrapped in <p>…</p>.
+     * @return string      Text with at most one outer <p> layer removed.
+     */
+    private static function unwrap_p(string $text): string
+    {
+        $text = trim($text);
+        if (preg_match('/^<p>(.*)<\/p>$/s', $text, $m)) {
+            return trim($m[1]);
+        }
+        return $text;
     }
 
     private static function reverse_blanks(array $params): array

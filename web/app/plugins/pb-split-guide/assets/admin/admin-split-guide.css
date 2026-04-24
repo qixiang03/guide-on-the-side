@@ -777,6 +777,101 @@
 }
 
 /* ================================================================
+   TINYMCE CONTAINERS (Instructions + Quiz Question WYSIWYG)
+   ================================================================ */
+
+/* Instructions WYSIWYG wrap */
+.pbsg-instructions-wrap {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 2px dashed var(--pbsg-green, #517E1B);
+}
+
+.pbsg-instructions-wrap .pbsg-field-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--pbsg-grey-mid);
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── TinyMCE: slim toolbar with focus-reveal ───────────────── */
+
+/* Container sizing */
+.pbsg-tinymce-wrap .mce-tinymce {
+  width: 100% !important;
+  border: 1px dashed var(--pbsg-grey-light, #e2e4e7) !important;
+  border-radius: 6px !important;
+  overflow: hidden;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, border-style 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Slim toolbar buttons */
+.pbsg-tinymce-wrap .mce-toolbar .mce-btn {
+  min-width: 26px;
+  height: 26px;
+  border-radius: 4px;
+}
+.pbsg-tinymce-wrap .mce-toolbar .mce-btn button {
+  padding: 2px 5px;
+  color: #50575e;
+}
+.pbsg-tinymce-wrap .mce-toolbar-grp {
+  background: #f9f9f9 !important;
+  border-bottom: 1px solid var(--pbsg-grey-light, #e2e4e7) !important;
+  padding: 2px 4px !important;
+}
+
+/* Hide statusbar */
+.pbsg-tinymce-wrap .mce-statusbar { display: none !important; }
+
+/* ── Idle state: hide toolbar ── */
+.pbsg-tinymce-wrap .mce-toolbar-grp {
+  max-height: 0;
+  overflow: hidden;
+  border-bottom: none !important;
+  padding: 0 !important;
+  transition: max-height 0.15s ease, padding 0.15s ease;
+}
+
+/* Editor area min-heights */
+.pbsg-instructions-wrap .pbsg-tinymce-wrap .mce-edit-area iframe {
+  min-height: 80px;
+}
+.pbsg-quiz-question-wrap .pbsg-tinymce-wrap .mce-edit-area iframe {
+  min-height: 50px;
+}
+
+/* ── Focused state: reveal toolbar ── */
+.pbsg-tinymce-wrap--focused .mce-tinymce {
+  border-color: var(--pbsg-red, #8C2004) !important;
+  border-style: solid !important;
+  box-shadow: 0 0 0 2px rgba(140, 32, 4, 0.1) !important;
+}
+.pbsg-tinymce-wrap--focused .mce-toolbar-grp {
+  max-height: 40px;
+  padding: 2px 4px !important;
+  border-bottom: 1px solid var(--pbsg-grey-light, #e2e4e7) !important;
+}
+
+/* Quicktags fallback textarea sizing (when TinyMCE fails to load) */
+.pbsg-instructions-editor {
+  width: 100%;
+  min-height: 80px;
+  box-sizing: border-box;
+}
+.pbsg-quiz-question-editor {
+  width: 100%;
+  min-height: 50px;
+  box-sizing: border-box;
+}
+
+/* ================================================================
    QUIZ TYPE SELECTOR
    ================================================================ */
 
@@ -1065,6 +1160,34 @@
   margin-top: 6px;
   padding: 4px 8px;
   background: #fff0f0;
+  border-radius: var(--pbsg-radius-sm);
+}
+
+/* ── Save-time inline validation errors ── */
+.pbsg-save-error {
+  font-size: 12px;
+  color: var(--pbsg-red);
+  margin-top: 6px;
+  padding: 5px 10px;
+  background: #fdf0ef;
+  border-left: 3px solid var(--pbsg-red);
+  border-radius: 0 var(--pbsg-radius-sm) var(--pbsg-radius-sm) 0;
+  animation: pbsg-error-fadein 0.2s ease;
+}
+@keyframes pbsg-error-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.pbsg-field--error .mce-tinymce,
+.pbsg-field--error .pbsg-tinymce-wrap .mce-tinymce {
+  border: 2px solid var(--pbsg-red) !important;
+  border-style: solid !important;
+}
+.pbsg-field--error .pbsg-answers-list,
+.pbsg-field--error .pbsg-sc-correct-row,
+.pbsg-field--error .pbsg-sc-wrong-list,
+.pbsg-field--error .pbsg-blanks-sentence {
+  border: 2px solid var(--pbsg-red) !important;
   border-radius: var(--pbsg-radius-sm);
 }
 

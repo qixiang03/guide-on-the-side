@@ -355,6 +355,18 @@ if (!function_exists('wp_unslash')) {
     }
 }
 
+if (!function_exists('wp_slash')) {
+    // No-op in tests: real WP pairs wp_slash() with update_metadata()'s
+    // internal wp_unslash(), yielding a net round-trip identity. The
+    // update_post_meta() stub is a pure recorder (no unslash), so a no-op
+    // wp_slash here matches that observable behavior and avoids breaking
+    // tests that json_decode() recorded meta values.
+    function wp_slash($value)
+    {
+        return $value;
+    }
+}
+
 if (!function_exists('esc_attr')) {
     function esc_attr(string $text): string
     {
@@ -477,6 +489,14 @@ if (!function_exists('wp_enqueue_style')) {
     }
 }
 
+if (!function_exists('wp_add_inline_style')) {
+    function wp_add_inline_style(string $handle, string $data): bool
+    {
+        WPStubs::record('wp_add_inline_style', [$handle, $data]);
+        return true;
+    }
+}
+
 if (!function_exists('wp_enqueue_script')) {
     function wp_enqueue_script(string $handle, string $src = '', array $deps = [], $ver = false, $in_footer = false): void
     {
@@ -488,6 +508,13 @@ if (!function_exists('wp_enqueue_media')) {
     function wp_enqueue_media(array $args = []): void
     {
         WPStubs::record('wp_enqueue_media', [$args]);
+    }
+}
+
+if (!function_exists('wp_enqueue_editor')) {
+    function wp_enqueue_editor(): void
+    {
+        WPStubs::record('wp_enqueue_editor', []);
     }
 }
 
@@ -663,6 +690,14 @@ if (!function_exists('get_option')) {
     }
 }
 
+if (!function_exists('delete_option')) {
+    function delete_option(string $option): bool
+    {
+        WPStubs::record('delete_option', [$option]);
+        return true;
+    }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Date / time stubs                                                 */
 /* ------------------------------------------------------------------ */
@@ -788,6 +823,34 @@ if (!function_exists('wp_remote_head')) {
     }
 }
 
+if (!function_exists('wp_remote_get')) {
+    function wp_remote_get(string $url, array $args = [])
+    {
+        WPStubs::record('wp_remote_get', [$url, $args]);
+        $override = WPStubs::returnFor('wp_remote_get', null);
+        if ($override !== null) {
+            return $override;
+        }
+        return new WP_Error('http_request_failed', 'Stubbed — no real HTTP in tests');
+    }
+}
+
+if (!function_exists('apply_filters')) {
+    /**
+     * Filter stub. Tests seed callbacks via WPStubs::$returns['filters'][$tag].
+     * Defaults to pass-through (returns $value unchanged).
+     */
+    function apply_filters(string $tag, $value, ...$args)
+    {
+        WPStubs::record('apply_filters', array_merge([$tag, $value], $args));
+        $filters = WPStubs::returnFor('filters', []);
+        if (isset($filters[$tag]) && is_callable($filters[$tag])) {
+            return call_user_func_array($filters[$tag], array_merge([$value], $args));
+        }
+        return $value;
+    }
+}
+
 if (!function_exists('wp_remote_retrieve_headers')) {
     function wp_remote_retrieve_headers($response): array
     {
@@ -806,6 +869,16 @@ if (!function_exists('wp_remote_retrieve_header')) {
         }
         $headers = $response['headers'] ?? [];
         return (string) ($headers[strtolower($header)] ?? '');
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_response_code')) {
+    function wp_remote_retrieve_response_code($response): int
+    {
+        if (is_wp_error($response)) {
+            return 0;
+        }
+        return (int) ($response['response']['code'] ?? 0);
     }
 }
 
@@ -847,7 +920,13 @@ if (!function_exists('wp_kses_post')) {
     function wp_kses_post(string $data): string
     {
         WPStubs::record('wp_kses_post', [$data]);
-        return $data; // pass-through for tests
+        // Strip dangerous tags (script, iframe, object, embed, form) to
+        // mirror real wp_kses_post behaviour in tests.
+        return preg_replace(
+            '#<(script|iframe|object|embed|form|style|applet|base|link|meta|xml)[^>]*>.*?</\1>#si',
+            '',
+            $data
+        ) ?? $data;
     }
 }
 

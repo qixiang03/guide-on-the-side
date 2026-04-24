@@ -97,7 +97,7 @@ final class PBSG_Steps_Normalizer
 
                         switch ($quiz_type) {
                             case 'multichoice':
-                                $clean_q['question'] = self::sanitize_text($q['question'] ?? '');
+                                $clean_q['question'] = self::sanitize_rich_text($q['question'] ?? '');
                                 $clean_q['answers']  = self::sanitize_mc_answers($q['answers'] ?? []);
                                 break;
 
@@ -108,7 +108,7 @@ final class PBSG_Steps_Normalizer
                                 break;
 
                             case 'singlechoice':
-                                $clean_q['question'] = self::sanitize_text($q['question'] ?? '');
+                                $clean_q['question'] = self::sanitize_rich_text($q['question'] ?? '');
                                 $clean_q['correct_answer'] = self::sanitize_text($q['correct_answer'] ?? '');
                                 $clean_q['wrong_answers'] = array_map(
                                     [self::class, 'sanitize_text'],
@@ -234,8 +234,11 @@ final class PBSG_Steps_Normalizer
             $raw_quiz = isset($s['quiz']) && is_array($s['quiz']) ? $s['quiz'] : null;
             $has_quiz = $raw_quiz && !empty(self::sanitize_key($raw_quiz['type'] ?? ''));
 
+            // Rich-text instructions count as content (don't drop steps that only have instructions)
+            $has_instructions = isset($s['instructions_html']) && trim((string)$s['instructions_html']) !== '';
+
             // Skip empty rows
-            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '') || $has_quiz || ($branch !== null);
+            $has_any = ($h5p_id > 0) || ($title !== '') || ($tutorial_type !== '') || $has_quiz || ($branch !== null) || $has_instructions;
             if (!$has_any) continue;
 
             $clean_step = [
@@ -250,6 +253,9 @@ final class PBSG_Steps_Normalizer
                 // Legacy key (optional)
                 'url' => $tutorial_type === 'url' ? $tutorial_url : '',
 
+                // Rich-text instructions shown in the left pane above the quiz
+                'instructions_html' => self::sanitize_rich_text((string)($s['instructions_html'] ?? '')),
+
                 // Branch / sub-tutorial fields
                 'branch' => $branch,
             ];
@@ -262,7 +268,7 @@ final class PBSG_Steps_Normalizer
 
                 switch ($quiz_type) {
                     case 'multichoice':
-                        $clean_quiz['question'] = self::sanitize_text($quiz['question'] ?? '');
+                        $clean_quiz['question'] = self::sanitize_rich_text($quiz['question'] ?? '');
                         $clean_quiz['answers']  = self::sanitize_mc_answers($quiz['answers'] ?? []);
                         break;
 
@@ -273,7 +279,7 @@ final class PBSG_Steps_Normalizer
                         break;
 
                     case 'singlechoice':
-                        $clean_quiz['question']       = self::sanitize_text($quiz['question'] ?? '');
+                        $clean_quiz['question']       = self::sanitize_rich_text($quiz['question'] ?? '');
                         $clean_quiz['correct_answer'] = self::sanitize_text($quiz['correct_answer'] ?? '');
                         $clean_quiz['wrong_answers']  = array_map(
                             [self::class, 'sanitize_text'],
@@ -348,6 +354,19 @@ final class PBSG_Steps_Normalizer
     {
         $text = trim($text);
         return preg_replace('/\s+/', ' ', $text) ?? '';
+    }
+
+    /**
+     * Sanitize rich text (HTML) using wp_kses_post.
+     * Allows safe inline/block HTML (bold, italic, links, etc.) while
+     * stripping dangerous tags such as <script>, <iframe>, <object>.
+     *
+     * @param string $html
+     * @return string
+     */
+    private static function sanitize_rich_text(string $html): string
+    {
+        return wp_kses_post(trim($html));
     }
 
     private static function sanitize_key(string $key): string

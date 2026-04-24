@@ -31,6 +31,14 @@
   --pbsg-radius: 8px;
   --pbsg-radius-sm: 6px;
   --pbsg-shadow: 0 1px 1px rgba(0,0,0,.04);
+
+  /* Style template defaults (fallbacks when wp_add_inline_style hasn't run) */
+  --pbsg-font-family: Roboto, sans-serif;
+  --pbsg-heading-font: Lusitana, serif;
+  --pbsg-font-size: 16px;
+  --pbsg-text-color: #333333;
+  --pbsg-accent-color: #8C2004;
+  --pbsg-button-color: #517E1B;
 }
 
 /* ---------- 1) Hide theme chrome for this template ---------- */
@@ -2077,4 +2085,23 @@ body.tutorial-active #colophon {
 @container (max-width: 180px) {
   .pbsg-running-score { display: none; }
   .pbsg-nav-btn { flex-basis: 100%; min-width: 0; }
+}
+
+/* ── Instructions body (per-step rich text from WYSIWYG editor) ── */
+.pbsg-instructions-body {
+  border-left: 3px solid var(--pbsg-accent-color, #517E1B);
+  padding: 6px 12px;
+  margin-bottom: 14px;
+  font-family: var(--pbsg-font-family, Roboto, sans-serif);
+  font-size: var(--pbsg-font-size, 16px);
+  color: var(--pbsg-text-color, #333);
+  line-height: 1.6;
+}
+
+.pbsg-instructions-body:empty {
+  display: none;
+}
+
+.pbsg-instructions-body a {
+  color: var(--pbsg-accent-color, #8C2004);
 }

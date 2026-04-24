@@ -36,6 +36,130 @@ function pbsgSetScore(correct, attempted) {
 let tutorialPopup;
 let popupPollInterval = null;
 
+// ── Embed-failure watchdog ──────────────────────────────────────────
+//
+// Browsers do not fire a reliable `error` event for iframes that fail to
+// render due to X-Frame-Options, CSP frame-ancestors, or network refusals
+// like ERR_CONNECTION_REFUSED (the "libraryupei.ca refused to connect"
+// screen). Save-time HEAD checks (PBSG_Embed_Check) also miss cases where
+// servers answer HEAD with different headers than GET.
+//
+// Last-line defense: after we set `iframe.src` for a URL-type embed, we
+// start a short no-load timer. If the `load` event has not fired by the
+// time the timer expires, the iframe is almost certainly broken — we
+// discard it and promote to the popup-fallback card (Tier 3 UX), so the
+// student always sees an actionable "Open in a new window" button rather
+// than a dead/empty/error iframe.
+//
+// This is a heuristic, not a guarantee (some sites blank-load and still
+// fire `load`). Combined with the server-side deny-list and the existing
+// three-tier fallback, it brings residual failures to a cosmetic level.
+let tutorialLoadWatchdog = null;
+const TUTORIAL_LOAD_TIMEOUT_MS = 8000;
+
+function clearTutorialLoadWatchdog() {
+  if (tutorialLoadWatchdog) {
+    clearTimeout(tutorialLoadWatchdog);
+    tutorialLoadWatchdog = null;
+  }
+}
+
+// ── Just-in-time embed probe ─────────────────────────────────────────
+//
+// Before we set iframe.src for a URL-type tutorial step (main step OR
+// any branch-step resource — branch-level, per-question, and main-for-
+// branch all funnel through renderTutorial), we re-verify embeddability
+// against a server-side probe endpoint (pbsg_probe_embed). This closes
+// failure modes that purely client-side heuristics cannot detect:
+//
+//   • Save-time meta said embeddable=true but the upstream now serves
+//     X-Frame-Options: DENY / CSP frame-ancestors blocks.
+//   • HEAD lied: server returned ALLOW-FROM on HEAD but 404/500 on GET.
+//   • JS frame-busting: server page contains top.location = self.location
+//     logic. The sandbox attribute (set below, sans allow-top-navigation)
+//     blocks that, and the 8s watchdog catches any lingering blank frame.
+//
+// Same-origin and known video hosts (YouTube/Vimeo/TED/Dailymotion) are
+// trusted without a probe to avoid latency on fast paths.
+const KNOWN_EMBEDDABLE_HOSTS = new Set([
+  'www.youtube.com', 'youtube.com', 'youtu.be',
+  'www.youtube-nocookie.com', 'youtube-nocookie.com',
+  'player.vimeo.com', 'vimeo.com', 'www.vimeo.com',
+  'embed.ted.com', 'www.ted.com', 'ted.com',
+  'www.dailymotion.com', 'dailymotion.com',
+]);
+
+const embedProbeCache    = new Map(); // url -> { embeddable, is_document_url }
+const embedProbeInFlight = new Map(); // url -> Promise<verdict|null>
+
+function getUrlHost(urlStr) {
+  try { return new URL(urlStr, location.href).hostname.toLowerCase(); }
+  catch (_) { return ''; }
+}
+
+function isKnownEmbeddableHost(urlStr) {
+  const host = getUrlHost(urlStr);
+  return host !== '' && KNOWN_EMBEDDABLE_HOSTS.has(host);
+}
+
+// Returns Promise<{embeddable, is_document_url, source}|null>.
+// null means the probe could not be completed (no PBSG_PROBE config,
+// network error, malformed response) — callers should fall back to the
+// server-side verdict baked into the step object.
+function probeEmbeddability(url) {
+  if (!url || typeof url !== 'string') {
+    return Promise.resolve(null);
+  }
+
+  // Fast path: known-safe video embed hosts skip the server round-trip.
+  if (isKnownEmbeddableHost(url)) {
+    const v = { embeddable: true, is_document_url: false, source: 'known_host' };
+    embedProbeCache.set(url, v);
+    return Promise.resolve(v);
+  }
+
+  if (embedProbeCache.has(url)) {
+    return Promise.resolve(embedProbeCache.get(url));
+  }
+  if (embedProbeInFlight.has(url)) {
+    return embedProbeInFlight.get(url);
+  }
+
+  const cfg = (typeof window !== 'undefined') ? window.PBSG_PROBE : null;
+  if (!cfg || !cfg.ajaxUrl) {
+    return Promise.resolve(null);
+  }
+
+  const body = new URLSearchParams();
+  body.set('action', cfg.action || 'pbsg_probe_embed');
+  body.set('nonce',  cfg.nonce  || '');
+  body.set('url',    url);
+
+  const promise = (function () {
+    return fetch(cfg.ajaxUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: body.toString(),
+    })
+      .then(function (resp) { return resp.ok ? resp.json() : null; })
+      .then(function (json) {
+        if (!json || json.success !== true || !json.data) return null;
+        const verdict = {
+          embeddable:      json.data.embeddable === true,
+          is_document_url: json.data.is_document_url === true,
+          source:          json.data.source || 'probe',
+        };
+        embedProbeCache.set(url, verdict);
+        return verdict;
+      })
+      .catch(function () { return null; });
+  })().finally(function () { embedProbeInFlight.delete(url); });
+
+  embedProbeInFlight.set(url, promise);
+  return promise;
+}
+
 // ── Popup window fallback system ──
 
 let popupUrl = '';
@@ -1181,6 +1305,7 @@ function attachH5PWatcher(stepIndex){
 }
 
 const titleEl = document.getElementById('pbsgStepTitle');
+const instructionsEl = document.getElementById('pbsgInstructionsBody');
 const progressEl = document.getElementById('pbsgProgress');
 const runningScoreEl = document.getElementById('pbsgRunningScore');
 const progressFillEl = document.getElementById('pbsgProgressFill');
@@ -1558,6 +1683,8 @@ function renderTutorial(step, options = {}){
 
   currentTutorialSignature = nextSignature;
 
+  // Any pending watchdog from the previous step is no longer meaningful.
+  clearTutorialLoadWatchdog();
   closeTutorialPopup();
 
   tutorialStage.innerHTML = `
@@ -1634,19 +1761,92 @@ function renderTutorial(step, options = {}){
   if (t.url) {
     openLink.href = t.url;
 
-    if (t.embeddable !== false) {
-      // Tier 1: iframe (embeddable or unknown)
-      freshFrame.src = toEmbeddableUrl(t.url);
-      fallback.style.display = 'none';
-    } else if (t.viewer_url) {
-      // Tier 2: Google Docs Viewer (non-embeddable document URL)
-      freshFrame.src = t.viewer_url;
-      fallback.style.display = 'none';
-    } else {
-      // Tier 3: popup fallback (non-embeddable, non-document URL)
-      closeTutorialPopup();
-      renderPopupFallbackCard(tutorialStage, t.url);
+    const originalUrl = t.url;
+    const signatureAtArm = currentTutorialSignature;
+
+    // Server already said non-embeddable at save/view time — honour that
+    // immediately without a probe. Use viewer tier for document URLs,
+    // popup card for everything else.
+    if (t.embeddable === false) {
+      if (t.viewer_url) {
+        // Tier 2: Google Docs Viewer (non-embeddable document URL).
+        freshFrame.src = t.viewer_url;
+        fallback.style.display = 'none';
+      } else {
+        // Tier 3: popup fallback (non-embeddable, non-document URL).
+        closeTutorialPopup();
+        renderPopupFallbackCard(tutorialStage, originalUrl);
+      }
+      return;
     }
+
+    // Server said embeddable=true OR meta was missing. Run the JIT probe
+    // before committing iframe.src: save-time HEAD checks can be stale
+    // (server changed its CSP) or wrong (HEAD vs GET header divergence).
+    //
+    // While the probe is in flight, the iframe stays blank and the pane
+    // shows no content. The probe hits a 1h-cached transient so the
+    // wait is typically sub-100ms after the first student view.
+
+    // Sandbox defeats JS frame-busting (top.location = self.location) by
+    // withholding allow-top-navigation. We keep allow-scripts/-forms/
+    // -popups/-popups-to-escape-sandbox/-same-origin for compatibility
+    // with common library-vendor pages. Skipped on known video embed
+    // hosts whose players expect a non-sandboxed context.
+    if (!isKnownEmbeddableHost(originalUrl)) {
+      freshFrame.setAttribute(
+        'sandbox',
+        'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin'
+      );
+    }
+
+    fallback.style.display = 'none';
+
+    probeEmbeddability(originalUrl).then(function (verdict) {
+      // Stale signature — user navigated away during the probe. Abort so
+      // we don't hijack the pane with yesterday's verdict.
+      if (currentTutorialSignature !== signatureAtArm) return;
+
+      // The stage may have been re-rendered (next step). Re-fetch nodes.
+      const stage = document.getElementById('pbsgTutorialStage');
+      const frame = document.getElementById('pbsgTutorialFrame');
+      if (!stage || !frame) return;
+
+      // Probe says no → render popup card, skip iframe entirely.
+      // (Probe failure returns null and falls through to the optimistic
+      // iframe path — the 8s watchdog is the last line of defense.)
+      if (verdict && verdict.embeddable === false) {
+        try { frame.src = 'about:blank'; } catch (_) {}
+        closeTutorialPopup();
+        renderPopupFallbackCard(stage, originalUrl);
+        return;
+      }
+
+      // Arm the iframe. Watchdog catches the rare case where probe said
+      // yes but the frame is actually broken (same-origin 4xx body that
+      // fires `load`, or a JS frame-buster that blanks the iframe).
+      const targetUrl = toEmbeddableUrl(originalUrl);
+      let loaded = false;
+      frame.addEventListener('load', function onFirstLoad() {
+        loaded = true;
+        clearTutorialLoadWatchdog();
+      }, { once: true });
+
+      frame.src = targetUrl;
+
+      tutorialLoadWatchdog = setTimeout(function () {
+        tutorialLoadWatchdog = null;
+        if (loaded) return;
+        if (currentTutorialSignature !== signatureAtArm) return;
+
+        const stage2 = document.getElementById('pbsgTutorialStage');
+        if (!stage2) return;
+
+        try { frame.src = 'about:blank'; } catch (e) {}
+        closeTutorialPopup();
+        renderPopupFallbackCard(stage2, originalUrl);
+      }, TUTORIAL_LOAD_TIMEOUT_MS);
+    });
   } else {
     freshFrame.src = '';
     fallback.style.display = 'none';
@@ -1691,6 +1891,19 @@ function render(){
 
   if (titleEl) titleEl.textContent = step.title || `Step ${i+1}`;
   if (stepEyebrowEl) stepEyebrowEl.textContent = `Step ${i+1} of ${steps.length}`;
+
+  // Render per-step instructions (rich text from WYSIWYG editor)
+  if (instructionsEl) {
+    const html = step.instructions_html || '';
+    if (html.trim()) {
+      instructionsEl.innerHTML = html;
+      instructionsEl.style.display = '';
+    } else {
+      instructionsEl.innerHTML = '';
+      instructionsEl.style.display = 'none';
+    }
+  }
+
   updateMenuState();
   if (progressEl) pbsgSetProgress(i + 1, steps.length);
   updateRunningScore();
@@ -1986,7 +2199,10 @@ function buildBranchTutorialStep(branch) {
       type: branch.tutorial_type || '',
       url: branch.tutorial_url || '',
       file_url: branch.tutorial_file_url || '',
-      mime: branch.tutorial_mime || ''
+      mime: branch.tutorial_mime || '',
+      embeddable: branch.tutorial_embeddable !== false,
+      is_document_url: branch.tutorial_is_document_url === true,
+      viewer_url: branch.tutorial_viewer_url || ''
     }
   };
 }
@@ -1997,7 +2213,10 @@ function getTutorialSignature(step) {
     type: t.type || '',
     url: t.url || '',
     file_url: t.file_url || '',
-    mime: t.mime || ''
+    mime: t.mime || '',
+    embeddable: t.embeddable !== false,
+    is_document_url: t.is_document_url === true,
+    viewer_url: t.viewer_url || ''
   });
 }
 
@@ -2007,7 +2226,10 @@ function buildMainTutorialStepForBranch(parentStep) {
       type: parentStep?.tutorial?.type || '',
       url: parentStep?.tutorial?.url || '',
       file_url: parentStep?.tutorial?.file_url || '',
-      mime: parentStep?.tutorial?.mime || ''
+      mime: parentStep?.tutorial?.mime || '',
+      embeddable: parentStep?.tutorial?.embeddable !== false,
+      is_document_url: parentStep?.tutorial?.is_document_url === true,
+      viewer_url: parentStep?.tutorial?.viewer_url || ''
     }
   };
 }
@@ -2018,7 +2240,10 @@ function buildBranchQuestionTutorialStep(q) {
       type: q?.tutorial_type || '',
       url: q?.tutorial_url || '',
       file_url: q?.tutorial_file_url || '',
-      mime: q?.tutorial_mime || ''
+      mime: q?.tutorial_mime || '',
+      embeddable: q?.tutorial_embeddable !== false,
+      is_document_url: q?.tutorial_is_document_url === true,
+      viewer_url: q?.tutorial_viewer_url || ''
     }
   };
 }

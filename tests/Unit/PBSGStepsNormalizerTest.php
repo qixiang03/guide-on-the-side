@@ -351,4 +351,139 @@ final class PBSGStepsNormalizerTest extends TestCase
         $this->assertCount(1, $out);
         $this->assertNull($out[0]['branch'], 'Branch should be stripped when per_question has no resources');
     }
+
+    // ═══════════════════════════════════════════════════════════
+    //  instructions_html field + sanitize_rich_text()
+    // ═══════════════════════════════════════════════════════════
+
+    public function test_instructions_html_preserved_through_normalize(): void
+    {
+        $input = [
+            [
+                'title' => 'Step with rich text',
+                'h5p_id' => 0,
+                'tutorial_type' => 'url',
+                'tutorial_url' => 'https://example.com',
+                'instructions_html' => '<p>Learn about <b>databases</b> and <span style="color:red">resources</span>.</p>',
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertArrayHasKey('instructions_html', $out[0]);
+        $this->assertStringContainsString('<b>databases</b>', $out[0]['instructions_html']);
+        $this->assertStringContainsString('<span', $out[0]['instructions_html']);
+    }
+
+    public function test_instructions_html_strips_unsafe_tags(): void
+    {
+        $input = [
+            [
+                'title' => 'Step with script',
+                'h5p_id' => 0,
+                'tutorial_type' => 'url',
+                'tutorial_url' => 'https://example.com',
+                'instructions_html' => '<p>Safe text</p><script>alert("xss")</script>',
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertStringNotContainsString('<script>', $out[0]['instructions_html']);
+        $this->assertStringNotContainsString('alert', $out[0]['instructions_html']);
+        $this->assertStringContainsString('Safe text', $out[0]['instructions_html']);
+    }
+
+    public function test_instructions_html_defaults_to_empty_string(): void
+    {
+        $input = [
+            [
+                'title' => 'Step without instructions_html',
+                'h5p_id' => 0,
+                'tutorial_type' => 'url',
+                'tutorial_url' => 'https://example.com',
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertArrayHasKey('instructions_html', $out[0]);
+        $this->assertSame('', $out[0]['instructions_html']);
+    }
+
+    public function test_quiz_question_preserves_html_after_sanitize_rich_text(): void
+    {
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'quiz' => [
+                    'type' => 'multichoice',
+                    'question' => 'What is <b>HTML</b>?',
+                    'answers' => [
+                        ['text' => 'A markup language', 'correct' => true],
+                        ['text' => 'A scripting language', 'correct' => false],
+                    ],
+                ],
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertStringContainsString('<b>HTML</b>', $out[0]['quiz']['question']);
+    }
+
+    public function test_quiz_question_strips_script_tags(): void
+    {
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'quiz' => [
+                    'type' => 'multichoice',
+                    'question' => 'Safe <script>evil()</script> question?',
+                    'answers' => [
+                        ['text' => 'Answer', 'correct' => true],
+                    ],
+                ],
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertStringNotContainsString('<script>', $out[0]['quiz']['question']);
+        $this->assertStringNotContainsString('evil()', $out[0]['quiz']['question']);
+        $this->assertStringContainsString('Safe', $out[0]['quiz']['question']);
+    }
+
+    public function test_blanks_sentence_still_strips_html(): void
+    {
+        // Regression: blanks sentence must NOT preserve HTML (uses strip_tags, not wp_kses_post)
+        $input = [
+            [
+                'title' => '',
+                'h5p_id' => 0,
+                'tutorial_type' => '',
+                'quiz' => [
+                    'type' => 'blanks',
+                    'sentence' => 'The answer is <b>*bold*</b>.',
+                    'case_sensitive' => false,
+                    'accept_typos' => false,
+                ],
+            ],
+        ];
+
+        $out = PBSG_Steps_Normalizer::normalize($input);
+
+        $this->assertCount(1, $out);
+        $this->assertStringNotContainsString('<b>', $out[0]['quiz']['sentence']);
+        $this->assertStringContainsString('*bold*', $out[0]['quiz']['sentence']);
+    }
 }

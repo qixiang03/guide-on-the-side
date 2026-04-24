@@ -22,7 +22,8 @@ node_modules/
 build/
 .history/
 CLAUDE.local.md
-.claude/commands/*
+.claude/*
 .cursor/
 docs/superpowers/*
 .superpowers/*
+vendor

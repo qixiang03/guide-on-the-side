@@ -154,4 +154,64 @@ final class PBSGH5PFactoryTest extends TestCase
         $this->assertSame('Inline Quiz (Step 1)', $m->invoke(null, '', 0, ''));
         $this->assertSame('Inline Quiz (Step 4)', $m->invoke(null, '', 4, ''));
     }
+
+    /**
+     * @covers PBSG_H5P_Factory::reverse
+     */
+    public function test_reverse_multichoice_preserves_html_in_question(): void
+    {
+        $ref = new ReflectionClass(PBSG_H5P_Factory::class);
+        $build = $ref->getMethod('build_params');
+        $quizIn = [
+            'type'     => 'multichoice',
+            'question' => 'Which are <b>Boolean operators</b>?',
+            'answers'  => [
+                ['text' => 'AND', 'correct' => true],
+            ],
+        ];
+        $params = $build->invoke(null, 'multichoice', $quizIn);
+        $out = PBSG_H5P_Factory::reverse('H5P.MultiChoice', wp_json_encode($params));
+
+        $this->assertSame('Which are <b>Boolean operators</b>?', $out['question']);
+    }
+
+    /**
+     * @covers PBSG_H5P_Factory::reverse
+     */
+    public function test_reverse_singlechoice_preserves_html_in_question(): void
+    {
+        $ref = new ReflectionClass(PBSG_H5P_Factory::class);
+        $build = $ref->getMethod('build_params');
+        $quizIn = [
+            'type'           => 'singlechoice',
+            'question'       => 'What does <i>peer-reviewed</i> mean?',
+            'correct_answer' => 'Reviewed by experts',
+            'wrong_answers'  => ['Not reviewed'],
+        ];
+        $params = $build->invoke(null, 'singlechoice', $quizIn);
+        $out = PBSG_H5P_Factory::reverse('H5P.MultiChoice', wp_json_encode($params));
+
+        $this->assertSame('What does <i>peer-reviewed</i> mean?', $out['question']);
+        $this->assertSame('Reviewed by experts', $out['correct_answer']);
+    }
+
+    /**
+     * @covers PBSG_H5P_Factory::build_params
+     */
+    public function test_build_multichoice_does_not_double_wrap_p_tags(): void
+    {
+        $ref = new ReflectionClass(PBSG_H5P_Factory::class);
+        $build = $ref->getMethod('build_params');
+        $quizIn = [
+            'type'     => 'multichoice',
+            'question' => '<p>Already wrapped</p>',
+            'answers'  => [
+                ['text' => '<p>Answer A</p>', 'correct' => true],
+            ],
+        ];
+        $params = $build->invoke(null, 'multichoice', $quizIn);
+
+        $this->assertSame('<p>Already wrapped</p>', $params['question']);
+        $this->assertSame('<p>Answer A</p>', $params['answers'][0]['text']);
+    }
 }

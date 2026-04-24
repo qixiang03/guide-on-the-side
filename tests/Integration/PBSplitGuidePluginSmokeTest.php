@@ -423,6 +423,46 @@ final class PBSplitGuidePluginSmokeTest extends TestCase
         $this->assertContains('wp_ajax_pbsg_download_certificate', $tags);
     }
 
+    /* =============================================================
+     *  Style Defaults Resolution
+     * ============================================================= */
+
+    public function test_resolve_style_defaults_returns_fallbacks_when_no_option(): void
+    {
+        // get_option stub uses 'get_option_<name>' key; leave it unset so it falls back to default
+        $defaults = PB_Split_Guide_Plugin::resolve_style_defaults();
+
+        $this->assertSame('Roboto, sans-serif', $defaults['font_family']);
+        $this->assertSame('Lusitana, serif', $defaults['heading_font']);
+        $this->assertSame('16px', $defaults['font_size']);
+        $this->assertSame('#333333', $defaults['text_color']);
+        $this->assertSame('#8C2004', $defaults['accent_color']);
+        $this->assertSame('#517E1B', $defaults['button_color']);
+    }
+
+    public function test_resolve_style_defaults_merges_saved_option(): void
+    {
+        $saved = wp_json_encode([
+            'font_family' => 'Georgia, serif',
+            'heading_font' => 'Lusitana, serif',
+            'font_size' => '18px',
+            'text_color' => '#222222',
+            'accent_color' => '#8C2004',
+            'button_color' => '#517E1B',
+        ]);
+        WPStubs::$returns['get_option_pbsg_style_defaults'] = $saved;
+
+        $defaults = PB_Split_Guide_Plugin::resolve_style_defaults();
+
+        $this->assertSame('Georgia, serif', $defaults['font_family']);
+        $this->assertSame('18px', $defaults['font_size']);
+        $this->assertSame('#222222', $defaults['text_color']);
+    }
+
+    /* =============================================================
+     *  Certificate init & activation hook (continued)
+     * ============================================================= */
+
     /**
      * Plugin file registers activation hook at load time; run in separate process
      * so we see the call before any other test's setUp has reset WPStubs.
