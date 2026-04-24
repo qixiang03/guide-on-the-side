@@ -777,6 +777,56 @@
 }
 
 /* ================================================================
+   TINYMCE CONTAINERS (Instructions + Quiz Question WYSIWYG)
+   ================================================================ */
+
+/* Instructions WYSIWYG wrap */
+.pbsg-instructions-wrap {
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 2px dashed var(--pbsg-green, #517E1B);
+}
+
+.pbsg-instructions-wrap .pbsg-field-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--pbsg-grey-mid);
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* TinyMCE container sizing */
+.pbsg-instructions-wrap .mce-tinymce,
+.pbsg-quiz-question-wrap .mce-tinymce {
+  width: 100% !important;
+}
+
+.pbsg-instructions-wrap .mce-edit-area iframe {
+  min-height: 80px;
+}
+
+.pbsg-quiz-question-wrap .mce-edit-area iframe {
+  min-height: 50px;
+}
+
+/* Quicktags fallback textarea sizing */
+.pbsg-instructions-editor {
+  width: 100%;
+  min-height: 80px;
+  box-sizing: border-box;
+}
+
+.pbsg-quiz-question-editor {
+  width: 100%;
+  min-height: 50px;
+  box-sizing: border-box;
+}
+
+/* ================================================================
    QUIZ TYPE SELECTOR
    ================================================================ */
 

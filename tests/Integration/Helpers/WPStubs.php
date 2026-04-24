@@ -499,6 +499,13 @@ if (!function_exists('wp_enqueue_media')) {
     }
 }
 
+if (!function_exists('wp_enqueue_editor')) {
+    function wp_enqueue_editor(): void
+    {
+        WPStubs::record('wp_enqueue_editor', []);
+    }
+}
+
 if (!function_exists('wp_localize_script')) {
     function wp_localize_script(string $handle, string $object_name, array $l10n): bool
     {

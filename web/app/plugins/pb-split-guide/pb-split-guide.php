@@ -747,15 +747,19 @@ class PB_Split_Guide_Plugin {
               <div class="pbsg-field">
                 <label for="pbsg_intro_description" class="pbsg-field-label">Description</label>
                 <?php
+                $__sd = self::resolve_style_defaults();
                 wp_editor($intro_desc, 'pbsg_intro_description', [
                     'textarea_name' => 'pbsg_intro_description',
                     'textarea_rows' => 4,
                     'media_buttons' => false,
                     'teeny'         => false,
                     'tinymce'       => [
-                        'toolbar1' => 'bold,italic,underline,|,bullist,numlist,|,link,|,fontselect,fontsizeselect,forecolor',
-                        'toolbar2' => '',
-                        'plugins'  => 'lists,link,textcolor',
+                        'toolbar1'        => 'bold,italic,underline,|,bullist,numlist,|,link,|,fontselect,fontsizeselect,forecolor',
+                        'toolbar2'        => '',
+                        'plugins'         => 'lists,link,textcolor',
+                        'content_style'   => 'body { font-family: ' . esc_attr($__sd['font_family']) . '; font-size: ' . esc_attr($__sd['font_size']) . '; color: ' . esc_attr($__sd['text_color']) . '; }',
+                        'font_formats'    => 'Roboto=Roboto, sans-serif;Lusitana=Lusitana, serif;Georgia=Georgia, serif;Arial=Arial, sans-serif;System=system-ui, sans-serif',
+                        'fontsize_formats' => '14px 16px 18px 20px',
                     ],
                     'quicktags'     => ['buttons' => 'strong,em,link,ul,ol,li'],
                 ]);
@@ -1890,70 +1894,58 @@ class PB_Split_Guide_Plugin {
                  name="<?php echo esc_attr(self::OPTION_STYLE_DEFAULTS); ?>"
                  value="<?php echo esc_attr(wp_json_encode($style)); ?>" />
 
-          <table class="form-table" role="presentation" style="margin-bottom:20px;">
-            <tr>
-              <th scope="row"><label for="pbsg_style_font_family">Body Font</label></th>
-              <td>
-                <select id="pbsg_style_font_family" class="pbsg-style-input" data-key="font_family">
-                  <option value="Roboto, sans-serif" <?php selected($style['font_family'], 'Roboto, sans-serif'); ?>>Roboto</option>
-                  <option value="Lusitana, serif" <?php selected($style['font_family'], 'Lusitana, serif'); ?>>Lusitana</option>
-                  <option value="Georgia, serif" <?php selected($style['font_family'], 'Georgia, serif'); ?>>Georgia</option>
-                  <option value="Arial, sans-serif" <?php selected($style['font_family'], 'Arial, sans-serif'); ?>>Arial</option>
-                  <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['font_family'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System Default</option>
-                </select>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row"><label for="pbsg_style_heading_font">Heading Font</label></th>
-              <td>
-                <select id="pbsg_style_heading_font" class="pbsg-style-input" data-key="heading_font">
-                  <option value="Lusitana, serif" <?php selected($style['heading_font'], 'Lusitana, serif'); ?>>Lusitana</option>
-                  <option value="Roboto, sans-serif" <?php selected($style['heading_font'], 'Roboto, sans-serif'); ?>>Roboto</option>
-                  <option value="Georgia, serif" <?php selected($style['heading_font'], 'Georgia, serif'); ?>>Georgia</option>
-                  <option value="Arial, sans-serif" <?php selected($style['heading_font'], 'Arial, sans-serif'); ?>>Arial</option>
-                  <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['heading_font'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System Default</option>
-                </select>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row"><label for="pbsg_style_font_size">Font Size</label></th>
-              <td>
-                <select id="pbsg_style_font_size" class="pbsg-style-input" data-key="font_size">
-                  <option value="14px" <?php selected($style['font_size'], '14px'); ?>>14px</option>
-                  <option value="16px" <?php selected($style['font_size'], '16px'); ?>>16px</option>
-                  <option value="18px" <?php selected($style['font_size'], '18px'); ?>>18px</option>
-                  <option value="20px" <?php selected($style['font_size'], '20px'); ?>>20px</option>
-                </select>
-              </td>
-            </tr>
-            <tr>
-              <th scope="row"><label for="pbsg_style_text_color">Text Colour</label></th>
-              <td>
-                <input type="text" id="pbsg_style_text_color" class="pbsg-style-input pbsg-color-field"
-                       data-key="text_color"
-                       value="<?php echo esc_attr($style['text_color']); ?>"
-                       data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['text_color']); ?>" />
-              </td>
-            </tr>
-            <tr>
-              <th scope="row"><label for="pbsg_style_accent_color">Accent Colour</label></th>
-              <td>
-                <input type="text" id="pbsg_style_accent_color" class="pbsg-style-input pbsg-color-field"
-                       data-key="accent_color"
-                       value="<?php echo esc_attr($style['accent_color']); ?>"
-                       data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['accent_color']); ?>" />
-              </td>
-            </tr>
-            <tr>
-              <th scope="row"><label for="pbsg_style_button_color">Button Colour</label></th>
-              <td>
-                <input type="text" id="pbsg_style_button_color" class="pbsg-style-input pbsg-color-field"
-                       data-key="button_color"
-                       value="<?php echo esc_attr($style['button_color']); ?>"
-                       data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['button_color']); ?>" />
-              </td>
-            </tr>
-          </table>
+          <div style="display:flex; flex-wrap:wrap; gap:16px 20px; margin-bottom:20px;">
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_font_family" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Body font</label>
+              <select id="pbsg_style_font_family" class="pbsg-style-input" data-key="font_family" style="width:100%;">
+                <option value="Roboto, sans-serif" <?php selected($style['font_family'], 'Roboto, sans-serif'); ?>>Roboto</option>
+                <option value="Lusitana, serif" <?php selected($style['font_family'], 'Lusitana, serif'); ?>>Lusitana</option>
+                <option value="Georgia, serif" <?php selected($style['font_family'], 'Georgia, serif'); ?>>Georgia</option>
+                <option value="Arial, sans-serif" <?php selected($style['font_family'], 'Arial, sans-serif'); ?>>Arial</option>
+                <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['font_family'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System default</option>
+              </select>
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_font_size" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Font size</label>
+              <select id="pbsg_style_font_size" class="pbsg-style-input" data-key="font_size" style="width:100%;">
+                <option value="14px" <?php selected($style['font_size'], '14px'); ?>>14px</option>
+                <option value="16px" <?php selected($style['font_size'], '16px'); ?>>16px</option>
+                <option value="18px" <?php selected($style['font_size'], '18px'); ?>>18px</option>
+                <option value="20px" <?php selected($style['font_size'], '20px'); ?>>20px</option>
+              </select>
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_text_color" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Text colour</label>
+              <input type="text" id="pbsg_style_text_color" class="pbsg-style-input pbsg-color-field"
+                     data-key="text_color"
+                     value="<?php echo esc_attr($style['text_color']); ?>"
+                     data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['text_color']); ?>" />
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_heading_font" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Heading font</label>
+              <select id="pbsg_style_heading_font" class="pbsg-style-input" data-key="heading_font" style="width:100%;">
+                <option value="Lusitana, serif" <?php selected($style['heading_font'], 'Lusitana, serif'); ?>>Lusitana</option>
+                <option value="Roboto, sans-serif" <?php selected($style['heading_font'], 'Roboto, sans-serif'); ?>>Roboto</option>
+                <option value="Georgia, serif" <?php selected($style['heading_font'], 'Georgia, serif'); ?>>Georgia</option>
+                <option value="Arial, sans-serif" <?php selected($style['heading_font'], 'Arial, sans-serif'); ?>>Arial</option>
+                <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['heading_font'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System default</option>
+              </select>
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_accent_color" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Accent / link colour</label>
+              <input type="text" id="pbsg_style_accent_color" class="pbsg-style-input pbsg-color-field"
+                     data-key="accent_color"
+                     value="<?php echo esc_attr($style['accent_color']); ?>"
+                     data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['accent_color']); ?>" />
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_button_color" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Button colour</label>
+              <input type="text" id="pbsg_style_button_color" class="pbsg-style-input pbsg-color-field"
+                     data-key="button_color"
+                     value="<?php echo esc_attr($style['button_color']); ?>"
+                     data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['button_color']); ?>" />
+            </div>
+          </div>
 
           <!-- Live preview -->
           <div id="pbsg_style_preview" style="
@@ -2447,7 +2439,7 @@ class PB_Split_Guide_Plugin {
     update_post_meta($post_id, self::META_INTRO_PREREQS, $intro_prereqs);
 
     // Save layout settings (Stretch Goal 5)
-    $left_ratio_raw = isset($_POST['pbsg_left_ratio']) ? $_POST['pbsg_left_ratio'] : '';
+    $left_ratio_raw = isset($_POST['pbsg_left_ratio']) ? wp_unslash($_POST['pbsg_left_ratio']) : '';
     if ($left_ratio_raw === '' || $left_ratio_raw === false) {
       delete_post_meta($post_id, self::META_LEFT_RATIO);
     } else {
@@ -2545,14 +2537,17 @@ class PB_Split_Guide_Plugin {
 
     // Inject site-level style defaults as CSS custom properties
     $style_defaults = self::resolve_style_defaults();
+    // Values are allow-listed by sanitize_style_defaults() — safe for direct
+    // insertion. Do NOT use esc_attr() on font stacks — it encodes quotes
+    // (e.g. "Segoe UI" → &quot;Segoe UI&quot;) which breaks CSS parsing.
     $inline_css = sprintf(
         ':root{--pbsg-font-family:%s;--pbsg-heading-font:%s;--pbsg-font-size:%s;--pbsg-text-color:%s;--pbsg-accent-color:%s;--pbsg-button-color:%s;}',
-        esc_attr($style_defaults['font_family']),
-        esc_attr($style_defaults['heading_font']),
-        esc_attr($style_defaults['font_size']),
-        esc_attr($style_defaults['text_color']),
-        esc_attr($style_defaults['accent_color']),
-        esc_attr($style_defaults['button_color'])
+        $style_defaults['font_family'],
+        $style_defaults['heading_font'],
+        $style_defaults['font_size'],
+        $style_defaults['text_color'],
+        $style_defaults['accent_color'],
+        $style_defaults['button_color']
     );
     wp_add_inline_style('pbsg_split_guide_css', $inline_css);
 
@@ -2736,6 +2731,10 @@ class PB_Split_Guide_Plugin {
         ),
       ],
     ]);
+
+    wp_localize_script('pbsg_admin_js', 'pbsgStyleDefaults', self::resolve_style_defaults());
+
+    wp_enqueue_editor();
 
     // Extra inline script: force the template on Add New Tutorial page.
     if ($hook === 'post-new.php') {

@@ -67,6 +67,45 @@ jQuery(function ($) {
     return labels[ext] || 'File will be available as a resource in the right pane';
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  TinyMCE Helpers (WYSIWYG editors for instructions + quiz questions)
+  // ═══════════════════════════════════════════════════════════
+  const PBSG_TINYMCE_TOOLBAR = 'bold italic underline | bullist numlist | link | fontselect fontsizeselect forecolor';
+
+  function pbsgInitTinyMCE(editorId) {
+    const defaults = window.pbsgStyleDefaults || {};
+    if (typeof wp !== 'undefined' && wp.editor && wp.editor.initialize) {
+      wp.editor.initialize(editorId, {
+        tinymce: {
+          wpautop: false,
+          toolbar1: PBSG_TINYMCE_TOOLBAR,
+          toolbar2: '',
+          plugins: 'lists,link,textcolor',
+          content_style: 'body { font-family: ' + (defaults.font_family || 'Roboto, sans-serif') + '; font-size: ' + (defaults.font_size || '16px') + '; color: ' + (defaults.text_color || '#333333') + '; }',
+          font_formats: 'Roboto=Roboto, sans-serif;Lusitana=Lusitana, serif;Georgia=Georgia, serif;Arial=Arial, sans-serif;System=system-ui, sans-serif',
+          fontsize_formats: '14px 16px 18px 20px',
+        },
+        quicktags: { buttons: 'strong,em,link,ul,ol,li' },
+        mediaButtons: false,
+      });
+    }
+  }
+
+  function pbsgRemoveTinyMCE(editorId) {
+    if (typeof wp !== 'undefined' && wp.editor && wp.editor.remove) {
+      wp.editor.remove(editorId);
+    }
+  }
+
+  function pbsgGetTinyMCEContent(editorId) {
+    if (typeof tinymce !== 'undefined') {
+      const editor = tinymce.get(editorId);
+      if (editor) return editor.getContent();
+    }
+    const el = document.getElementById(editorId);
+    return el ? el.value : '';
+  }
+
   function getSteps() {
     try { const v = JSON.parse($('#pbsg_steps_json').val() || ''); return Array.isArray(v) ? v : []; }
     catch (e) { return []; }
@@ -146,6 +185,7 @@ jQuery(function ($) {
     o.h5p_id = o.h5p_id || 0;
     o.h5p_cleared = !!o.h5p_cleared;
     o.title = o.title || '';
+    o.instructions_html = o.instructions_html || '';
     // Branch / sub-tutorial defaults
        o.branch = (o.branch && typeof o.branch === 'object') ? o.branch : null;
 
@@ -681,9 +721,28 @@ function branchSummary(s) {
   function quizName(t) { return { multichoice: 'Multiple Selection', blanks: 'Fill in Blanks', singlechoice: 'Single Selection' }[t] || ''; }
 
   function renderStepCards() {
-    const steps = getSteps().map(norm);
     const $c = $('#pbsg-steps-container');
     if (!$c.length) return;
+
+    // Flush TinyMCE content into steps data before destroying editors
+    $c.find('.pbsg-step-card').each(function () {
+      const oldIdx = parseInt($(this).data('idx'), 10);
+      if (!isNaN(oldIdx)) {
+        syncInstructions(oldIdx);
+        syncQuiz(oldIdx);
+      }
+    });
+
+    const steps = getSteps().map(norm);
+
+    // Destroy existing TinyMCE instances before wiping DOM
+    $c.find('.pbsg-step-card').each(function () {
+      const oldIdx = parseInt($(this).data('idx'), 10);
+      if (!isNaN(oldIdx)) {
+        pbsgRemoveTinyMCE('pbsg_instructions_' + oldIdx);
+        pbsgRemoveTinyMCE('pbsg_quiz_question_' + oldIdx);
+      }
+    });
 
     // Snapshot collapsed state before wiping DOM
     $c.find('.pbsg-step-card--collapsed').each(function () {
@@ -719,6 +778,12 @@ function branchSummary(s) {
           </div>
           <div class="pbsg-step-body" data-idx="${idx}">
             <div class="pbsg-panel pbsg-panel-quiz" data-idx="${idx}">
+              <div class="pbsg-field pbsg-instructions-wrap">
+                <label class="pbsg-field-label">
+                  <span class="pbsg-panel-icon">${icon('document')}</span> Instructions (left pane)
+                </label>
+                <textarea id="pbsg_instructions_${idx}" class="pbsg-instructions-editor" data-idx="${idx}">${esc(s.instructions_html || '')}</textarea>
+              </div>
               <div class="pbsg-panel-label">
                 <span class="pbsg-panel-icon">${icon('puzzle')}</span> Quiz Question
               </div>
@@ -770,6 +835,14 @@ function branchSummary(s) {
     setSteps(steps);
     steps.forEach(function (_s, idx) {
       if (_s.quiz && _s.quiz.type === 'blanks') updateBlanksCaseRiskUI(idx);
+    });
+
+    // Initialize TinyMCE editors for instructions + quiz questions (after DOM is ready)
+    steps.forEach(function (_s, idx) {
+      pbsgInitTinyMCE('pbsg_instructions_' + idx);
+      if (_s.quiz && _s.quiz.type !== 'blanks') {
+        pbsgInitTinyMCE('pbsg_quiz_question_' + idx);
+      }
     });
   }
 
@@ -872,9 +945,9 @@ function branchSummary(s) {
     });
 
     return `
-      <div class="pbsg-field">
+      <div class="pbsg-field pbsg-quiz-question-wrap">
         <label class="pbsg-field-label">Question</label>
-        <input type="text" class="pbsg-quiz-question" data-idx="${idx}" data-quiz-field="question" value="${esc(q)}" placeholder="Enter your question..." />
+        <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
       </div>
       <div class="pbsg-field">
         <label class="pbsg-field-label">Answers <span class="pbsg-field-optional">&mdash; check the correct one(s)</span></label>
@@ -997,9 +1070,9 @@ function branchSummary(s) {
     });
 
     return `
-      <div class="pbsg-field">
+      <div class="pbsg-field pbsg-quiz-question-wrap">
         <label class="pbsg-field-label">Question</label>
-        <input type="text" class="pbsg-quiz-question" data-idx="${idx}" data-quiz-field="question" value="${esc(q)}" placeholder="Enter your question..." />
+        <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
       </div>
       <div class="pbsg-field">
         <label class="pbsg-field-label">Correct Answer</label>
@@ -1163,7 +1236,7 @@ function branchSummary(s) {
   // ═══════════════════════════════════════════════════════════
   //  Multiple Choice Events
   // ═══════════════════════════════════════════════════════════
-  $(document).on('input', '.pbsg-quiz-question, .pbsg-answer-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
+  $(document).on('input', '.pbsg-answer-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
   $(document).on('change', '.pbsg-answer-check', function () {
     const idx = parseInt($(this).data('idx'), 10);
     syncQuiz(idx);
@@ -1219,6 +1292,17 @@ function branchSummary(s) {
   });
 
   // ═══════════════════════════════════════════════════════════
+  //  Sync Instructions from TinyMCE
+  // ═══════════════════════════════════════════════════════════
+  function syncInstructions(idx) {
+    if (isNaN(idx)) return;
+    const steps = getSteps().map(norm), step = steps[idx];
+    if (!step) return;
+    step.instructions_html = pbsgGetTinyMCEContent('pbsg_instructions_' + idx) || '';
+    steps[idx] = step; setSteps(steps);
+  }
+
+  // ═══════════════════════════════════════════════════════════
   //  Sync Quiz Data from Form
   // ═══════════════════════════════════════════════════════════
   function syncQuiz(idx) {
@@ -1229,7 +1313,7 @@ function branchSummary(s) {
     if (!$card.length) return;
     switch (step.quiz.type) {
       case 'multichoice': {
-        step.quiz.question = $card.find('.pbsg-quiz-question').val() || '';
+        step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
         const a = []; $card.find('.pbsg-answers-list > div').each(function () { a.push({ text: $(this).find('.pbsg-answer-input').val() || '', correct: $(this).find('.pbsg-answer-check').is(':checked') }); });
         step.quiz.answers = a; break;
       }
@@ -1239,7 +1323,7 @@ function branchSummary(s) {
         step.quiz.accept_typos = $card.find('.pbsg-blanks-typos').is(':checked'); break;
       }
       case 'singlechoice': {
-        step.quiz.question = $card.find('.pbsg-quiz-question').val() || '';
+        step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
         step.quiz.correct_answer = $card.find('.pbsg-sc-correct-input').val() || '';
         const w = []; $card.find('.pbsg-sc-wrong-input').each(function () { w.push($(this).val() || ''); });
         step.quiz.wrong_answers = w; break;
@@ -2663,6 +2747,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     const caseRiskStepNums = [];
 
     steps.forEach((s, idx) => {
+      syncInstructions(idx);
       syncQuiz(idx);
       syncResource(idx);
       const step = getSteps().map(norm)[idx];
