@@ -6,15 +6,24 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Stretch Goal 4: package a tutorial as a portable JSON file and re-import it
  * on a different server.
  *
- * Export format:
- *   - All post meta (_pbsg_steps_json, _pbsg_header_note, post_content)
- *   - All uploaded attachments referenced by steps, base64-encoded
- *   - Attachment IDs replaced by portable tokens "att_<original_id>" so the
- *     importer can remap them after re-uploading on the target server.
+ * Export format (v1.1):
+ *   - pbsg_version = "1.1"
+ *   - title, post_content, header_note
+ *   - cover_id as "att_<id>" token
+ *   - steps[] with *_id fields tokenized:
+ *       - tutorial_attachment_id, branch_tutorial_attachment_id → "att_<id>"
+ *       - h5p_id (and any *_h5p_id) → "h5p_<id>"
+ *   - attachments[] — every referenced upload, base64-encoded
+ *   - h5p_contents[] — every referenced wp_h5p_contents row, keyed by library
+ *     (name + major + minor) rather than numeric library_id, parameters passed
+ *     through verbatim as a JSON string.
+ *
+ * Backward-compat: v1.0 packages (no h5p_contents key) still import cleanly —
+ * steps' integer h5p_id survives unchanged, matching legacy behavior.
  */
 class PBSG_Export_Import {
 
-	const EXPORT_VERSION = '1.0';
+	const EXPORT_VERSION = '1.1';
 
 	public static function init() {
 		add_action( 'wp_ajax_pbsg_export_tutorial', [ __CLASS__, 'handle_export' ] );
@@ -58,6 +67,51 @@ class PBSG_Export_Import {
 		if ( $cover_id ) $att_ids[] = $cover_id;
 		$att_ids = array_unique( array_filter( $att_ids ) );
 
+		// Collect all H5P content IDs referenced in steps + branches
+		$h5p_ids = [];
+		foreach ( $steps as $step ) {
+			foreach ( $step as $key => $value ) {
+				if ( is_string( $key )
+					&& substr( $key, -strlen( 'h5p_id' ) ) === 'h5p_id'
+					&& is_numeric( $value )
+					&& (int) $value > 0
+				) {
+					$h5p_ids[] = (int) $value;
+				}
+			}
+		}
+		$h5p_ids = array_values( array_unique( $h5p_ids ) );
+
+		// Fetch each referenced H5P content row joined to its library
+		global $wpdb;
+		$h5p_contents = [];
+		foreach ( $h5p_ids as $hid ) {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT c.id, c.title, c.parameters, c.disable,
+					        l.name AS library_name, l.major_version, l.minor_version
+					   FROM {$wpdb->prefix}h5p_contents c
+					   JOIN {$wpdb->prefix}h5p_libraries l ON l.id = c.library_id
+					  WHERE c.id = %d",
+					$hid
+				),
+				ARRAY_A
+			);
+			if ( ! $row ) continue;
+
+			$h5p_contents[] = [
+				'original_id' => (int) $row['id'],
+				'title'       => (string) $row['title'],
+				'library'     => [
+					'name'          => (string) $row['library_name'],
+					'major_version' => (int) $row['major_version'],
+					'minor_version' => (int) $row['minor_version'],
+				],
+				'parameters'  => (string) $row['parameters'],
+				'disable'     => (int) $row['disable'],
+			];
+		}
+
 		// Encode each attachment as base64
 		$attachments = [];
 		foreach ( $att_ids as $aid ) {
@@ -83,6 +137,15 @@ class PBSG_Export_Import {
 			if ( $baid && isset( $attachments[ $baid ] ) ) {
 				$step['branch_tutorial_attachment_id'] = 'att_' . $baid;
 			}
+
+			foreach ( $step as $key => $value ) {
+				if ( is_string( $key )
+					&& substr( $key, -strlen( 'h5p_id' ) ) === 'h5p_id'
+					&& is_int( $value ) && $value > 0
+				) {
+					$step[ $key ] = 'h5p_' . $value;
+				}
+			}
 		}
 		unset( $step );
 
@@ -94,6 +157,7 @@ class PBSG_Export_Import {
 			'header_note'  => $header_note,
 			'cover_id'     => $cover_id ? ( 'att_' . $cover_id ) : null,
 			'steps'        => $steps,
+			'h5p_contents' => $h5p_contents,
 			'attachments'  => array_values( $attachments ),
 		];
 
@@ -105,7 +169,7 @@ class PBSG_Export_Import {
 		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
 		header( 'Content-Length: ' . strlen( $json ) );
 		echo $json; // phpcs:ignore
-		exit;
+		wp_die( '' );
 	}
 
 	// ── IMPORT ───────────────────────────────────────────────────────────────
@@ -141,6 +205,92 @@ class PBSG_Export_Import {
 		$post_content = wp_kses_post( $package['post_content'] ?? '' );
 		$steps        = is_array( $package['steps'] ) ? $package['steps'] : [];
 		$cover_token  = $package['cover_id'] ?? null;
+
+		$h5p_contents_in = is_array( $package['h5p_contents'] ?? null ) ? $package['h5p_contents'] : [];
+
+		if ( ! empty( $h5p_contents_in ) && ! class_exists( 'H5P_Plugin' ) ) {
+			wp_send_json_error( [
+				'message' => 'This tutorial contains H5P quizzes. Install and activate the H5P plugin on this server before importing.',
+			] );
+			return;
+		}
+
+		$h5p_library_ids = []; // keyed by original_id
+		$h5p_missing     = [];
+		if ( ! empty( $h5p_contents_in ) ) {
+			global $wpdb;
+			foreach ( $h5p_contents_in as $entry ) {
+				$lib  = $entry['library'] ?? [];
+				$name = isset( $lib['name'] ) ? (string) $lib['name'] : '';
+				$maj  = isset( $lib['major_version'] ) ? (int) $lib['major_version'] : -1;
+				$min  = isset( $lib['minor_version'] ) ? (int) $lib['minor_version'] : -1;
+
+				$row = $wpdb->get_row(
+					$wpdb->prepare(
+						"SELECT id FROM {$wpdb->prefix}h5p_libraries
+						  WHERE name = %s AND major_version = %d AND minor_version = %d
+						  LIMIT 1",
+						$name, $maj, $min
+					),
+					ARRAY_A
+				);
+				if ( $row && ! empty( $row['id'] ) ) {
+					$h5p_library_ids[ (int) $entry['original_id'] ] = (int) $row['id'];
+				} else {
+					$h5p_missing[] = "{$name} {$maj}.{$min}";
+				}
+			}
+
+			if ( ! empty( $h5p_missing ) ) {
+				$h5p_missing = array_values( array_unique( $h5p_missing ) );
+				wp_send_json_error( [
+					'message' => 'The target server is missing these H5P libraries required by this tutorial: '
+						. implode( ', ', $h5p_missing )
+						. '. Install them via H5P → Libraries and try again.',
+				] );
+				return;
+			}
+		}
+
+		$h5p_id_map = []; // "h5p_<original_id>" => new int id
+		if ( ! empty( $h5p_contents_in ) ) {
+			$h5p_core = $GLOBALS['H5P_Plugin']->get_h5p_instance( 'core' );
+			foreach ( $h5p_contents_in as $entry ) {
+				$orig_id = (int) ( $entry['original_id'] ?? 0 );
+				if ( $orig_id <= 0 ) continue;
+
+				$params_str = (string) ( $entry['parameters'] ?? '' );
+				if ( json_decode( $params_str, true ) === null && json_last_error() !== JSON_ERROR_NONE ) {
+					wp_send_json_error( [
+						'message' => "Quiz {$orig_id} has invalid parameters JSON: " . json_last_error_msg(),
+					] );
+					return;
+				}
+
+				$new_id = $h5p_core->saveContent( [
+					'library'    => [
+						'libraryId'    => $h5p_library_ids[ $orig_id ] ?? 0,
+						'name'         => (string) $entry['library']['name'],
+						'majorVersion' => (int) $entry['library']['major_version'],
+						'minorVersion' => (int) $entry['library']['minor_version'],
+					],
+					'parameters' => $params_str,
+					'disable'    => (int) ( $entry['disable'] ?? 0 ),
+					'title'      => (string) ( $entry['title'] ?? '' ),
+				] );
+
+				if ( is_wp_error( $new_id ) ) {
+					wp_send_json_error( [
+						'message' => 'H5P saveContent failed for quiz '
+							. $orig_id . ': ' . $new_id->get_error_message()
+							. '. Earlier quizzes in this import may have been created — delete them via H5P admin.',
+					] );
+					return;
+				}
+
+				$h5p_id_map[ 'h5p_' . $orig_id ] = (int) $new_id;
+			}
+		}
 
 		// Re-upload attachments, building token → new attachment ID map
 		$id_map = [];
@@ -193,6 +343,16 @@ class PBSG_Export_Import {
 				$new_id = $id_map[ $btoken ] ?? 0;
 				$step['branch_tutorial_attachment_id'] = $new_id;
 				if ( ! $new_id ) $step['branch_tutorial_type'] = '';
+			}
+
+			foreach ( $step as $key => $value ) {
+				if ( is_string( $key )
+					&& substr( $key, -strlen( 'h5p_id' ) ) === 'h5p_id'
+					&& is_string( $value )
+					&& strpos( $value, 'h5p_' ) === 0
+				) {
+					$step[ $key ] = $h5p_id_map[ $value ] ?? 0;
+				}
 			}
 		}
 		unset( $step );

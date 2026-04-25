@@ -114,6 +114,30 @@ class MockWpdb
     {
         $this->calls[] = ['method' => 'get_row', 'args' => [$query, $output]];
         $this->queries[] = $query;
+
+        // H5P content row lookup — keyed by content id extracted from query
+        if (isset($this->returns['h5p_content_rows'])
+            && preg_match('/wp_h5p_contents/i', $query)
+            && preg_match('/= (\d+)/', $query, $m)
+        ) {
+            $id = (int) $m[1];
+            return $this->returns['h5p_content_rows'][$id] ?? null;
+        }
+
+        // H5P library resolution — keyed by name|major|minor
+        if (isset($this->returns['h5p_library_resolutions'])
+            && preg_match('/wp_h5p_libraries/i', $query)
+            && preg_match("/name = '([^']+)'/", $query, $mn)
+            && preg_match('/major_version = (\d+)/', $query, $mmaj)
+            && preg_match('/minor_version = (\d+)/', $query, $mmin)
+        ) {
+            $key = "{$mn[1]}|{$mmaj[1]}|{$mmin[1]}";
+            if (isset($this->returns['h5p_library_resolutions'][$key])) {
+                return ['id' => (int) $this->returns['h5p_library_resolutions'][$key]];
+            }
+            return null;
+        }
+
         return $this->findReturn('get_row', $query, null);
     }
 
