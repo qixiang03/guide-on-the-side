@@ -32,6 +32,13 @@ require_once plugin_dir_path(__FILE__) . 'accessibility-dashboard/class-pbsg-acc
 
 
 class PB_Split_Guide_Plugin {
+  /**
+   * Plugin version. Used as the asset cache-bust key when `filemtime()` is
+   * unavailable (read errors, restricted permissions, sync-conflict quirks).
+   * Bump when shipping frontend asset changes.
+   */
+  const VERSION = '0.5.1';
+
   const TEMPLATE_SLUG = 'split-guide-template.php';
 
   /** Some installs (e.g. Pressbooks) store {@see TEMPLATE_SLUG} with a templates/ prefix. */
@@ -66,6 +73,17 @@ class PB_Split_Guide_Plugin {
   // Cross-editing & ownership transfer (Sprint 6)
   const OPTION_CROSS_EDIT    = 'pbsg_cross_edit_enabled';
   const OPTION_TRANSFER      = 'pbsg_ownership_transfer_enabled';
+
+  // Style template defaults (WYSIWYG CSS Template System)
+  const OPTION_STYLE_DEFAULTS = 'pbsg_style_defaults';
+  const STYLE_DEFAULTS = [
+      'font_family'   => 'Roboto, sans-serif',
+      'heading_font'  => 'Lusitana, serif',
+      'font_size'     => '16px',
+      'text_color'    => '#333333',
+      'accent_color'  => '#8C2004',
+      'button_color'  => '#517E1B',
+  ];
 
   // Hardcoded fallback benchmark defaults (used when no option saved)
   const BENCHMARK_FALLBACKS = [
@@ -104,6 +122,12 @@ class PB_Split_Guide_Plugin {
     add_action('wp_ajax_pbsg_get_transfer_targets', [$this, 'ajax_get_transfer_targets']);
     add_action('wp_ajax_pbsg_rename_h5p', [$this, 'ajax_rename_h5p']);
     add_action('wp_ajax_pbsg_duplicate_h5p', [$this, 'ajax_duplicate_h5p']);
+
+    // Just-in-time embeddability probe used by split-guide.js before
+    // setting iframe.src. Available to logged-out users because tutorials
+    // may be viewed publicly. Nonce + SSRF guard enforced in the handler.
+    add_action('wp_ajax_pbsg_probe_embed',        [$this, 'ajax_probe_embed']);
+    add_action('wp_ajax_nopriv_pbsg_probe_embed', [$this, 'ajax_probe_embed']);
 
     // Bulk action: Transfer Ownership on the Tutorials (Pages) list table
     add_filter('bulk_actions-edit-page', [$this, 'register_transfer_bulk_action']);
@@ -725,8 +749,8 @@ class PB_Split_Guide_Plugin {
                 <textarea
                   id="pbsg_intro_description"
                   name="pbsg_intro_description"
-                  rows="3"
-                  placeholder="Brief overview of what this tutorial covers..."
+                  rows="4"
+                  class="pbsg-wysiwyg-target"
                 ><?php echo esc_textarea($intro_desc); ?></textarea>
               </div>
 
@@ -1363,6 +1387,11 @@ class PB_Split_Guide_Plugin {
       'sanitize_callback' => 'rest_sanitize_boolean',
       'default'           => true,
     ]);
+    register_setting('pbsg_guide_settings', self::OPTION_STYLE_DEFAULTS, [
+      'type'              => 'string',
+      'sanitize_callback' => [$this, 'sanitize_style_defaults'],
+      'default'           => wp_json_encode(self::STYLE_DEFAULTS),
+    ]);
   }
 
   public function sanitize_ratio($value) {
@@ -1381,6 +1410,60 @@ class PB_Split_Guide_Plugin {
       $clean[$key] = isset($decoded[$key]) ? max(0, intval($decoded[$key])) : $fallback;
     }
     return wp_json_encode($clean);
+  }
+
+  /**
+   * Sanitize style defaults — whitelist fonts/sizes, validate hex colours.
+   */
+  public function sanitize_style_defaults($value) {
+    $decoded = is_string($value) ? json_decode($value, true) : $value;
+    if (!is_array($decoded)) $decoded = [];
+
+    $allowed_fonts = [
+        'Roboto, sans-serif',
+        'Lusitana, serif',
+        'Georgia, serif',
+        'Arial, sans-serif',
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    ];
+    $allowed_sizes = ['14px', '16px', '18px', '20px'];
+
+    $clean = [];
+    $clean['font_family'] = in_array($decoded['font_family'] ?? '', $allowed_fonts, true)
+        ? $decoded['font_family'] : self::STYLE_DEFAULTS['font_family'];
+    $clean['heading_font'] = in_array($decoded['heading_font'] ?? '', $allowed_fonts, true)
+        ? $decoded['heading_font'] : self::STYLE_DEFAULTS['heading_font'];
+    $clean['font_size'] = in_array($decoded['font_size'] ?? '', $allowed_sizes, true)
+        ? $decoded['font_size'] : self::STYLE_DEFAULTS['font_size'];
+    $clean['text_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $decoded['text_color'] ?? '')
+        ? $decoded['text_color'] : self::STYLE_DEFAULTS['text_color'];
+    $clean['accent_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $decoded['accent_color'] ?? '')
+        ? $decoded['accent_color'] : self::STYLE_DEFAULTS['accent_color'];
+    $clean['button_color'] = preg_match('/^#[0-9A-Fa-f]{6}$/', $decoded['button_color'] ?? '')
+        ? $decoded['button_color'] : self::STYLE_DEFAULTS['button_color'];
+
+    return wp_json_encode($clean);
+  }
+
+  /**
+   * Resolve the effective style defaults.
+   * Saved option → hardcoded fallback.
+   */
+  public static function resolve_style_defaults(): array {
+    $raw = get_option(self::OPTION_STYLE_DEFAULTS, '');
+    $decoded = is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($decoded)) {
+        return self::STYLE_DEFAULTS;
+    }
+    return array_merge(self::STYLE_DEFAULTS, $decoded);
+  }
+
+  /**
+   * Clean up plugin options on uninstall.
+   * Registered via register_uninstall_hook().
+   */
+  public static function uninstall(): void {
+    delete_option(self::OPTION_STYLE_DEFAULTS);
   }
 
   /**
@@ -1454,6 +1537,7 @@ class PB_Split_Guide_Plugin {
     $current_ratio = max(self::RATIO_MIN, min(self::RATIO_MAX, $current_ratio));
 
     $bench = self::resolve_benchmarks(); // site defaults (no tutorial ID)
+    $style = self::resolve_style_defaults();
     ?>
     <div class="wrap">
       <h1><?php esc_html_e('Guide Settings', 'pb-split-guide'); ?></h1>
@@ -1461,7 +1545,7 @@ class PB_Split_Guide_Plugin {
         Site-wide defaults for tutorial layout and analytics benchmarks. Librarians can override benchmarks per tutorial.
       </p>
 
-      <form method="post" action="options.php">
+      <form method="post" action="<?php echo esc_url( admin_url('options.php') ); ?>">
         <?php settings_fields('pbsg_guide_settings'); ?>
 
         <!-- ═══ Section 1: Layout ═══ -->
@@ -1791,6 +1875,95 @@ class PB_Split_Guide_Plugin {
           </div>
         </div>
 
+        <!-- Section 4: Style Defaults -->
+        <div class="pbsg-admin-settings-card" style="
+          background: #fff; border: 1px solid #E0E0E0; border-radius: 8px;
+          padding: 24px; max-width: 720px; margin-bottom: 24px;
+        ">
+          <h2 style="margin-top:0; font-size:18px; display:flex; align-items:center; gap:8px;"><?php echo pbsg_icon('pencil'); ?> Style Defaults</h2>
+          <p class="description" style="margin-bottom: 16px;">
+            Site-wide font and colour defaults for all tutorials. Per-tutorial overrides will be available in the tutorial editor.
+          </p>
+
+          <!-- Hidden input carries the JSON blob -->
+          <input type="hidden" id="pbsg_style_defaults_json"
+                 name="<?php echo esc_attr(self::OPTION_STYLE_DEFAULTS); ?>"
+                 value="<?php echo esc_attr(wp_json_encode($style)); ?>" />
+
+          <div style="display:flex; flex-wrap:wrap; gap:16px 20px; margin-bottom:20px;">
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_font_family" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Body font</label>
+              <select id="pbsg_style_font_family" class="pbsg-style-input" data-key="font_family" style="width:100%;">
+                <option value="Roboto, sans-serif" <?php selected($style['font_family'], 'Roboto, sans-serif'); ?>>Roboto</option>
+                <option value="Lusitana, serif" <?php selected($style['font_family'], 'Lusitana, serif'); ?>>Lusitana</option>
+                <option value="Georgia, serif" <?php selected($style['font_family'], 'Georgia, serif'); ?>>Georgia</option>
+                <option value="Arial, sans-serif" <?php selected($style['font_family'], 'Arial, sans-serif'); ?>>Arial</option>
+                <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['font_family'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System default</option>
+              </select>
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_font_size" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Font size</label>
+              <select id="pbsg_style_font_size" class="pbsg-style-input" data-key="font_size" style="width:100%;">
+                <option value="14px" <?php selected($style['font_size'], '14px'); ?>>14px</option>
+                <option value="16px" <?php selected($style['font_size'], '16px'); ?>>16px</option>
+                <option value="18px" <?php selected($style['font_size'], '18px'); ?>>18px</option>
+                <option value="20px" <?php selected($style['font_size'], '20px'); ?>>20px</option>
+              </select>
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_text_color" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Text colour</label>
+              <input type="text" id="pbsg_style_text_color" class="pbsg-style-input pbsg-color-field"
+                     data-key="text_color"
+                     value="<?php echo esc_attr($style['text_color']); ?>"
+                     data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['text_color']); ?>" />
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_heading_font" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Heading font</label>
+              <select id="pbsg_style_heading_font" class="pbsg-style-input" data-key="heading_font" style="width:100%;">
+                <option value="Lusitana, serif" <?php selected($style['heading_font'], 'Lusitana, serif'); ?>>Lusitana</option>
+                <option value="Roboto, sans-serif" <?php selected($style['heading_font'], 'Roboto, sans-serif'); ?>>Roboto</option>
+                <option value="Georgia, serif" <?php selected($style['heading_font'], 'Georgia, serif'); ?>>Georgia</option>
+                <option value="Arial, sans-serif" <?php selected($style['heading_font'], 'Arial, sans-serif'); ?>>Arial</option>
+                <option value="-apple-system, BlinkMacSystemFont, &quot;Segoe UI&quot;, Roboto, sans-serif" <?php selected($style['heading_font'], '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'); ?>>System default</option>
+              </select>
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_accent_color" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Accent / link colour</label>
+              <input type="text" id="pbsg_style_accent_color" class="pbsg-style-input pbsg-color-field"
+                     data-key="accent_color"
+                     value="<?php echo esc_attr($style['accent_color']); ?>"
+                     data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['accent_color']); ?>" />
+            </div>
+            <div style="flex:0 0 calc(33.33% - 14px);">
+              <label for="pbsg_style_button_color" style="display:block; font-weight:600; font-size:13px; color:#666; margin-bottom:4px;">Button colour</label>
+              <input type="text" id="pbsg_style_button_color" class="pbsg-style-input pbsg-color-field"
+                     data-key="button_color"
+                     value="<?php echo esc_attr($style['button_color']); ?>"
+                     data-default-color="<?php echo esc_attr(self::STYLE_DEFAULTS['button_color']); ?>" />
+            </div>
+          </div>
+
+          <!-- Live preview -->
+          <div id="pbsg_style_preview" style="
+            border: 1px solid #E0E0E0; border-radius: 6px; padding: 20px;
+            background: #F8F8F8;
+          ">
+            <h3 id="pbsg_preview_heading" style="margin-top:0; margin-bottom:8px;">Preview Heading</h3>
+            <p id="pbsg_preview_body" style="margin-bottom:8px;">
+              This is sample body text showing how your tutorials will look with the selected fonts and colours.
+            </p>
+            <a href="#" id="pbsg_preview_link" onclick="return false;" style="margin-right:12px;">Sample Link</a>
+            <button type="button" id="pbsg_preview_button" style="
+              padding: 6px 16px; border: none; border-radius: 4px;
+              color: #fff; cursor: pointer; font-size: 14px;
+            ">Sample Button</button>
+          </div>
+
+          <div style="margin-top:12px;">
+            <button type="button" class="button" id="pbsg_style_reset">Reset Style Defaults</button>
+          </div>
+        </div>
+
         <!-- Save -->
         <div style="max-width:720px; display:flex; gap:10px;">
           <?php submit_button(__('Save Settings', 'pb-split-guide'), 'primary', 'submit', false); ?>
@@ -1832,16 +2005,152 @@ class PB_Split_Guide_Plugin {
           el.addEventListener('input', syncBenchJSON);
         });
 
+        /* ── Style Defaults — field sync + live preview ── */
+        var styleHidden = document.getElementById('pbsg_style_defaults_json');
+        var styleInputs = document.querySelectorAll('.pbsg-style-input');
+        var styleDefaults = <?php echo wp_json_encode(self::STYLE_DEFAULTS); ?>;
+
+        function getStyleValue(key) {
+          var el = document.querySelector('.pbsg-style-input[data-key="' + key + '"]');
+          return el ? el.value : styleDefaults[key];
+        }
+
+        function syncStyleJSON() {
+          var obj = {};
+          styleInputs.forEach(function(el) {
+            obj[el.getAttribute('data-key')] = el.value;
+          });
+          styleHidden.value = JSON.stringify(obj);
+        }
+
+        function updateStylePreview() {
+          var heading = document.getElementById('pbsg_preview_heading');
+          var body    = document.getElementById('pbsg_preview_body');
+          var link    = document.getElementById('pbsg_preview_link');
+          var btn     = document.getElementById('pbsg_preview_button');
+
+          heading.style.fontFamily = getStyleValue('heading_font');
+          heading.style.color      = getStyleValue('text_color');
+          body.style.fontFamily    = getStyleValue('font_family');
+          body.style.fontSize      = getStyleValue('font_size');
+          body.style.color         = getStyleValue('text_color');
+          link.style.fontFamily    = getStyleValue('font_family');
+          link.style.color         = getStyleValue('accent_color');
+          btn.style.backgroundColor = getStyleValue('button_color');
+          btn.style.fontFamily     = getStyleValue('font_family');
+        }
+
+        styleInputs.forEach(function(el) {
+          el.addEventListener('change', function() { syncStyleJSON(); updateStylePreview(); });
+          el.addEventListener('input', function()  { syncStyleJSON(); updateStylePreview(); });
+        });
+
+        // Initialize color pickers (jQuery wp-color-picker).
+        // Wrapped in jQuery.ready because wp-color-picker JS loads in the
+        // footer, after this inline script runs.
+        if (typeof jQuery !== 'undefined') {
+          jQuery(function() {
+            if (jQuery.fn.wpColorPicker) {
+              jQuery('.pbsg-color-field').wpColorPicker({
+                change: function(event, ui) {
+                  jQuery(event.target).val(ui.color.toString());
+                  syncStyleJSON();
+                  updateStylePreview();
+                },
+                clear: function(event) {
+                  jQuery(event.target).val(jQuery(event.target).data('default-color'));
+                  syncStyleJSON();
+                  updateStylePreview();
+                }
+              });
+            }
+          });
+        }
+
+        // Style-only reset button
+        document.getElementById('pbsg_style_reset').addEventListener('click', function() {
+          styleInputs.forEach(function(el) {
+            var key = el.getAttribute('data-key');
+            if (styleDefaults[key] !== undefined) {
+              el.value = styleDefaults[key];
+              // Also update the color picker widget if applicable
+              if (typeof jQuery !== 'undefined' && jQuery(el).hasClass('pbsg-color-field') && jQuery.fn.wpColorPicker) {
+                jQuery(el).wpColorPicker('color', styleDefaults[key]);
+              }
+            }
+          });
+          syncStyleJSON();
+          updateStylePreview();
+        });
+
+        // Initialize preview on page load
+        updateStylePreview();
+
         /* ── Reset button ── */
         var defaults = <?php echo wp_json_encode(self::BENCHMARK_FALLBACKS); ?>;
         document.getElementById('pbsg_admin_reset').addEventListener('click', function(){
-          slider.value = <?php echo self::RATIO_DEFAULT; ?>;
-          slider.dispatchEvent(new Event('input'));
-          benchInputs.forEach(function(el) {
-            var key = el.getAttribute('data-key');
-            if (defaults[key] !== undefined) el.value = defaults[key];
+          if (!window.PbsgModal) {
+            // Fallback if modal primitive somehow didn't load — block rather than silently reset.
+            alert('Cannot reset — modal unavailable. Reload the page and try again.');
+            return;
+          }
+          window.PbsgModal.open({
+            variant: 'destructive',
+            icon:    (window.pbsgModalIcons && window.pbsgModalIcons.refresh) || '',
+            heading: 'Reset all Guide Settings?',
+            subtitle: 'This will revert every section on this page to its factory default.',
+            bodyLabel: 'The following will be reset and saved immediately',
+            bullets: [
+              '<strong>Panel Layout</strong> — returns to <?php echo (int) self::RATIO_DEFAULT; ?>% left / <?php echo (int) (100 - self::RATIO_DEFAULT); ?>% right.',
+              '<strong>Analytics Benchmarks</strong> — all thresholds restored to factory defaults.',
+              '<strong>Permissions</strong> — cross-editing <strong>on</strong>, ownership transfer <strong>on</strong>.',
+              '<strong>Style Defaults</strong> — fonts, sizes, and colours restored to factory defaults.'
+            ],
+            caveat: "<strong>This cannot be undone.</strong> Any customizations you've made across all panels will be overwritten.",
+            confirmLabel: 'Reset and save',
+            onConfirm: function () {
+              // 1. Ratio slider
+              slider.value = <?php echo self::RATIO_DEFAULT; ?>;
+              slider.dispatchEvent(new Event('input'));
+
+              // 2. Benchmarks
+              benchInputs.forEach(function(el) {
+                var key = el.getAttribute('data-key');
+                if (defaults[key] !== undefined) el.value = defaults[key];
+              });
+              syncBenchJSON();
+
+              // 3. Permission toggles — both ON is the client default
+              var cross = document.getElementById('pbsg_cross_edit_toggle');
+              var xfer  = document.getElementById('pbsg_transfer_toggle');
+              if (cross) cross.checked = true;
+              if (xfer)  xfer.checked  = true;
+
+              // 4. Style Defaults — reset all to factory
+              styleInputs.forEach(function(el) {
+                var key = el.getAttribute('data-key');
+                if (styleDefaults[key] !== undefined) {
+                  el.value = styleDefaults[key];
+                  if (typeof jQuery !== 'undefined' && jQuery(el).hasClass('pbsg-color-field') && jQuery.fn.wpColorPicker) {
+                    jQuery(el).wpColorPicker('color', styleDefaults[key]);
+                  }
+                }
+              });
+              syncStyleJSON();
+              updateStylePreview();
+
+              // 5. Submit to persist.
+              //    NOTE: the form has <input name="submit"> from submit_button(),
+              //    which shadows form.submit (the method) on the element. Calling
+              //    the prototype method directly bypasses the shadow. This also
+              //    skips the submit event (native .submit() does not fire it), so
+              //    the per-toggle confirmation chain is naturally bypassed.
+              var form = document.querySelector('form[action$="options.php"]');
+              if (form) {
+                HTMLFormElement.prototype.submit.call(form);
+              }
+            }
           });
-          syncBenchJSON();
         });
       })();
       </script>
@@ -2009,14 +2318,52 @@ class PB_Split_Guide_Plugin {
       }
 
       // ── Embeddability check for URL-type tutorial resources ──
+      // Main step, branch-level tutorial, AND each branch question. Without
+      // the branch/per-question passes, the student-side renderer has no
+      // `embeddable` flag for branch tutorials and always takes Tier 1
+      // (iframe) — meaning the popup/viewer fallbacks and the host deny-list
+      // only protect the main step.
+      // Use check_cached() (not check()) at save-time so the transient is
+      // warm for the first student view. resolve_flags() at view-time hits
+      // check_cached() as its single source of truth, so warming the cache
+      // here avoids a 5-8s synchronous HEAD+GET on the first page load.
       if (!empty($step['tutorial_type']) && $step['tutorial_type'] === 'url' && !empty($step['tutorial_url'])) {
-        $embed_result        = PBSG_Embed_Check::check($step['tutorial_url']);
+        $embed_result        = PBSG_Embed_Check::check_cached($step['tutorial_url']);
         $step['embeddable']      = $embed_result['embeddable'];
         $step['is_document_url'] = $embed_result['is_document_url'];
       }
 
-      // Strip transient data from stored JSON
-      unset($step['quiz'], $step['_editing_h5p']);
+      if (!empty($step['branch']) && is_array($step['branch'])) {
+        if (!empty($step['branch']['tutorial_type']) && $step['branch']['tutorial_type'] === 'url' && !empty($step['branch']['tutorial_url'])) {
+          $b_embed = PBSG_Embed_Check::check_cached($step['branch']['tutorial_url']);
+          $step['branch']['tutorial_embeddable']      = $b_embed['embeddable'];
+          $step['branch']['tutorial_is_document_url'] = $b_embed['is_document_url'];
+        }
+
+        if (!empty($step['branch']['questions']) && is_array($step['branch']['questions'])) {
+          foreach ($step['branch']['questions'] as &$bq_ref) {
+            if (is_array($bq_ref)
+                && !empty($bq_ref['tutorial_type'])
+                && $bq_ref['tutorial_type'] === 'url'
+                && !empty($bq_ref['tutorial_url'])) {
+              $q_embed = PBSG_Embed_Check::check_cached($bq_ref['tutorial_url']);
+              $bq_ref['tutorial_embeddable']      = $q_embed['embeddable'];
+              $bq_ref['tutorial_is_document_url'] = $q_embed['is_document_url'];
+            }
+          }
+          unset($bq_ref);
+        }
+      }
+
+      // Strip transient editing flag
+      unset($step['_editing_h5p']);
+
+      // Only strip quiz data if H5P content was successfully created/updated.
+      // If H5P is unavailable or creation failed, preserve quiz so the
+      // librarian's work isn't silently lost.
+      if (!empty($step['h5p_id']) && $step['h5p_id'] > 0) {
+        unset($step['quiz']);
+      }
     }
     unset($step);
 
@@ -2036,7 +2383,10 @@ class PB_Split_Guide_Plugin {
       });
     }
 
-    update_post_meta($post_id, self::META_STEPS, wp_json_encode($clean));
+    // wp_slash: WordPress's update_metadata() calls wp_unslash() on meta
+    // values, which strips JSON's \" escapes (e.g. href="..." in HTML).
+    // Pre-slashing ensures the stored JSON remains valid.
+    update_post_meta($post_id, self::META_STEPS, wp_slash(wp_json_encode($clean)));
 
     // Invalidate H5P usage map — links may have changed
     PBSG_H5P_Usage_Map::invalidate();
@@ -2076,7 +2426,7 @@ class PB_Split_Guide_Plugin {
 
     // Save structured intro fields (Phase 7)
     $intro_desc = isset($_POST['pbsg_intro_description'])
-      ? sanitize_textarea_field(wp_unslash($_POST['pbsg_intro_description'])) : '';
+      ? sanitize_text_field(wp_unslash($_POST['pbsg_intro_description'])) : '';
     update_post_meta($post_id, self::META_INTRO_DESC, $intro_desc);
 
     $intro_objectives_raw = isset($_POST['pbsg_intro_objectives'])
@@ -2095,7 +2445,7 @@ class PB_Split_Guide_Plugin {
     update_post_meta($post_id, self::META_INTRO_PREREQS, $intro_prereqs);
 
     // Save layout settings (Stretch Goal 5)
-    $left_ratio_raw = isset($_POST['pbsg_left_ratio']) ? $_POST['pbsg_left_ratio'] : '';
+    $left_ratio_raw = isset($_POST['pbsg_left_ratio']) ? wp_unslash($_POST['pbsg_left_ratio']) : '';
     if ($left_ratio_raw === '' || $left_ratio_raw === false) {
       delete_post_meta($post_id, self::META_LEFT_RATIO);
     } else {
@@ -2144,6 +2494,37 @@ class PB_Split_Guide_Plugin {
     }
   }
 
+  /**
+   * Resolve a cache-bust version string for a plugin-relative asset path.
+   *
+   * Prefers `filemtime()` (best cache-bust granularity) but gracefully falls
+   * back to {@see PB_Split_Guide_Plugin::VERSION} when the file cannot be
+   * stat'd — unreadable permissions, broken symlinks, iCloud-sync conflict
+   * files, etc. Previously a failed `filemtime()` returned `false` which
+   * WordPress passes through to the browser as no version, allowing stale
+   * cached assets to persist.
+   *
+   * @param string $relative Path relative to the plugin directory (e.g. "assets/split-guide.js").
+   * @return string Non-empty version string safe for wp_enqueue_*.
+   */
+  private static function asset_version(string $relative): string {
+    $abs = plugin_dir_path(__FILE__) . ltrim($relative, '/');
+    $mtime = @filemtime($abs);
+    if ($mtime !== false && $mtime > 0) {
+      return (string) $mtime;
+    }
+    return self::VERSION;
+  }
+
+  /**
+   * Front-end asset loading for tutorial pages.
+   *
+   * Defense in depth: the template file (split-guide-template.php) also
+   * enqueues the same handles. WordPress deduplicates by handle, so the two
+   * paths are redundant. This ensures that if the template is bypassed by a
+   * theme filter, child-theme override, or a multisite subsite where the
+   * plugin's template_include filter doesn't fire, the assets still ship.
+   */
   public function enqueue_assets() {
     if (!is_page()) return;
 
@@ -2151,25 +2532,69 @@ class PB_Split_Guide_Plugin {
     $selected = get_post_meta($page_id, '_wp_page_template', true);
     if (!self::is_split_guide_template($selected)) return;
 
+    $base_url = plugin_dir_url(__FILE__);
+
     wp_enqueue_style(
       'pbsg_split_guide_css',
-      plugin_dir_url(__FILE__) . 'assets/split-guide.css',
+      $base_url . 'assets/split-guide.css',
       [],
-      '0.5.0.1'
+      self::asset_version('assets/split-guide.css')
     );
 
-    // Only localize tracker data on published tutorials — prevents draft/preview pollution
+    // Inject site-level style defaults as CSS custom properties
+    $style_defaults = self::resolve_style_defaults();
+    // Values are allow-listed by sanitize_style_defaults() — safe for direct
+    // insertion. Do NOT use esc_attr() on font stacks — it encodes quotes
+    // (e.g. "Segoe UI" → &quot;Segoe UI&quot;) which breaks CSS parsing.
+    $inline_css = sprintf(
+        ':root{--pbsg-font-family:%s;--pbsg-heading-font:%s;--pbsg-font-size:%s;--pbsg-text-color:%s;--pbsg-accent-color:%s;--pbsg-button-color:%s;}',
+        $style_defaults['font_family'],
+        $style_defaults['heading_font'],
+        $style_defaults['font_size'],
+        $style_defaults['text_color'],
+        $style_defaults['accent_color'],
+        $style_defaults['button_color']
+    );
+    wp_add_inline_style('pbsg_split_guide_css', $inline_css);
+
+    // Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
+    wp_enqueue_script(
+      'pbsg_icons_js',
+      $base_url . 'assets/pbsg-icons.js',
+      [],
+      self::asset_version('assets/pbsg-icons.js'),
+      true
+    );
+
+    wp_enqueue_script(
+      'pbsg-split-guide',
+      $base_url . 'assets/split-guide.js',
+      ['pbsg_icons_js'],
+      self::asset_version('assets/split-guide.js'),
+      true
+    );
+
+    // Only load analytics tracker on published tutorials — prevents draft/preview pollution
     if ( get_post_status( $page_id ) === 'publish' ) {
+        wp_enqueue_script(
+            'pbsg-tracker',
+            $base_url . 'assets/split-guide-tracker.js',
+            [],
+            self::asset_version('assets/split-guide-tracker.js'),
+            true
+        );
+
         $steps_json = get_post_meta( $page_id, '_pbsg_steps_json', true );
         $steps_data = json_decode( $steps_json, true );
         $total_steps = is_array( $steps_data ) ? count( $steps_data ) : 1;
 
+        // Must come AFTER wp_enqueue_script — localize attaches to a registered handle.
         wp_localize_script( 'pbsg-tracker', 'pbsgTracker', array(
             'ajaxUrl'        => admin_url( 'admin-ajax.php' ),
             'tutorialPageId' => $page_id,
             'totalSteps'     => $total_steps,
         ) );
-    } 
+    }
   }
 
   /**
@@ -2263,7 +2688,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'thickbox', 'pbsg_icons_js'],
-      '0.7.2',
+      '0.8.4',
       true
     );
 
@@ -2313,6 +2738,16 @@ class PB_Split_Guide_Plugin {
       ],
     ]);
 
+    wp_localize_script('pbsg_admin_js', 'pbsgStyleDefaults', self::resolve_style_defaults());
+
+    // Load TinyMCE editor scripts. We enqueue the 'editor' handle directly instead
+    // of calling wp_enqueue_editor() because wp_enqueue_editor() in Pressbooks breaks
+    // admin footer script output. The 'editor' handle pulls in TinyMCE and wp.editor.
+    wp_enqueue_script('wp-tinymce');
+    wp_enqueue_script('editor');
+    wp_enqueue_script('quicktags');
+    wp_enqueue_style('editor-buttons');
+
     // Extra inline script: force the template on Add New Tutorial page.
     if ($hook === 'post-new.php') {
       $template_slug = esc_js(self::TEMPLATE_SLUG);
@@ -2349,8 +2784,10 @@ class PB_Split_Guide_Plugin {
     }
   } // end post editor assets
 
-  // Slider CSS + JS on Guide Settings page (benchmark sliders)
+  // Slider CSS + JS on Guide Settings page (benchmark sliders + style defaults)
   if (isset($_GET['page']) && $_GET['page'] === 'pbsg-guide-settings') {
+    wp_enqueue_style('wp-color-picker');
+    wp_enqueue_script('wp-color-picker');
     wp_enqueue_style(
       'pbsg-admin',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-split-guide.css',
@@ -2368,7 +2805,7 @@ class PB_Split_Guide_Plugin {
       'pbsg_admin_js',
       plugin_dir_url(__FILE__) . 'assets/admin-split-guide.js',
       ['jquery', 'pbsg_icons_js'],
-      '0.7.2',
+      '0.8.4',
       true
     );
     wp_localize_script('pbsg_admin_js', 'PBSG_ADMIN', [
@@ -2383,6 +2820,19 @@ class PB_Split_Guide_Plugin {
   $is_pages_list = ($hook === 'edit.php' && $screen && $screen->post_type === 'page');
   if (in_array($current_page, $cross_edit_screens, true) || $hook === 'post.php' || $hook === 'post-new.php' || $is_pages_list) {
     wp_enqueue_style(
+      'pbsg-modal',
+      plugin_dir_url(__FILE__) . 'assets/admin/pbsg-modal.css',
+      [],
+      '0.1.0'
+    );
+    wp_enqueue_script(
+      'pbsg-modal',
+      plugin_dir_url(__FILE__) . 'assets/admin/pbsg-modal.js',
+      [],
+      '0.1.0',
+      true
+    );
+    wp_enqueue_style(
       'pbsg-admin-cross-edit',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.css',
       [],
@@ -2391,10 +2841,16 @@ class PB_Split_Guide_Plugin {
     wp_enqueue_script(
       'pbsg-admin-cross-edit',
       plugin_dir_url(__FILE__) . 'assets/admin/admin-cross-edit.js',
-      ['jquery'],
-      '0.6.0',
+      ['jquery', 'pbsg-modal'],
+      '0.8.0',
       true
     );
+    wp_localize_script('pbsg-admin-cross-edit', 'pbsgModalIcons', [
+      'lockClosed' => pbsg_icon('lock-closed'),
+      'lockOpen'   => pbsg_icon('lock-open'),
+      'shuffle'    => pbsg_icon('shuffle'),
+      'refresh'    => pbsg_icon('refresh'),
+    ]);
     // Check for pending bulk transfer from Pages list
     $bulk_transfer_ids = [];
     if ( isset($_GET['pbsg_bulk_transfer']) && $_GET['pbsg_bulk_transfer'] === '1' ) {
@@ -2975,6 +3431,147 @@ class PB_Split_Guide_Plugin {
   }
 
   /**
+   * AJAX: Just-in-time embeddability probe.
+   *
+   * Called by split-guide.js immediately before setting iframe.src for a
+   * URL-type tutorial step. Runs PBSG_Embed_Check::check_cached() (HEAD+GET
+   * with 1-hour transient cache) and returns the verdict so the client can
+   * render the popup-fallback card when the target can't be iframed.
+   *
+   * This closes the gap where:
+   *   • The save-time meta said `embeddable=true` (e.g. old tutorial, or
+   *     HEAD succeeded at save-time but the server now 4xx's),
+   *   • The browser's `load` event fires even for XFO/CSP-blocked frames
+   *     (Chrome behaviour), so a purely client-side heuristic can't tell
+   *     a block apart from a legitimate cross-origin render.
+   *
+   * Defenses:
+   *   • Nonce verification (anti-CSRF).
+   *   • Scheme must be http(s) — rejects javascript:, data:, file:, etc.
+   *   • Hostname must not be loopback/private/link-local/.local/.test
+   *     (anti-SSRF). DNS is resolved to also check the resolved IP so a
+   *     public hostname that resolves to a private address is rejected.
+   */
+  public function ajax_probe_embed() {
+    // 1. Nonce (scoped to this action).
+    check_ajax_referer('pbsg_probe_embed', 'nonce');
+
+    $raw = isset($_POST['url']) ? wp_unslash($_POST['url']) : '';
+    $url = esc_url_raw(trim((string) $raw));
+
+    if ($url === '') {
+      wp_send_json_error(['message' => 'Missing url.'], 400);
+    }
+
+    // 2. Scheme guard — http(s) only.
+    $parts = wp_parse_url($url);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+      wp_send_json_error(['message' => 'Invalid url.'], 400);
+    }
+    $scheme = strtolower((string) $parts['scheme']);
+    if ($scheme !== 'http' && $scheme !== 'https') {
+      wp_send_json_error(['message' => 'Unsupported scheme.'], 400);
+    }
+
+    // 3. Host + DNS guard — block loopback/private/link-local/dev-only hosts.
+    $host = strtolower((string) $parts['host']);
+    if ($this->pbsg_host_is_ssrf_risk($host)) {
+      // Treat as non-embeddable instead of erroring — the client still
+      // needs a verdict, and a dev-only host shouldn't be framed in a
+      // public tutorial anyway.
+      wp_send_json_success([
+        'embeddable'      => false,
+        'is_document_url' => false,
+        'source'          => 'ssrf_guard',
+      ]);
+    }
+
+    // 4. Delegate to the cached embed-check.
+    $verdict = PBSG_Embed_Check::check_cached($url);
+
+    wp_send_json_success([
+      'embeddable'      => !empty($verdict['embeddable']),
+      'is_document_url' => !empty($verdict['is_document_url']),
+      'source'          => 'probe',
+    ]);
+  }
+
+  /**
+   * Return true if the hostname is a loopback, private-range, link-local,
+   * or dev-only (.local/.test) address. Used by ajax_probe_embed() to
+   * reject SSRF-style URLs before dispatching an outbound HTTP request.
+   *
+   * Resolves the host via gethostbyname()/dns_get_record() so a public
+   * name that points at a private IP (DNS-rebinding style) is caught.
+   * Resolution failure is treated as risky.
+   *
+   * @param string $host Lowercased hostname from parse_url().
+   * @return bool True = reject, false = safe to probe.
+   */
+  private function pbsg_host_is_ssrf_risk(string $host): bool {
+    if ($host === '') {
+      return true;
+    }
+
+    // Dev-only TLDs and bare loopback names.
+    if ($host === 'localhost' || $host === 'ip6-localhost' || $host === 'ip6-loopback') {
+      return true;
+    }
+    if (str_ends_with($host, '.local') || str_ends_with($host, '.test') ||
+        str_ends_with($host, '.localhost') || str_ends_with($host, '.internal')) {
+      return true;
+    }
+
+    // Collect candidate IPs: the host itself if it IS an IP literal,
+    // otherwise all A/AAAA records.
+    $ips = [];
+    if (filter_var($host, FILTER_VALIDATE_IP)) {
+      $ips[] = $host;
+    } else {
+      // gethostbynamel returns IPv4 addresses; supplement with AAAA via
+      // dns_get_record if available.
+      if (function_exists('gethostbynamel')) {
+        $v4 = @gethostbynamel($host);
+        if (is_array($v4)) {
+          $ips = array_merge($ips, $v4);
+        }
+      }
+      if (function_exists('dns_get_record')) {
+        $aaaa = @dns_get_record($host, DNS_AAAA);
+        if (is_array($aaaa)) {
+          foreach ($aaaa as $rec) {
+            if (!empty($rec['ipv6'])) {
+              $ips[] = $rec['ipv6'];
+            }
+          }
+        }
+      }
+    }
+
+    // No resolvable IPs — [Inference] could be a legitimate host whose DNS
+    // is briefly unreachable from the PHP worker, or could be a dead link.
+    // Either way, skip the outbound request to avoid retry storms.
+    if (empty($ips)) {
+      return true;
+    }
+
+    foreach ($ips as $ip) {
+      // FILTER_FLAG_NO_PRIV_RANGE: reject RFC1918 + RFC4193 (ULA).
+      // FILTER_FLAG_NO_RES_RANGE : reject loopback, link-local, reserved.
+      $ok = filter_var(
+        $ip,
+        FILTER_VALIDATE_IP,
+        FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE
+      );
+      if ($ok === false) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Render the PBSG-410 error page when a tutorial becomes unavailable mid-session.
    * Triggered by /?pbsg-error=410 redirect from split-guide-tracker.js.
    */
@@ -3101,6 +3698,7 @@ new PB_Split_Guide_Plugin();
 register_activation_hook( __FILE__, array( 'PBSG_Roles', 'activate' ) );
 register_activation_hook( __FILE__, array( 'PBSG_Analytics', 'create_tables' ) );
 register_deactivation_hook( __FILE__, array( 'PBSG_Roles', 'deactivate' ) );
+register_uninstall_hook( __FILE__, array( 'PB_Split_Guide_Plugin', 'uninstall' ) );
 
 PBSG_Roles::init();
 PBSG_Analytics::init();

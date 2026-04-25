@@ -2,38 +2,44 @@
 declare(strict_types=1);
 
 /**
- * Test double for the H5P plugin's core saveContent() entry point.
- * Records every saveContent() call and returns a preset new content ID.
+ * Minimal test double for the H5P plugin's H5PCore object.
+ *
+ * Used by PBSGExportImportH5PTest to exercise H5P content
+ * export/import logic without a real WordPress + H5P installation.
  */
-final class FakeH5PCore
+class FakeH5PCore
 {
-    /** @var list<array> */
-    public array $saveContentCalls = [];
+    /** @var array<int, array<string, mixed>> Simulates saved H5P content rows */
+    public array $savedContent = [];
 
-    /** @var list<int> */
-    public array $saveContentReturns = [];
+    /** Next auto-increment ID returned by saveContent() */
+    private int $nextId = 1;
 
-    /** When true, saveContent() returns a WP_Error instead of an int. */
-    public bool $failNext = false;
-
-    public function saveContent(array $content): int|WP_Error
+    /**
+     * @param array<string, mixed> $content
+     * @return int The new content ID
+     */
+    public function saveContent(array $content): int
     {
-        $this->saveContentCalls[] = $content;
-        if ($this->failNext) {
-            $this->failNext = false;
-            return new WP_Error('pbsg_fake_h5p_error', 'simulated saveContent failure');
-        }
-        return (int) array_shift($this->saveContentReturns) ?: 0;
+        $id = $this->nextId++;
+        $this->savedContent[$id] = $content;
+        return $id;
     }
 }
 
 /**
- * Test double for the global H5P_Plugin singleton.
- * handle_import() resolves the core via $GLOBALS['H5P_Plugin']->get_h5p_instance('core').
+ * Minimal test double for the top-level H5P_Plugin WordPress object.
+ * Wraps a FakeH5PCore so the plugin code can call
+ * $GLOBALS['H5P_Plugin']->get_h5p_instance('core').
  */
-final class FakeH5PPlugin
+class FakeH5PPlugin
 {
-    public function __construct(private FakeH5PCore $core) {}
+    private FakeH5PCore $core;
+
+    public function __construct(FakeH5PCore $core)
+    {
+        $this->core = $core;
+    }
 
     public function get_h5p_instance(string $type): FakeH5PCore
     {

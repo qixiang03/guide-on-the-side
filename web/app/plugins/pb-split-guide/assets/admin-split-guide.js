@@ -67,12 +67,93 @@ jQuery(function ($) {
     return labels[ext] || 'File will be available as a resource in the right pane';
   }
 
+  // ═══════════════════════════════════════════════════════════
+  //  TinyMCE Helpers (WYSIWYG editors for instructions + quiz questions)
+  // ═══════════════════════════════════════════════════════════
+  const PBSG_TINYMCE_TOOLBAR = 'bold italic underline | bullist numlist | link | fontselect fontsizeselect forecolor';
+
+  function pbsgInitTinyMCEDirect(editorId) {
+    // Remove existing instance if any (re-init after reorder)
+    var existing = tinymce.get(editorId);
+    if (existing) existing.remove();
+
+    var defaults = window.pbsgStyleDefaults || {};
+    tinymce.init({
+      selector: '#' + editorId,
+      menubar: false,
+      statusbar: false,
+      toolbar: PBSG_TINYMCE_TOOLBAR,
+      plugins: 'lists link textcolor',
+      content_style: 'body { font-family: ' + (defaults.font_family || 'Roboto, sans-serif') + '; font-size: ' + (defaults.font_size || '16px') + '; color: ' + (defaults.text_color || '#333333') + '; }',
+      font_formats: 'Roboto=Roboto, sans-serif;Lusitana=Lusitana, serif;Georgia=Georgia, serif;Arial=Arial, sans-serif;System=system-ui, sans-serif',
+      fontsize_formats: '14px 16px 18px 20px',
+      branding: false,
+      height: 120,
+      setup: function(editor) {
+        editor.on('change keyup', function() {
+          editor.save();
+        });
+        editor.on('focus', function() {
+          var wrap = editor.getContainer();
+          if (wrap) wrap = wrap.closest('.pbsg-tinymce-wrap');
+          if (wrap) wrap.classList.add('pbsg-tinymce-wrap--focused');
+        });
+        editor.on('blur', function() {
+          var wrap = editor.getContainer();
+          if (wrap) wrap = wrap.closest('.pbsg-tinymce-wrap');
+          if (wrap) wrap.classList.remove('pbsg-tinymce-wrap--focused');
+        });
+      }
+    });
+  }
+
+  // TinyMCE may load after jQuery ready (footer scripts). Retry until available.
+  function pbsgInitTinyMCE(editorId) {
+    if (typeof tinymce !== 'undefined') {
+      pbsgInitTinyMCEDirect(editorId);
+      return;
+    }
+    var tries = 0;
+    var timer = setInterval(function() {
+      tries++;
+      if (typeof tinymce !== 'undefined') {
+        clearInterval(timer);
+        pbsgInitTinyMCEDirect(editorId);
+      } else if (tries > 40) {
+        clearInterval(timer);
+      }
+    }, 200);
+  }
+
+  function pbsgRemoveTinyMCE(editorId) {
+    if (typeof tinymce === 'undefined') return;
+    var editor = tinymce.get(editorId);
+    if (editor) editor.remove();
+  }
+
+  function pbsgGetTinyMCEContent(editorId) {
+    if (typeof tinymce !== 'undefined') {
+      const editor = tinymce.get(editorId);
+      if (editor) return editor.getContent();
+    }
+    const el = document.getElementById(editorId);
+    return el ? el.value : '';
+  }
+
   function getSteps() {
     try { const v = JSON.parse($('#pbsg_steps_json').val() || ''); return Array.isArray(v) ? v : []; }
     catch (e) { return []; }
   }
 
-  function setSteps(steps) { $('#pbsg_steps_json').val(JSON.stringify(steps || [])); markDirty(); }
+  function setSteps(steps) {
+    try {
+      $('#pbsg_steps_json').val(JSON.stringify(steps || []));
+    } catch (e) {
+      console.error('[PBSG] Failed to serialize steps:', e);
+      return;
+    }
+    markDirty();
+  }
 
   // ═══════════════════════════════════════════════════════════
   //  Unsaved-changes detection
@@ -90,7 +171,7 @@ jQuery(function ($) {
       $('#pbsg_steps_json').val() || '',
       $('#pbsg_intro_title').val() || '',
       $('#pbsg_intro_subtitle').val() || '',
-      $('#pbsg_intro_description').val() || '',
+      pbsgGetTinyMCEContent('pbsg_intro_description') || $('#pbsg_intro_description').val() || '',
     ];
     return parts.join('|||');
   }
@@ -146,6 +227,7 @@ jQuery(function ($) {
     o.h5p_id = o.h5p_id || 0;
     o.h5p_cleared = !!o.h5p_cleared;
     o.title = o.title || '';
+    o.instructions_html = o.instructions_html || '';
     // Branch / sub-tutorial defaults
        o.branch = (o.branch && typeof o.branch === 'object') ? o.branch : null;
 
@@ -680,10 +762,32 @@ function branchSummary(s) {
   // ═══════════════════════════════════════════════════════════
   function quizName(t) { return { multichoice: 'Multiple Selection', blanks: 'Fill in Blanks', singlechoice: 'Single Selection' }[t] || ''; }
 
-  function renderStepCards() {
-    const steps = getSteps().map(norm);
+  function renderStepCards(skipSync) {
     const $c = $('#pbsg-steps-container');
     if (!$c.length) return;
+
+    // Flush TinyMCE content into steps data before destroying editors
+    // skipSync: caller already synced and mutated the JSON — trust it as-is
+    if (!skipSync) {
+      $c.find('.pbsg-step-card').each(function () {
+        const oldIdx = parseInt($(this).data('idx'), 10);
+        if (!isNaN(oldIdx)) {
+          syncInstructions(oldIdx);
+          syncQuiz(oldIdx);
+        }
+      });
+    }
+
+    const steps = getSteps().map(norm);
+
+    // Destroy existing TinyMCE instances before wiping DOM
+    $c.find('.pbsg-step-card').each(function () {
+      const oldIdx = parseInt($(this).data('idx'), 10);
+      if (!isNaN(oldIdx)) {
+        pbsgRemoveTinyMCE('pbsg_instructions_' + oldIdx);
+        pbsgRemoveTinyMCE('pbsg_quiz_question_' + oldIdx);
+      }
+    });
 
     // Snapshot collapsed state before wiping DOM
     $c.find('.pbsg-step-card--collapsed').each(function () {
@@ -719,6 +823,14 @@ function branchSummary(s) {
           </div>
           <div class="pbsg-step-body" data-idx="${idx}">
             <div class="pbsg-panel pbsg-panel-quiz" data-idx="${idx}">
+              <div class="pbsg-field pbsg-instructions-wrap">
+                <label class="pbsg-field-label">
+                  <span class="pbsg-panel-icon">${icon('document')}</span> Instructions (left pane)
+                </label>
+                <div class="pbsg-tinymce-wrap">
+                  <textarea id="pbsg_instructions_${idx}" class="pbsg-instructions-editor" data-idx="${idx}">${esc(s.instructions_html || '')}</textarea>
+                </div>
+              </div>
               <div class="pbsg-panel-label">
                 <span class="pbsg-panel-icon">${icon('puzzle')}</span> Quiz Question
               </div>
@@ -763,13 +875,21 @@ function branchSummary(s) {
         handle: '.pbsg-drag-handle',
         animation: 200,
         ghostClass: 'sortable-ghost',
-        onEnd: function () { reorderFromDOM(); renderStepCards(); }
+        onEnd: function () { syncAllEditors(); reorderFromDOM(); renderStepCards(true); }
       });
     }
 
     setSteps(steps);
     steps.forEach(function (_s, idx) {
       if (_s.quiz && _s.quiz.type === 'blanks') updateBlanksCaseRiskUI(idx);
+    });
+
+    // Initialize TinyMCE editors for instructions + quiz questions (after DOM is ready)
+    steps.forEach(function (_s, idx) {
+      pbsgInitTinyMCE('pbsg_instructions_' + idx);
+      if (_s.quiz && _s.quiz.type !== 'blanks') {
+        pbsgInitTinyMCE('pbsg_quiz_question_' + idx);
+      }
     });
   }
 
@@ -872,9 +992,11 @@ function branchSummary(s) {
     });
 
     return `
-      <div class="pbsg-field">
+      <div class="pbsg-field pbsg-quiz-question-wrap">
         <label class="pbsg-field-label">Question</label>
-        <input type="text" class="pbsg-quiz-question" data-idx="${idx}" data-quiz-field="question" value="${esc(q)}" placeholder="Enter your question..." />
+        <div class="pbsg-tinymce-wrap">
+          <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
+        </div>
       </div>
       <div class="pbsg-field">
         <label class="pbsg-field-label">Answers <span class="pbsg-field-optional">&mdash; check the correct one(s)</span></label>
@@ -997,9 +1119,11 @@ function branchSummary(s) {
     });
 
     return `
-      <div class="pbsg-field">
+      <div class="pbsg-field pbsg-quiz-question-wrap">
         <label class="pbsg-field-label">Question</label>
-        <input type="text" class="pbsg-quiz-question" data-idx="${idx}" data-quiz-field="question" value="${esc(q)}" placeholder="Enter your question..." />
+        <div class="pbsg-tinymce-wrap">
+          <textarea id="pbsg_quiz_question_${idx}" class="pbsg-quiz-question-editor" data-idx="${idx}">${esc(q)}</textarea>
+        </div>
       </div>
       <div class="pbsg-field">
         <label class="pbsg-field-label">Correct Answer</label>
@@ -1163,19 +1287,27 @@ function branchSummary(s) {
   // ═══════════════════════════════════════════════════════════
   //  Multiple Choice Events
   // ═══════════════════════════════════════════════════════════
-  $(document).on('input', '.pbsg-quiz-question, .pbsg-answer-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
+  $(document).on('input', '.pbsg-answer-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
   $(document).on('change', '.pbsg-answer-check', function () {
     const idx = parseInt($(this).data('idx'), 10);
     syncQuiz(idx);
     renderStepCards(); // re-render to update correct/incorrect styling
   });
   $(document).on('click', '.pbsg-add-answer', function () {
-    const idx = parseInt($(this).data('idx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.answers = steps[idx].quiz.answers || []; steps[idx].quiz.answers.push({ text: '', correct: false }); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.answers = steps[idx].quiz.answers || []; steps[idx].quiz.answers.push({ text: '', correct: false }); setSteps(steps); renderStepCards(true); }
   });
   $(document).on('click', '.pbsg-answer-remove', function () {
-    const idx = parseInt($(this).data('idx'), 10), ai = parseInt($(this).data('aidx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.answers && steps[idx].quiz.answers.length > 2) { steps[idx].quiz.answers.splice(ai, 1); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10), ai = parseInt($(this).data('aidx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.answers && steps[idx].quiz.answers.length > 2) { steps[idx].quiz.answers.splice(ai, 1); setSteps(steps); renderStepCards(true); }
   });
 
   // ═══════════════════════════════════════════════════════════
@@ -1210,13 +1342,32 @@ function branchSummary(s) {
   // ═══════════════════════════════════════════════════════════
   $(document).on('input', '.pbsg-sc-correct-input, .pbsg-sc-wrong-input', function () { syncQuiz(parseInt($(this).data('idx'), 10)); });
   $(document).on('click', '.pbsg-add-sc-wrong', function () {
-    const idx = parseInt($(this).data('idx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.wrong_answers = steps[idx].quiz.wrong_answers || []; steps[idx].quiz.wrong_answers.push(''); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz) { steps[idx].quiz.wrong_answers = steps[idx].quiz.wrong_answers || []; steps[idx].quiz.wrong_answers.push(''); setSteps(steps); renderStepCards(true); }
   });
   $(document).on('click', '.pbsg-sc-wrong-remove', function () {
-    const idx = parseInt($(this).data('idx'), 10), wi = parseInt($(this).data('widx'), 10), steps = getSteps().map(norm);
-    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.wrong_answers && steps[idx].quiz.wrong_answers.length > 1) { steps[idx].quiz.wrong_answers.splice(wi, 1); setSteps(steps); renderStepCards(); }
+    const idx = parseInt($(this).data('idx'), 10), wi = parseInt($(this).data('widx'), 10);
+    if (isNaN(idx)) return;
+    syncInstructions(idx);
+    syncQuiz(idx);
+    const steps = getSteps().map(norm);
+    if (steps[idx] && steps[idx].quiz && steps[idx].quiz.wrong_answers && steps[idx].quiz.wrong_answers.length > 1) { steps[idx].quiz.wrong_answers.splice(wi, 1); setSteps(steps); renderStepCards(true); }
   });
+
+  // ═══════════════════════════════════════════════════════════
+  //  Sync Instructions from TinyMCE
+  // ═══════════════════════════════════════════════════════════
+  function syncInstructions(idx) {
+    if (isNaN(idx)) return;
+    const steps = getSteps().map(norm), step = steps[idx];
+    if (!step) return;
+    step.instructions_html = pbsgGetTinyMCEContent('pbsg_instructions_' + idx) || '';
+    steps[idx] = step; setSteps(steps);
+  }
 
   // ═══════════════════════════════════════════════════════════
   //  Sync Quiz Data from Form
@@ -1229,7 +1380,7 @@ function branchSummary(s) {
     if (!$card.length) return;
     switch (step.quiz.type) {
       case 'multichoice': {
-        step.quiz.question = $card.find('.pbsg-quiz-question').val() || '';
+        step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
         const a = []; $card.find('.pbsg-answers-list > div').each(function () { a.push({ text: $(this).find('.pbsg-answer-input').val() || '', correct: $(this).find('.pbsg-answer-check').is(':checked') }); });
         step.quiz.answers = a; break;
       }
@@ -1239,13 +1390,68 @@ function branchSummary(s) {
         step.quiz.accept_typos = $card.find('.pbsg-blanks-typos').is(':checked'); break;
       }
       case 'singlechoice': {
-        step.quiz.question = $card.find('.pbsg-quiz-question').val() || '';
+        step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
         step.quiz.correct_answer = $card.find('.pbsg-sc-correct-input').val() || '';
         const w = []; $card.find('.pbsg-sc-wrong-input').each(function () { w.push($(this).val() || ''); });
         step.quiz.wrong_answers = w; break;
       }
     }
     steps[idx] = step; setSteps(steps);
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  //  Atomic sync: flush ALL editors to JSON in a single pass
+  // ═══════════════════════════════════════════════════════════
+  function syncAllEditors() {
+    const steps = getSteps().map(norm);
+    steps.forEach(function (step, idx) {
+      const $card = $(`#pbsg-step-${idx}`);
+      if (!$card.length) return;
+
+      // Instructions (TinyMCE)
+      step.instructions_html = pbsgGetTinyMCEContent('pbsg_instructions_' + idx) || '';
+
+      // Quiz
+      if (step.quiz) {
+        switch (step.quiz.type) {
+          case 'multichoice': {
+            step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
+            const a = [];
+            $card.find('.pbsg-answers-list > div').each(function () {
+              a.push({
+                text: $(this).find('.pbsg-answer-input').val() || '',
+                correct: $(this).find('.pbsg-answer-check').is(':checked')
+              });
+            });
+            step.quiz.answers = a;
+            break;
+          }
+          case 'blanks': {
+            step.quiz.sentence = $card.find('.pbsg-blanks-sentence').val() || '';
+            step.quiz.case_sensitive = $card.find('.pbsg-blanks-case').is(':checked');
+            step.quiz.accept_typos = $card.find('.pbsg-blanks-typos').is(':checked');
+            break;
+          }
+          case 'singlechoice': {
+            step.quiz.question = pbsgGetTinyMCEContent('pbsg_quiz_question_' + idx) || '';
+            step.quiz.correct_answer = $card.find('.pbsg-sc-correct-input').val() || '';
+            const w = [];
+            $card.find('.pbsg-sc-wrong-input').each(function () { w.push($(this).val() || ''); });
+            step.quiz.wrong_answers = w;
+            break;
+          }
+        }
+      }
+
+      // Resource (inline — avoids syncResource's separate read-modify-write)
+      if (step.tutorial_type !== 'file') {
+        const url = $card.find('.pbsg-resource-url').val() || '';
+        step.tutorial_url = url;
+        step.tutorial_type = url ? 'url' : '';
+        step.url = url;
+      }
+    });
+    setSteps(steps);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -1842,7 +2048,7 @@ function syncBranchResourceMode(stepIdx, value) {
       q.answers.push({ text: '', correct: false });
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('click', '.pbsg-branch-mc-remove-answer', function () {
@@ -1859,7 +2065,7 @@ function syncBranchResourceMode(stepIdx, value) {
       }
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('input', '.pbsg-branch-blanks-sentence', function () {
@@ -1962,7 +2168,7 @@ function syncBranchResourceMode(stepIdx, value) {
       q.wrong_answers.push('');
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('click', '.pbsg-branch-sc-wrong-remove', function () {
@@ -1976,7 +2182,7 @@ function syncBranchResourceMode(stepIdx, value) {
       if (!q.wrong_answers.length) q.wrong_answers = [''];
     });
 
-    renderStepCards();
+    renderStepCards(true);
   });
 
   $(document).on('change', '.pbsg-branch-resource-type-toggle input[type="radio"]', function () {
@@ -2357,7 +2563,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       };
 
       setSteps(steps);
-      renderStepCards();
+      renderStepCards(true);
     }
   });
 
@@ -2443,7 +2649,7 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
       steps[idx]._editing_h5p = true;
       setSteps(steps);
       collapsedSteps.delete(idx);
-      renderStepCards();
+      renderStepCards(true);
     }).fail(function () {
       alert('Failed to fetch H5P content.');
       renderStepCards();
@@ -2658,33 +2864,103 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   // ═══════════════════════════════════════════════════════════
   // Issue 7d: Validate Fill in Blanks has at least one *blank* before save
   $(document).on('click', '#publish, #save-post', function (e) {
+    // Intro description is a plain textarea — no TinyMCE sync needed.
+    // Atomic sync: flush all TinyMCE editors + form fields in one pass
+    syncAllEditors();
+
+    // Re-read for validation
     const steps = getSteps().map(norm);
     let valid = true;
     const caseRiskStepNums = [];
 
-    steps.forEach((s, idx) => {
-      syncQuiz(idx);
-      syncResource(idx);
-      const step = getSteps().map(norm)[idx];
-      if (!step || !step.quiz) return;
+    // Clear previous save-time validation errors
+    $('.pbsg-save-error').remove();
+    $('.pbsg-field--error').removeClass('pbsg-field--error');
 
-      // Validate Fill in Blanks has at least one *blank*
-      if (step.quiz.type === 'blanks') {
-        const sentence = step.quiz.sentence || '';
+    function showError($field, msg) {
+      valid = false;
+      $field.addClass('pbsg-field--error');
+      $field.append('<div class="pbsg-save-error">' + msg + '</div>');
+    }
+
+    let $firstError = null;
+
+    steps.forEach((s, idx) => {
+      if (!s || !s.quiz) return;
+
+      const $card = $(`#pbsg-step-${idx}`);
+      $card.removeClass('pbsg-step-card--collapsed');
+      collapsedSteps.delete(idx);
+
+      const $questionWrap = $card.find('.pbsg-quiz-question-wrap');
+      const $answersField = $card.find('.pbsg-answers-list').closest('.pbsg-field');
+      const $scCorrectField = $card.find('.pbsg-sc-correct-row').closest('.pbsg-field');
+      const $scWrongField = $card.find('.pbsg-sc-wrong-list').closest('.pbsg-field');
+
+      // ── Multiple Selection validation ──
+      if (s.quiz.type === 'multichoice') {
+        const q = (s.quiz.question || '').replace(/<[^>]*>/g, '').trim();
+        const answers = Array.isArray(s.quiz.answers) ? s.quiz.answers : [];
+        const filled = answers.filter(a => (a.text || '').trim());
+        const hasCorrect = answers.some(a => a.correct);
+        const hasAnyContent = q || filled.length > 0;
+
+        // Completely empty quiz → skip validation, PHP will skip H5P creation
+        if (hasAnyContent) {
+          if (!q) {
+            showError($questionWrap, 'Question text is required.');
+          }
+          if (filled.length < 2) {
+            showError($answersField.length ? $answersField : $questionWrap, 'At least 2 answer options are needed.');
+          } else if (!hasCorrect) {
+            showError($answersField.length ? $answersField : $questionWrap, 'Check at least one answer as correct.');
+          }
+        }
+      }
+
+      // ── Single Selection validation ──
+      if (s.quiz.type === 'singlechoice') {
+        const q = (s.quiz.question || '').replace(/<[^>]*>/g, '').trim();
+        const correct = (s.quiz.correct_answer || '').trim();
+        const wrongs = Array.isArray(s.quiz.wrong_answers) ? s.quiz.wrong_answers : [];
+        const filledWrongs = wrongs.filter(w => (w || '').trim());
+        const hasAnyContent = q || correct || filledWrongs.length > 0;
+
+        if (hasAnyContent) {
+          if (!q) {
+            showError($questionWrap, 'Question text is required.');
+          }
+          if (!correct) {
+            showError($scCorrectField.length ? $scCorrectField : $questionWrap, 'A correct answer is required.');
+          }
+          if (filledWrongs.length < 1) {
+            showError($scWrongField.length ? $scWrongField : $questionWrap, 'At least 1 wrong answer is needed.');
+          }
+        }
+      }
+
+      // ── Fill in Blanks validation ──
+      if (s.quiz.type === 'blanks') {
+        const sentence = s.quiz.sentence || '';
         const blanks = (sentence.match(/\*[^*]+\*/g) || []).length;
         if (sentence.trim().length > 0 && blanks === 0) {
-          valid = false;
-          // Expand the step card so user can see the error
-          $(`#pbsg-step-${idx}`).removeClass('pbsg-step-card--collapsed');
-          collapsedSteps.delete(idx);
-          // Highlight the error
-          $(`#pbsg-step-${idx} .pbsg-blanks-sentence`).css('border-color', '#8C2004');
-          alert('Step ' + (idx + 1) + ': Fill in the Blanks requires at least one *blank* word wrapped in asterisks.');
-        } else if (step.quiz.case_sensitive && blanks > 0 && blanksCaseSensitiveRiskyAnswers(sentence)) {
+          const $blanksField = $card.find('.pbsg-blanks-sentence').closest('.pbsg-field');
+          showError($blanksField.length ? $blanksField : $questionWrap, 'Wrap at least one word in *asterisks* to create a blank.');
+        } else if (s.quiz.case_sensitive && blanks > 0 && blanksCaseSensitiveRiskyAnswers(sentence)) {
           caseRiskStepNums.push(idx + 1);
         }
       }
+
+      // Track the first error for scrolling
+      if (!valid && !$firstError) {
+        $firstError = $card.find('.pbsg-save-error').first();
+      }
     });
+
+    // Scroll to first error
+    if ($firstError && $firstError.length) {
+      $('html, body').animate({ scrollTop: $firstError.offset().top - 100 }, 300);
+    }
 
     if (!valid) {
       e.preventDefault();
@@ -2719,8 +2995,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-layout-body');
     var $chevron = $('#pbsg-layout-chevron');
     var isVisible = $body.is(':visible');
-    
-    $body.toggle();
+
+    $body.stop(true, true).slideToggle(200);
     $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
     $(this).attr('aria-expanded', !isVisible);
   });
@@ -2943,8 +3219,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-benchmark-body');
     var $chevron = $('#pbsg-benchmark-chevron');
     var isVisible = $body.is(':visible');
-    
-    $body.toggle();
+
+    $body.stop(true, true).slideToggle(200);
     $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
     $(this).attr('aria-expanded', !isVisible);
   });
@@ -2958,8 +3234,8 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
     var $body = $('#pbsg-close-url-body');
     var $chevron = $('#pbsg-close-url-chevron');
     var isVisible = $body.is(':visible');
-    
-    $body.toggle();
+
+    $body.stop(true, true).slideToggle(200);
     $chevron.html(icon(isVisible ? 'chevron-right' : 'chevron-down'));
     $(this).attr('aria-expanded', !isVisible);
   });
@@ -3123,6 +3399,9 @@ $(document).on('drop', '.pbsg-branch-q-upload-zone', function (e) {
   //  Init
   // ═══════════════════════════════════════════════════════════
   renderStepCards();
+
+  // Intro description stays as a plain textarea (no TinyMCE) —
+  // the structured intro card uses esc_html() and is already curated.
 
     // Pre-load H5P metadata for ownership rendering
     if (PBSG_ADMIN.h5pAvailable) {

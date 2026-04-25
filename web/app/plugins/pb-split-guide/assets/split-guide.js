@@ -8,8 +8,157 @@ const openLink = document.getElementById('pbsgOpenLink');
 const fallback = document.getElementById('pbsgTutorialFallback');
 const fallbackLink = document.getElementById('pbsgFallbackLink');
 
+// ── Dual-label nav updaters ──
+//
+// The nav template renders both a long label ("Page: 2 of 10",
+// "Correct/Attempted 3/5") and a short label ("2/10", "3/5") inside the
+// progress and running-score elements. CSS container queries decide which
+// variant is visible at any given width. Because both copies live in the
+// DOM simultaneously, the helpers below MUST use querySelectorAll + forEach
+// so the long and short variants stay in sync. Do not swap to querySelector
+// on a single span — one of the two copies will go stale.
+function pbsgSetProgress(current, total) {
+  document.querySelectorAll('#pbsgProgress .pbsg-progress-current').forEach(function (el) {
+    el.textContent = current;
+  });
+  document.querySelectorAll('#pbsgProgress .pbsg-progress-total').forEach(function (el) {
+    el.textContent = total;
+  });
+}
+
+function pbsgSetScore(correct, attempted) {
+  var value = correct + '/' + attempted;
+  document.querySelectorAll('#pbsgRunningScore .pbsg-score-value').forEach(function (el) {
+    el.textContent = value;
+  });
+}
+
 let tutorialPopup;
 let popupPollInterval = null;
+
+// ── Embed-failure watchdog ──────────────────────────────────────────
+//
+// Browsers do not fire a reliable `error` event for iframes that fail to
+// render due to X-Frame-Options, CSP frame-ancestors, or network refusals
+// like ERR_CONNECTION_REFUSED (the "libraryupei.ca refused to connect"
+// screen). Save-time HEAD checks (PBSG_Embed_Check) also miss cases where
+// servers answer HEAD with different headers than GET.
+//
+// Last-line defense: after we set `iframe.src` for a URL-type embed, we
+// start a short no-load timer. If the `load` event has not fired by the
+// time the timer expires, the iframe is almost certainly broken — we
+// discard it and promote to the popup-fallback card (Tier 3 UX), so the
+// student always sees an actionable "Open in a new window" button rather
+// than a dead/empty/error iframe.
+//
+// This is a heuristic, not a guarantee (some sites blank-load and still
+// fire `load`). Combined with the server-side deny-list and the existing
+// three-tier fallback, it brings residual failures to a cosmetic level.
+let tutorialLoadWatchdog = null;
+const TUTORIAL_LOAD_TIMEOUT_MS = 8000;
+
+function clearTutorialLoadWatchdog() {
+  if (tutorialLoadWatchdog) {
+    clearTimeout(tutorialLoadWatchdog);
+    tutorialLoadWatchdog = null;
+  }
+}
+
+// ── Just-in-time embed probe ─────────────────────────────────────────
+//
+// Before we set iframe.src for a URL-type tutorial step (main step OR
+// any branch-step resource — branch-level, per-question, and main-for-
+// branch all funnel through renderTutorial), we re-verify embeddability
+// against a server-side probe endpoint (pbsg_probe_embed). This closes
+// failure modes that purely client-side heuristics cannot detect:
+//
+//   • Save-time meta said embeddable=true but the upstream now serves
+//     X-Frame-Options: DENY / CSP frame-ancestors blocks.
+//   • HEAD lied: server returned ALLOW-FROM on HEAD but 404/500 on GET.
+//   • JS frame-busting: server page contains top.location = self.location
+//     logic. The sandbox attribute (set below, sans allow-top-navigation)
+//     blocks that, and the 8s watchdog catches any lingering blank frame.
+//
+// Same-origin and known video hosts (YouTube/Vimeo/TED/Dailymotion) are
+// trusted without a probe to avoid latency on fast paths.
+const KNOWN_EMBEDDABLE_HOSTS = new Set([
+  'www.youtube.com', 'youtube.com', 'youtu.be',
+  'www.youtube-nocookie.com', 'youtube-nocookie.com',
+  'player.vimeo.com', 'vimeo.com', 'www.vimeo.com',
+  'embed.ted.com', 'www.ted.com', 'ted.com',
+  'www.dailymotion.com', 'dailymotion.com',
+]);
+
+const embedProbeCache    = new Map(); // url -> { embeddable, is_document_url }
+const embedProbeInFlight = new Map(); // url -> Promise<verdict|null>
+
+function getUrlHost(urlStr) {
+  try { return new URL(urlStr, location.href).hostname.toLowerCase(); }
+  catch (_) { return ''; }
+}
+
+function isKnownEmbeddableHost(urlStr) {
+  const host = getUrlHost(urlStr);
+  return host !== '' && KNOWN_EMBEDDABLE_HOSTS.has(host);
+}
+
+// Returns Promise<{embeddable, is_document_url, source}|null>.
+// null means the probe could not be completed (no PBSG_PROBE config,
+// network error, malformed response) — callers should fall back to the
+// server-side verdict baked into the step object.
+function probeEmbeddability(url) {
+  if (!url || typeof url !== 'string') {
+    return Promise.resolve(null);
+  }
+
+  // Fast path: known-safe video embed hosts skip the server round-trip.
+  if (isKnownEmbeddableHost(url)) {
+    const v = { embeddable: true, is_document_url: false, source: 'known_host' };
+    embedProbeCache.set(url, v);
+    return Promise.resolve(v);
+  }
+
+  if (embedProbeCache.has(url)) {
+    return Promise.resolve(embedProbeCache.get(url));
+  }
+  if (embedProbeInFlight.has(url)) {
+    return embedProbeInFlight.get(url);
+  }
+
+  const cfg = (typeof window !== 'undefined') ? window.PBSG_PROBE : null;
+  if (!cfg || !cfg.ajaxUrl) {
+    return Promise.resolve(null);
+  }
+
+  const body = new URLSearchParams();
+  body.set('action', cfg.action || 'pbsg_probe_embed');
+  body.set('nonce',  cfg.nonce  || '');
+  body.set('url',    url);
+
+  const promise = (function () {
+    return fetch(cfg.ajaxUrl, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      body: body.toString(),
+    })
+      .then(function (resp) { return resp.ok ? resp.json() : null; })
+      .then(function (json) {
+        if (!json || json.success !== true || !json.data) return null;
+        const verdict = {
+          embeddable:      json.data.embeddable === true,
+          is_document_url: json.data.is_document_url === true,
+          source:          json.data.source || 'probe',
+        };
+        embedProbeCache.set(url, verdict);
+        return verdict;
+      })
+      .catch(function () { return null; });
+  })().finally(function () { embedProbeInFlight.delete(url); });
+
+  embedProbeInFlight.set(url, promise);
+  return promise;
+}
 
 // ── Popup window fallback system ──
 
@@ -201,6 +350,16 @@ const startTutorialBtn = document.getElementById('pbsgStartTutorial');
 // --------------------
 const menuBtn = document.getElementById('pbsgMenuBtn');
 const menuDd  = document.getElementById('pbsgMenuDropdown');
+
+const stepEyebrowEl = document.getElementById('pbsgStepEyebrow');
+const menuListEl    = document.getElementById('pbsgMenuList');
+const menuHeadCurrentEl = menuDd ? menuDd.querySelector('.pbsg-menu-head-current') : null;
+const menuHeadTotalEl   = menuDd ? menuDd.querySelector('.pbsg-menu-head-total')   : null;
+const menuHeadDoneEl    = menuDd ? menuDd.querySelector('.pbsg-menu-head-done-count') : null;
+
+// Tracks which step indices the user has visited in this session.
+// In-memory only — no persistence, no storage, no PII.
+const visitedSteps = new Set();
 
 
 const h5pFrameHost = h5pFrame ? h5pFrame.parentElement : null;
@@ -423,14 +582,52 @@ function getH5PStyleCSS() {
             color: #8C2004 !important;
           }
 
-          /* Button container — push buttons right */
+          /* H5P's Question.js truncates the retry button to an icon-only
+             2.235em square when it decides the button row is too wide
+             (see question.js:674 — it calls $button.html('').addClass('truncated')
+             which wipes the label from the DOM). Next to our wide "Show
+             solution" button, that truncated retry looks like a broken
+             square. Override the size clamp and re-inject the saved label
+             via ::after + aria-label (H5P stores the original text there
+             at question.js:671 before wiping). */
+          .h5p-joubelui-button.truncated {
+            width: auto !important;
+            height: auto !important;
+            border-radius: 6px !important;
+          }
+          .h5p-question-try-again.truncated::after {
+            content: attr(aria-label);
+            display: inline;
+            font: inherit;
+            margin-left: 0;
+            vertical-align: baseline;
+          }
+
+          /* Button container — push buttons right.
+             H5P toggles .h5p-question-visible, .has-scorebar, and .wrap on
+             this element, each of which ships its own width/display rules
+             (see H5P.Question-1.5/styles/question.css:186-206). Match all
+             variants so our right-alignment wins regardless of state. */
           .h5p-question .h5p-question-buttons,
+          .h5p-question-buttons.h5p-question-visible,
+          .h5p-question-buttons.has-scorebar,
+          .h5p-question-buttons.has-scorebar.wrap,
           .h5p-actions,
           .h5p-joubelui-button-container {
             display: flex !important;
+            flex-wrap: wrap !important;
             justify-content: flex-end !important;
+            align-items: center !important;
             gap: 10px !important;
             margin-top: 14px !important;
+            width: auto !important;
+            max-width: 100% !important;
+          }
+
+          /* When H5P inserts a scorebar sibling inside the buttons container,
+             push it to the left so buttons stay right-aligned */
+          .h5p-question-buttons .h5p-joubelui-score-bar {
+            margin-right: auto !important;
           }
 
           /* ── Feedback callouts ───────────────────────────── */
@@ -562,15 +759,33 @@ function bindMenu(){
 function updateMenuState(){
   if (!menuDd) return;
 
+  // Record current step as visited (current position is trivially visited).
+  if (Number.isFinite(i)) visitedSteps.add(i);
+
   const items = menuDd.querySelectorAll('.pbsg-menu-item');
-  items.forEach(el=>{
+  items.forEach(el => {
     const idx = parseInt(el.dataset.stepIndex, 10);
     const isCurrent = idx === i;
-    const isFuture = idx > i;
+    const isFuture  = idx > i;
+    const isVisited = visitedSteps.has(idx) && !isCurrent;
 
-    el.classList.toggle('is-current', isCurrent);
+    el.classList.toggle('is-current',  isCurrent);
+    el.classList.toggle('is-visited',  isVisited);
     el.classList.toggle('is-disabled', inBranch || isFuture);
   });
+
+  // Sticky header counters
+  if (menuHeadCurrentEl) menuHeadCurrentEl.textContent = String((i | 0) + 1);
+  if (menuHeadTotalEl)   menuHeadTotalEl.textContent   = String(steps.length);
+  if (menuHeadDoneEl)    menuHeadDoneEl.textContent    = String(visitedSteps.size);
+
+  // Overflow fade — toggle after layout settles
+  if (menuListEl) {
+    // rAF so we read scrollHeight after any new class-driven layout change.
+    requestAnimationFrame(() => {
+      menuListEl.classList.toggle('has-overflow', menuListEl.scrollHeight > menuListEl.clientHeight + 1);
+    });
+  }
 }
 
 // Expose a jump function that uses your existing render()
@@ -1090,6 +1305,7 @@ function attachH5PWatcher(stepIndex){
 }
 
 const titleEl = document.getElementById('pbsgStepTitle');
+const instructionsEl = document.getElementById('pbsgInstructionsBody');
 const progressEl = document.getElementById('pbsgProgress');
 const runningScoreEl = document.getElementById('pbsgRunningScore');
 const progressFillEl = document.getElementById('pbsgProgressFill');
@@ -1106,7 +1322,6 @@ const certModalCancel = document.getElementById('pbsgCertModalCancel');
 const certModalClose = document.getElementById('pbsgCertModalClose');
 const certModalError = document.getElementById('pbsgCertModalError');
 const certHint = document.getElementById('pbsgCertHint');
-const finalGradeEl = document.getElementById('pbsgFinalGrade');
 const retakeBtn = document.getElementById('pbsgRetakeTutorial');
 
 function lockCert(locked, msg){
@@ -1149,18 +1364,25 @@ function getFinalGradePercent(){
   return ((passed / total) * 100).toFixed(2);
 }
 
+function formatDurationMs(ms) {
+  if (!ms || ms < 0) ms = 0;
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}m ${s.toString().padStart(2, '0')}s`;
+}
+
 function updateRunningScore() {
   if (!runningScoreEl) return;
 
   const correct = passedQuizStepsCount();
   const attempted = attemptedQuizStepsCount();
 
-  // Use innerHTML so the Marginalia check icon renders as inline SVG.
-  // Numeric values are safe (produced by Number coercion above).
-  const checkIcon = (typeof PBSG_ICONS !== 'undefined')
-    ? PBSG_ICONS.render('check', 'pbsg-icon--ok')
-    : '';
-  runningScoreEl.innerHTML = `Correct/Attempted ${correct}/${attempted} ${checkIcon}`;
+  // The template pre-renders the "Correct/Attempted" label and the check
+  // icon inside both long and short score spans, so we only need to update
+  // the numeric value spans. pbsgSetScore keeps the long/short variants in
+  // sync.
+  pbsgSetScore(correct, attempted);
 }
 
 function resetTutorialToStart(){
@@ -1247,6 +1469,8 @@ let attemptCounts = {};
 steps.forEach((_, idx) => {
   attemptCounts[idx] = 0;
 });
+
+const pbsgTutorialStartedAt = Date.now();
 
 async function markCompletedOnce() {
   if (!window.PBSG_CERT?.isLoggedIn) return false;
@@ -1459,6 +1683,8 @@ function renderTutorial(step, options = {}){
 
   currentTutorialSignature = nextSignature;
 
+  // Any pending watchdog from the previous step is no longer meaningful.
+  clearTutorialLoadWatchdog();
   closeTutorialPopup();
 
   tutorialStage.innerHTML = `
@@ -1535,19 +1761,92 @@ function renderTutorial(step, options = {}){
   if (t.url) {
     openLink.href = t.url;
 
-    if (t.embeddable !== false) {
-      // Tier 1: iframe (embeddable or unknown)
-      freshFrame.src = toEmbeddableUrl(t.url);
-      fallback.style.display = 'none';
-    } else if (t.viewer_url) {
-      // Tier 2: Google Docs Viewer (non-embeddable document URL)
-      freshFrame.src = t.viewer_url;
-      fallback.style.display = 'none';
-    } else {
-      // Tier 3: popup fallback (non-embeddable, non-document URL)
-      closeTutorialPopup();
-      renderPopupFallbackCard(tutorialStage, t.url);
+    const originalUrl = t.url;
+    const signatureAtArm = currentTutorialSignature;
+
+    // Server already said non-embeddable at save/view time — honour that
+    // immediately without a probe. Use viewer tier for document URLs,
+    // popup card for everything else.
+    if (t.embeddable === false) {
+      if (t.viewer_url) {
+        // Tier 2: Google Docs Viewer (non-embeddable document URL).
+        freshFrame.src = t.viewer_url;
+        fallback.style.display = 'none';
+      } else {
+        // Tier 3: popup fallback (non-embeddable, non-document URL).
+        closeTutorialPopup();
+        renderPopupFallbackCard(tutorialStage, originalUrl);
+      }
+      return;
     }
+
+    // Server said embeddable=true OR meta was missing. Run the JIT probe
+    // before committing iframe.src: save-time HEAD checks can be stale
+    // (server changed its CSP) or wrong (HEAD vs GET header divergence).
+    //
+    // While the probe is in flight, the iframe stays blank and the pane
+    // shows no content. The probe hits a 1h-cached transient so the
+    // wait is typically sub-100ms after the first student view.
+
+    // Sandbox defeats JS frame-busting (top.location = self.location) by
+    // withholding allow-top-navigation. We keep allow-scripts/-forms/
+    // -popups/-popups-to-escape-sandbox/-same-origin for compatibility
+    // with common library-vendor pages. Skipped on known video embed
+    // hosts whose players expect a non-sandboxed context.
+    if (!isKnownEmbeddableHost(originalUrl)) {
+      freshFrame.setAttribute(
+        'sandbox',
+        'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-same-origin'
+      );
+    }
+
+    fallback.style.display = 'none';
+
+    probeEmbeddability(originalUrl).then(function (verdict) {
+      // Stale signature — user navigated away during the probe. Abort so
+      // we don't hijack the pane with yesterday's verdict.
+      if (currentTutorialSignature !== signatureAtArm) return;
+
+      // The stage may have been re-rendered (next step). Re-fetch nodes.
+      const stage = document.getElementById('pbsgTutorialStage');
+      const frame = document.getElementById('pbsgTutorialFrame');
+      if (!stage || !frame) return;
+
+      // Probe says no → render popup card, skip iframe entirely.
+      // (Probe failure returns null and falls through to the optimistic
+      // iframe path — the 8s watchdog is the last line of defense.)
+      if (verdict && verdict.embeddable === false) {
+        try { frame.src = 'about:blank'; } catch (_) {}
+        closeTutorialPopup();
+        renderPopupFallbackCard(stage, originalUrl);
+        return;
+      }
+
+      // Arm the iframe. Watchdog catches the rare case where probe said
+      // yes but the frame is actually broken (same-origin 4xx body that
+      // fires `load`, or a JS frame-buster that blanks the iframe).
+      const targetUrl = toEmbeddableUrl(originalUrl);
+      let loaded = false;
+      frame.addEventListener('load', function onFirstLoad() {
+        loaded = true;
+        clearTutorialLoadWatchdog();
+      }, { once: true });
+
+      frame.src = targetUrl;
+
+      tutorialLoadWatchdog = setTimeout(function () {
+        tutorialLoadWatchdog = null;
+        if (loaded) return;
+        if (currentTutorialSignature !== signatureAtArm) return;
+
+        const stage2 = document.getElementById('pbsgTutorialStage');
+        if (!stage2) return;
+
+        try { frame.src = 'about:blank'; } catch (e) {}
+        closeTutorialPopup();
+        renderPopupFallbackCard(stage2, originalUrl);
+      }, TUTORIAL_LOAD_TIMEOUT_MS);
+    });
   } else {
     freshFrame.src = '';
     fallback.style.display = 'none';
@@ -1589,9 +1888,24 @@ function render(){
   renderTutorial(step);
 
   //titleEl.textContent = step.title || `Step ${i+1}`;
-  
-  if (titleEl) titleEl.textContent = '';
-  if (progressEl) progressEl.textContent = `Page: ${i+1} of ${steps.length}`;
+
+  if (titleEl) titleEl.textContent = step.title || `Step ${i+1}`;
+  if (stepEyebrowEl) stepEyebrowEl.textContent = `Step ${i+1} of ${steps.length}`;
+
+  // Render per-step instructions (rich text from WYSIWYG editor)
+  if (instructionsEl) {
+    const html = step.instructions_html || '';
+    if (html.trim()) {
+      instructionsEl.innerHTML = html;
+      instructionsEl.style.display = '';
+    } else {
+      instructionsEl.innerHTML = '';
+      instructionsEl.style.display = 'none';
+    }
+  }
+
+  updateMenuState();
+  if (progressEl) pbsgSetProgress(i + 1, steps.length);
   updateRunningScore();
 
   
@@ -1885,7 +2199,10 @@ function buildBranchTutorialStep(branch) {
       type: branch.tutorial_type || '',
       url: branch.tutorial_url || '',
       file_url: branch.tutorial_file_url || '',
-      mime: branch.tutorial_mime || ''
+      mime: branch.tutorial_mime || '',
+      embeddable: branch.tutorial_embeddable !== false,
+      is_document_url: branch.tutorial_is_document_url === true,
+      viewer_url: branch.tutorial_viewer_url || ''
     }
   };
 }
@@ -1896,7 +2213,10 @@ function getTutorialSignature(step) {
     type: t.type || '',
     url: t.url || '',
     file_url: t.file_url || '',
-    mime: t.mime || ''
+    mime: t.mime || '',
+    embeddable: t.embeddable !== false,
+    is_document_url: t.is_document_url === true,
+    viewer_url: t.viewer_url || ''
   });
 }
 
@@ -1906,7 +2226,10 @@ function buildMainTutorialStepForBranch(parentStep) {
       type: parentStep?.tutorial?.type || '',
       url: parentStep?.tutorial?.url || '',
       file_url: parentStep?.tutorial?.file_url || '',
-      mime: parentStep?.tutorial?.mime || ''
+      mime: parentStep?.tutorial?.mime || '',
+      embeddable: parentStep?.tutorial?.embeddable !== false,
+      is_document_url: parentStep?.tutorial?.is_document_url === true,
+      viewer_url: parentStep?.tutorial?.viewer_url || ''
     }
   };
 }
@@ -1917,7 +2240,10 @@ function buildBranchQuestionTutorialStep(q) {
       type: q?.tutorial_type || '',
       url: q?.tutorial_url || '',
       file_url: q?.tutorial_file_url || '',
-      mime: q?.tutorial_mime || ''
+      mime: q?.tutorial_mime || '',
+      embeddable: q?.tutorial_embeddable !== false,
+      is_document_url: q?.tutorial_is_document_url === true,
+      viewer_url: q?.tutorial_viewer_url || ''
     }
   };
 }
@@ -1962,10 +2288,8 @@ function renderBranchStep() {
   renderTutorial(effectiveTutorialStep);
 
   
-  const branchTotal = Array.isArray(branch.questions) ? branch.questions.length : 0;
   const letter = String.fromCharCode(65 + branchStepIndex); // A, B, C...
   const mainNumber = branchParentIndex + 1;
-  const branchCurrent = branchStepIndex + 1;
 
   // Total tutorial pages — used as the denominator so the student sees their
   // overall position in the tutorial (e.g. "Page: 2A of 10") rather than just
@@ -1973,7 +2297,7 @@ function renderBranchStep() {
   const totalPages = Array.isArray(steps) ? steps.length : 0;
   const pageText = `Page: ${mainNumber}${letter} of ${totalPages}`;
 
-  if (progressEl) progressEl.textContent = pageText;
+  if (progressEl) pbsgSetProgress(`${mainNumber}${letter}`, totalPages);
   updateRunningScore();
   if (progressLabelEl) progressLabelEl.textContent = pageText;
 
@@ -2134,11 +2458,21 @@ retakeBtn.onclick = () => {
 const focusTutBtn = document.getElementById('pbsgFocusTutorial');
 const focusQuizBtn = document.getElementById('pbsgFocusQuiz');
 
+function setFocusBtnLabel(btn, text){
+  if (!btn) return;
+  const label = btn.querySelector('.pbsg-focus-label');
+  if (label) {
+    label.textContent = text;
+  } else {
+    btn.textContent = text;
+  }
+}
+
 function clearFocus(){
   document.body.classList.remove('pbsg-focus-tutorial','pbsg-focus-quiz');
-  focusTutBtn.textContent='Focus Tutorial';
-  focusQuizBtn.textContent='Focus Quiz';
-  
+  setFocusBtnLabel(focusTutBtn, 'Focus Tutorial');
+  setFocusBtnLabel(focusQuizBtn, 'Focus Quiz');
+
   // Remove the inert attribute from both panes when exiting focus mode
   const leftPane = document.querySelector('.pbsg-left');
   const rightPane = document.querySelector('.pbsg-right');
@@ -2148,21 +2482,21 @@ function clearFocus(){
 
 function toggleFocus(mode){
   const cls = mode==='tutorial'?'pbsg-focus-tutorial':'pbsg-focus-quiz';
-  if(document.body.classList.contains(cls)){ 
-    clearFocus(); 
+  if(document.body.classList.contains(cls)){
+    clearFocus();
   } else {
     clearFocus();
     document.body.classList.add(cls);
-    
+
     const leftPane = document.querySelector('.pbsg-left');
     const rightPane = document.querySelector('.pbsg-right');
-    
+
     if(mode==='tutorial') {
-      focusTutBtn.textContent='Exit Focus';
+      setFocusBtnLabel(focusTutBtn, 'Exit Focus');
       // Tutorial is active (right pane), make quiz pane (left pane) inert
       if (leftPane) leftPane.setAttribute('inert', '');
     } else {
-      focusQuizBtn.textContent='Exit Focus';
+      setFocusBtnLabel(focusQuizBtn, 'Exit Focus');
       // Quiz is active (left pane), make tutorial pane (right pane) inert
       if (rightPane) rightPane.setAttribute('inert', '');
     }
@@ -2235,30 +2569,88 @@ function notifyParentBranchCompleted() {
 }
 
 function showSummaryScreen(){
-
   const mainContent = document.getElementById('pbsgMainContent');
   const summaryScreen = document.getElementById('pbsgSummaryScreen');
-  const attemptBox = document.getElementById('pbsgAttemptSummary');
 
-  if(mainContent) mainContent.style.display = 'none';
-  if(summaryScreen) summaryScreen.style.display = '';
+  if (mainContent) mainContent.style.display = 'none';
+  if (summaryScreen) summaryScreen.style.display = '';
 
-  if(attemptBox){
-    let html = '<ul>';
-
-    steps.forEach((step, idx)=>{
-      const tries = attemptCounts[idx] || 0;
-      const label = step.title || `Question ${idx+1}`;
-      html += `<li><strong>${label}</strong>: tried ${tries} time${tries===1?'':'s'}</li>`;
-    });
-
-    html += '</ul>';
-    attemptBox.innerHTML = html;
+  // Duration
+  const durationEl = document.getElementById('pbsgSummaryDuration');
+  if (durationEl) {
+    durationEl.textContent = formatDurationMs(Date.now() - pbsgTutorialStartedAt);
   }
 
-  if (finalGradeEl) {
-    const grade = getFinalGradePercent();
-    finalGradeEl.innerHTML = `<p><strong>Final Score:</strong> ${grade}%</p>`;
+  const totalQ = requiredQuizStepsCount();
+  const correctQ = passedQuizStepsCount();
+
+  const wrap = document.getElementById('pbsgObjectivesWrap');
+  const list = document.getElementById('pbsgSummaryQuestions');
+  const correctHead = document.getElementById('pbsgSummaryCorrect');
+  const totalHead = document.getElementById('pbsgSummaryTotal');
+  const correctMeta = document.getElementById('pbsgSummaryCorrect2');
+  const totalMeta = document.getElementById('pbsgSummaryTotal2');
+  const correctItem = document.getElementById('pbsgSummaryCorrectItem');
+  const scoreItem = document.getElementById('pbsgSummaryScoreItem');
+  const scoreEl = document.getElementById('pbsgSummaryScore');
+  const metaSeps = document.querySelectorAll('.pbsg-summary-meta [data-pbsg-meta-sep]');
+
+  if (totalQ > 0) {
+    // Build objectives list
+    if (list) {
+      list.innerHTML = '';
+      let qIdx = 0;
+      steps.forEach((step, idx) => {
+        if (!step.h5p_id) return;
+        qIdx += 1;
+        const tries = attemptCounts[idx] || 0;
+        const passed = passedSteps.has(idx);
+        const li = document.createElement('li');
+        if (!passed) li.classList.add('is-wrong');
+
+        const labelSpan = document.createElement('span');
+        labelSpan.className = 'pbsg-obj-label';
+        const strong = document.createElement('strong');
+        strong.textContent = `Question ${qIdx}`;
+        labelSpan.appendChild(strong);
+
+        const metaSpan = document.createElement('span');
+        metaSpan.className = 'pbsg-obj-meta';
+        metaSpan.textContent = `${tries} attempt${tries === 1 ? '' : 's'}`;
+
+        li.appendChild(labelSpan);
+        li.appendChild(metaSpan);
+        list.appendChild(li);
+      });
+    }
+
+    if (correctHead) correctHead.textContent = String(correctQ);
+    if (totalHead) totalHead.textContent = String(totalQ);
+    if (correctMeta) correctMeta.textContent = String(correctQ);
+    if (totalMeta) totalMeta.textContent = String(totalQ);
+    if (scoreEl) scoreEl.textContent = `${getFinalGradePercent()}%`;
+
+    if (wrap) wrap.hidden = false;
+    if (correctItem) correctItem.hidden = false;
+    if (scoreItem) scoreItem.hidden = false;
+    metaSeps.forEach(sep => { sep.hidden = false; });
+
+    // Overflow indicator — measure after layout settles
+    if (wrap && list) {
+      requestAnimationFrame(() => {
+        if (list.scrollHeight > list.clientHeight + 1) {
+          wrap.classList.add('has-overflow');
+        } else {
+          wrap.classList.remove('has-overflow');
+        }
+      });
+    }
+  } else {
+    // No quizzes — keep objectives + correct/score hidden, leave duration visible
+    if (wrap) wrap.hidden = true;
+    if (correctItem) correctItem.hidden = true;
+    if (scoreItem) scoreItem.hidden = true;
+    metaSeps.forEach(sep => { sep.hidden = true; });
   }
 }
 

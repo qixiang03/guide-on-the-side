@@ -16,28 +16,42 @@ if ( get_post_status() === 'private' && !current_user_can('read_private_pages') 
     );
 }
 
-// Enqueue assets directly in template — ensures they load on Multisite subsites
+// Defense in depth: these enqueues are also performed by
+// PB_Split_Guide_Plugin::enqueue_assets() on the `wp_enqueue_scripts` hook.
+// WordPress deduplicates by handle, so running both paths is safe. If either
+// path fails (theme override of template_include, subsite without the plugin,
+// filter ordering), the other ensures the left-panel JS/CSS still ships.
+$__pbsg_plugin_url = plugin_dir_url( dirname( __FILE__ ) );
+$__pbsg_plugin_dir = plugin_dir_path( dirname( __FILE__ ) );
+$__pbsg_ver = static function ( string $rel ) use ( $__pbsg_plugin_dir ): string {
+    $mtime = @filemtime( $__pbsg_plugin_dir . $rel );
+    if ( $mtime !== false && $mtime > 0 ) {
+        return (string) $mtime;
+    }
+    return defined( 'PB_Split_Guide_Plugin::VERSION' ) ? PB_Split_Guide_Plugin::VERSION : '0.5.1';
+};
+
 wp_enqueue_style(
     'pbsg_split_guide_css',
-    plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.css',
+    $__pbsg_plugin_url . 'assets/split-guide.css',
     array(),
-    '0.5.0.1'
+    $__pbsg_ver( 'assets/split-guide.css' )
 );
 
 // Icon set — must load before split-guide.js so PBSG_ICONS.render() is available.
 wp_enqueue_script(
   'pbsg_icons_js',
-  plugin_dir_url( dirname( __FILE__ ) ) . 'assets/pbsg-icons.js',
+  $__pbsg_plugin_url . 'assets/pbsg-icons.js',
   array(),
-  filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/pbsg-icons.js' ),
+  $__pbsg_ver( 'assets/pbsg-icons.js' ),
   true
 );
 
 wp_enqueue_script(
   'pbsg-split-guide',
-  plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide.js',
+  $__pbsg_plugin_url . 'assets/split-guide.js',
   array( 'pbsg_icons_js' ),
-  filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide.js' ),
+  $__pbsg_ver( 'assets/split-guide.js' ),
   true
 );
 
@@ -45,9 +59,9 @@ wp_enqueue_script(
 if ( get_post_status() === 'publish' ) {
     wp_enqueue_script(
         'pbsg-tracker',
-        plugin_dir_url( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js',
+        $__pbsg_plugin_url . 'assets/split-guide-tracker.js',
         array(),
-        filemtime( plugin_dir_path( dirname( __FILE__ ) ) . 'assets/split-guide-tracker.js' ),
+        $__pbsg_ver( 'assets/split-guide-tracker.js' ),
         true
     );
 }
@@ -115,13 +129,23 @@ foreach ($steps as $s) {
     $tutorial_url = $s['url'];
   }
 
+  // View-time resolution: if save-time flags are absent (old tutorial,
+  // edited before the embed-check feature shipped), run the cached check
+  // so deny-listed hosts (libraryupei.ca etc.) get the popup fallback
+  // without requiring a re-save.
+  $__main_saved_embeddable = array_key_exists('embeddable', $s) ? (bool) $s['embeddable'] : null;
+  $__main_saved_is_doc     = array_key_exists('is_document_url', $s) ? (bool) $s['is_document_url'] : null;
+  $__main_resolved = ($tutorial_type === 'url' && !empty($tutorial_url))
+    ? PBSG_Embed_Check::resolve_flags($tutorial_url, $__main_saved_embeddable, $__main_saved_is_doc)
+    : ['embeddable' => $__main_saved_embeddable ?? true, 'is_document_url' => $__main_saved_is_doc ?? false];
+
   $tutorial = [
     'type' => $tutorial_type,
     'url'  => $tutorial_url,
     'file_url' => '',
     'mime' => '',
-    'embeddable' => isset($s['embeddable']) ? (bool) $s['embeddable'] : true,
-    'is_document_url' => isset($s['is_document_url']) ? (bool) $s['is_document_url'] : false,
+    'embeddable' => $__main_resolved['embeddable'],
+    'is_document_url' => $__main_resolved['is_document_url'],
     'viewer_url' => '',
   ];
 
@@ -133,10 +157,13 @@ foreach ($steps as $s) {
 
   // For non-embeddable document URLs, generate Google Viewer URL
   if ($tutorial_type === 'url' && !empty($tutorial['url']) && !$tutorial['embeddable'] && $tutorial['is_document_url']) {
-    $tutorial['viewer_url'] = 'https://docs.google.com/gview?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
+    $tutorial['viewer_url'] = 'https://docs.google.com/viewer?url=' . rawurlencode($tutorial['url']) . '&embedded=true';
   }
 
   $s['tutorial'] = $tutorial;
+
+  // Sanitize rich-text instructions for safe frontend rendering
+  $s['instructions_html'] = wp_kses_post($s['instructions_html'] ?? '');
 
   $branch = null;
 
@@ -156,10 +183,27 @@ if (!empty($s['branch']) && is_array($s['branch'])) {
       $q_tutorial_file_name = !empty($q['tutorial_file_name']) ? $q['tutorial_file_name'] : '';
       $q_tutorial_file_url = !empty($q['tutorial_file_url']) ? $q['tutorial_file_url'] : '';
       $q_tutorial_mime = '';
+      $q_tutorial_viewer_url = '';
+      // View-time resolution on branch questions (see main-step comment above):
+      // saved meta from old tutorials lacks the embed flags, so the default
+      // was `true` → Tier 1 iframe even for deny-listed hosts. Re-resolve here.
+      $__q_saved_embed = array_key_exists('tutorial_embeddable', $q) ? (bool) $q['tutorial_embeddable'] : null;
+      $__q_saved_doc   = array_key_exists('tutorial_is_document_url', $q) ? (bool) $q['tutorial_is_document_url'] : null;
+      $__q_resolved    = ($q_tutorial_type === 'url' && !empty($q_tutorial_url))
+        ? PBSG_Embed_Check::resolve_flags($q_tutorial_url, $__q_saved_embed, $__q_saved_doc)
+        : ['embeddable' => $__q_saved_embed ?? true, 'is_document_url' => $__q_saved_doc ?? false];
+      $q_tutorial_embeddable      = $__q_resolved['embeddable'];
+      $q_tutorial_is_document_url = $__q_resolved['is_document_url'];
 
       if ($q_tutorial_type === 'file' && $q_tutorial_attachment_id > 0) {
         $q_tutorial_file_url = wp_get_attachment_url($q_tutorial_attachment_id);
         $q_tutorial_mime = get_post_mime_type($q_tutorial_attachment_id);
+        $q_tutorial_viewer_url = PBSG_Embed_Check::viewer_url($q_tutorial_file_url ?: '', $q_tutorial_mime ?: '');
+      }
+
+      // For non-embeddable document URLs on branch questions, resolve Google Viewer fallback.
+      if ($q_tutorial_type === 'url' && !empty($q_tutorial_url) && !$q_tutorial_embeddable && $q_tutorial_is_document_url) {
+        $q_tutorial_viewer_url = 'https://docs.google.com/viewerng/viewer?url=' . rawurlencode($q_tutorial_url) . '&embedded=true';
       }
 
       $q['tutorial_type'] = $q_tutorial_type;
@@ -168,27 +212,53 @@ if (!empty($s['branch']) && is_array($s['branch'])) {
       $q['tutorial_file_name'] = $q_tutorial_file_name;
       $q['tutorial_file_url'] = $q_tutorial_file_url;
       $q['tutorial_mime'] = $q_tutorial_mime;
+      $q['tutorial_embeddable']      = $q_tutorial_embeddable;
+      $q['tutorial_is_document_url'] = $q_tutorial_is_document_url;
+      $q['tutorial_viewer_url']      = $q_tutorial_viewer_url;
 
       $branch_questions[] = $q;
     }
   }
+
+  // View-time resolution on branch-level tutorial (see main-step comment above).
+  $__b_type       = !empty($raw_branch['tutorial_type']) ? $raw_branch['tutorial_type'] : '';
+  $__b_url        = !empty($raw_branch['tutorial_url'])  ? $raw_branch['tutorial_url']  : '';
+  $__b_saved_embed = array_key_exists('tutorial_embeddable', $raw_branch) ? (bool) $raw_branch['tutorial_embeddable'] : null;
+  $__b_saved_doc   = array_key_exists('tutorial_is_document_url', $raw_branch) ? (bool) $raw_branch['tutorial_is_document_url'] : null;
+  $__b_resolved    = ($__b_type === 'url' && !empty($__b_url))
+    ? PBSG_Embed_Check::resolve_flags($__b_url, $__b_saved_embed, $__b_saved_doc)
+    : ['embeddable' => $__b_saved_embed ?? true, 'is_document_url' => $__b_saved_doc ?? false];
 
   $branch = [
     'mode' => !empty($raw_branch['mode']) ? $raw_branch['mode'] : 'optional',
     'resource_mode' => !empty($raw_branch['resource_mode']) ? $raw_branch['resource_mode'] : 'main',
     'trigger_attempts' => 1,
     'questions' => $branch_questions,
-    'tutorial_type' => !empty($raw_branch['tutorial_type']) ? $raw_branch['tutorial_type'] : '',
-    'tutorial_url' => !empty($raw_branch['tutorial_url']) ? $raw_branch['tutorial_url'] : '',
+    'tutorial_type' => $__b_type,
+    'tutorial_url' => $__b_url,
     'tutorial_attachment_id' => !empty($raw_branch['tutorial_attachment_id']) ? absint($raw_branch['tutorial_attachment_id']) : 0,
     'tutorial_file_name' => !empty($raw_branch['tutorial_file_name']) ? $raw_branch['tutorial_file_name'] : '',
     'tutorial_file_url' => !empty($raw_branch['tutorial_file_url']) ? $raw_branch['tutorial_file_url'] : '',
     'tutorial_mime' => '',
+    'tutorial_embeddable'      => $__b_resolved['embeddable'],
+    'tutorial_is_document_url' => $__b_resolved['is_document_url'],
+    'tutorial_viewer_url'      => '',
   ];
 
   if ($branch['tutorial_type'] === 'file' && $branch['tutorial_attachment_id'] > 0) {
     $branch['tutorial_file_url'] = wp_get_attachment_url($branch['tutorial_attachment_id']);
     $branch['tutorial_mime'] = get_post_mime_type($branch['tutorial_attachment_id']);
+    $branch['tutorial_viewer_url'] = PBSG_Embed_Check::viewer_url($branch['tutorial_file_url'] ?: '', $branch['tutorial_mime'] ?: '');
+  }
+
+  // For non-embeddable document URLs on the branch-level tutorial, resolve Google Viewer fallback.
+  if (
+    $branch['tutorial_type'] === 'url' &&
+    !empty($branch['tutorial_url']) &&
+    !$branch['tutorial_embeddable'] &&
+    $branch['tutorial_is_document_url']
+  ) {
+    $branch['tutorial_viewer_url'] = 'https://docs.google.com/viewerng/viewer?url=' . rawurlencode($branch['tutorial_url']) . '&embedded=true';
   }
 
   if (
@@ -294,6 +364,34 @@ $s['branch'] = $branch;
     </div>
   <?php endif; ?>
 
+<noscript>
+  <div class="pbsg-noscript-fallback" style="padding:1rem;border:1px solid #8C2004;background:#fff;margin:1rem;">
+    <h2 style="margin-top:0"><?php esc_html_e('JavaScript is required for the interactive tutorial', 'pb-split-guide'); ?></h2>
+    <p><?php esc_html_e('Enable JavaScript in your browser to use the full tutorial. While JavaScript is off, you can still open each tutorial resource directly:', 'pb-split-guide'); ?></p>
+    <ol>
+      <?php foreach ($steps_enriched as $__idx => $__step): ?>
+        <?php
+          $__num   = $__idx + 1;
+          $__label = !empty($__step['title']) ? $__step['title'] : sprintf(__('Step %d', 'pb-split-guide'), $__num);
+          $__t     = isset($__step['tutorial']) && is_array($__step['tutorial']) ? $__step['tutorial'] : [];
+          $__href  = '';
+          if (!empty($__t['url'])) {
+            $__href = $__t['url'];
+          } elseif (!empty($__t['file_url'])) {
+            $__href = $__t['file_url'];
+          }
+        ?>
+        <li>
+          <strong><?php echo esc_html($__label); ?></strong>
+          <?php if ($__href): ?>
+            — <a href="<?php echo esc_url($__href); ?>" target="_blank" rel="noopener"><?php esc_html_e('Open resource in new tab', 'pb-split-guide'); ?></a>
+          <?php endif; ?>
+        </li>
+      <?php endforeach; ?>
+    </ol>
+  </div>
+</noscript>
+
 <div
   class="pbsg-main-content"
   id="pbsgMainContent"
@@ -306,44 +404,67 @@ $s['branch'] = $branch;
     <div class="pbsg-left-inner">
 
       <div class="pbsg-quiz-header">
-  <div class="pbsg-quiz-header-left">
-    <!-- Menu button -->
-    <div class="pbsg-menu-wrap">
-      <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
-        <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
-        <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
-        <span class="pbsg-menu-text">Menu</span>
-      </button>
 
-      <!-- Dropdown -->
-      <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
-        <div class="pbsg-menu-list">
-          <?php foreach ($steps_enriched as $idx => $step): ?>
-            
-              <button
-                type="button"
-                class="pbsg-menu-item"
-                data-step-index="<?php echo esc_attr($idx); ?>"
-                role="menuitem"
-              >
-                <?php
-                  $num = $idx + 1;
-                  $label = !empty($step['title']) ? $step['title'] : "Page $num";
-                  echo esc_html($num . '. ' . $label);
-                ?>
-              </button>
-            
-          <?php endforeach; ?>
-        </div>
+  <!-- Menu button + dropdown -->
+  <div class="pbsg-menu-wrap">
+    <button type="button" class="pbsg-menu-btn" id="pbsgMenuBtn" aria-haspopup="true" aria-expanded="false">
+      <span class="pbsg-menu-icon"><?php echo pbsg_icon('menu'); ?></span>
+      <span class="pbsg-menu-arrow"><?php echo pbsg_icon('chevron-down'); ?></span>
+      <span class="pbsg-menu-label">Menu</span>
+    </button>
+
+    <!-- Dropdown -->
+    <div class="pbsg-menu-dropdown" id="pbsgMenuDropdown" role="menu" aria-label="Steps menu">
+      <div class="pbsg-menu-head">
+        <span class="pbsg-menu-head-position">
+          Steps &middot; <span class="pbsg-menu-head-current">1</span> of <span class="pbsg-menu-head-total"><?php echo (int) count($steps_enriched); ?></span>
+        </span>
+        <span class="pbsg-menu-head-done">
+          <span class="pbsg-menu-head-done-count">0</span>
+          <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?>
+        </span>
+      </div>
+      <div class="pbsg-menu-list" id="pbsgMenuList">
+        <?php foreach ($steps_enriched as $idx => $step): ?>
+          <?php
+            $num = $idx + 1;
+            $label = !empty($step['title']) ? $step['title'] : "Step $num";
+          ?>
+          <button
+            type="button"
+            class="pbsg-menu-item"
+            data-step-index="<?php echo esc_attr($idx); ?>"
+            role="menuitem"
+          >
+            <span class="pbsg-menu-item-label">
+              <span class="pbsg-menu-item-num"><?php echo esc_html($num . '.'); ?></span>
+              <?php echo esc_html($label); ?>
+            </span>
+            <span class="pbsg-menu-item-check" aria-hidden="true">
+              <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?>
+            </span>
+          </button>
+        <?php endforeach; ?>
       </div>
     </div>
-
-    <!-- Current step title -->
-    <div id="pbsgStepTitle" class="pbsg-step-title"></div>
   </div>
 
-  <button type="button" class="pbsg-focus-btn" id="pbsgFocusQuiz">Focus Quiz</button>
+  <!-- Title zone (eyebrow + title) -->
+  <div class="pbsg-step-title-zone">
+    <span class="pbsg-step-eyebrow" id="pbsgStepEyebrow" aria-hidden="true"></span>
+    <span class="pbsg-step-title" id="pbsgStepTitle"></span>
+  </div>
+
+  <!-- Focus Quiz button -->
+  <button type="button" class="pbsg-focus-btn" id="pbsgFocusQuiz" aria-label="Focus Quiz">
+    <span class="pbsg-focus-icon"><?php echo pbsg_icon('maximize'); ?></span>
+    <span class="pbsg-focus-label">Focus Quiz</span>
+  </button>
+
 </div>
+
+      <!-- Instructions body (populated per-step by split-guide.js) -->
+      <div class="pbsg-instructions-body" id="pbsgInstructionsBody" style="display:none;"></div>
 
       <div class="pbsg-iframe-wrap">
         <iframe aria-label="H5P Frame" id="pbsgH5PFrame" class="pbsg-iframe" tabindex="0"></iframe>
@@ -357,14 +478,18 @@ $s['branch'] = $branch;
       </div>
 
       <div class="pbsg-nav">
-        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev">Prev</button>
-
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgPrev"><?php esc_html_e('Prev', 'pb-split-guide'); ?></button>
         <div class="pbsg-nav-center">
-          <span id="pbsgProgress" class="pbsg-progress"></span>
-          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">Correct/Attempted 0/0 <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+          <span id="pbsgProgress" class="pbsg-progress">
+            <span class="pbsg-progress-long"><?php esc_html_e('Page:', 'pb-split-guide'); ?> <span class="pbsg-progress-current">1</span> <?php esc_html_e('of', 'pb-split-guide'); ?> <span class="pbsg-progress-total">1</span></span>
+            <span class="pbsg-progress-short"><span class="pbsg-progress-current">1</span>/<span class="pbsg-progress-total">1</span></span>
+          </span>
+          <span id="pbsgRunningScore" class="pbsg-running-score" aria-live="polite">
+            <span class="pbsg-score-long"><?php esc_html_e('Correct/Attempted', 'pb-split-guide'); ?> <span class="pbsg-score-value">0/0</span> <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+            <span class="pbsg-score-short"><span class="pbsg-score-value">0/0</span> <?php echo pbsg_icon('check', 'pbsg-icon--ok'); ?></span>
+          </span>
         </div>
-
-        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext">Next</button>
+        <button type="button" class="pbsg-btn-outline pbsg-nav-btn" id="pbsgNext"><?php esc_html_e('Next', 'pb-split-guide'); ?></button>
       </div>
 
     </div>
@@ -452,6 +577,17 @@ window.PBSG_CERT = {
   isLoggedIn: <?php echo $is_logged_in ? 'true' : 'false'; ?>,
   closeTutorialUrl: <?php echo wp_json_encode($close_tutorial_url); ?>,
 };
+
+// Just-in-time embed-probe config consumed by split-guide.js to
+// re-verify URL tutorials (both main-step and branch-step resources)
+// immediately before setting iframe.src. Covers the failure class
+// where save-time meta said embeddable=true but the upstream now
+// refuses framing, returns non-2xx, or uses JS frame-busting.
+window.PBSG_PROBE = {
+  ajaxUrl: <?php echo wp_json_encode($ajax_url); ?>,
+  nonce:   <?php echo wp_json_encode(wp_create_nonce('pbsg_probe_embed')); ?>,
+  action:  'pbsg_probe_embed',
+};
 </script>
 
 
@@ -464,37 +600,70 @@ window.PBSG_CERT = {
 
 
 <div id="pbsgSummaryScreen" class="pbsg-summary-screen" style="display:none;">
-  <div class="pbsg-summary-card">
+  <div class="pbsg-summary-card<?php echo $cover_image_url ? ' pbsg-summary-card--structured' : ''; ?>">
 
-    <h2 class="pbsg-summary-title">Tutorial Summary</h2>
-
-    <div class="pbsg-summary-message">
-      <p>You have completed this tutorial.</p>
-    </div>
-
-    <div id="pbsgAttemptSummary" class="pbsg-attempt-summary"></div>
-
-    <div id="pbsgFinalGrade" class="pbsg-final-grade"></div>
-
-    <?php if ($is_logged_in): ?>
-      <div class="pbsg-summary-actions">
-        <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload">
-          Generate Certificate
-        </button>
-
-        <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial">
-          Close Tutorial
-        </button>
-      </div>
-    <?php else: ?>
-      <div class="pbsg-summary-actions">
-        <p>Please log in to generate your certificate.</p>
-        <button type="button" class="button" id="pbsgRetakeTutorial">
-          Close Tutorial
-        </button>
+    <?php if ($cover_image_url): ?>
+      <div class="pbsg-summary-cover">
+        <img src="<?php echo esc_url($cover_image_url); ?>" alt="" />
       </div>
     <?php endif; ?>
 
+    <div class="pbsg-summary-info">
+
+      <div class="pbsg-summary-eyebrow"><?php esc_html_e('Completed', 'pb-split-guide'); ?></div>
+      <p class="pbsg-summary-desc" id="pbsgSummaryDesc">
+        <?php
+          /* translators: %d: number of steps */
+          printf(
+            esc_html__("You've completed all %d steps of this tutorial.", 'pb-split-guide'),
+            (int) count($steps_enriched)
+          );
+        ?>
+      </p>
+
+      <div class="pbsg-objectives-wrap" id="pbsgObjectivesWrap" hidden>
+        <div class="pbsg-objectives-head">
+          <span><?php esc_html_e('Questions', 'pb-split-guide'); ?></span>
+          <span class="pbsg-objectives-count">
+            <span id="pbsgSummaryCorrect">0</span>
+            /
+            <span id="pbsgSummaryTotal">0</span>
+            <?php esc_html_e('correct', 'pb-split-guide'); ?>
+          </span>
+        </div>
+        <ul class="pbsg-objectives" id="pbsgSummaryQuestions" tabindex="0"></ul>
+      </div>
+
+      <div class="pbsg-summary-meta">
+        <span class="pbsg-meta-item">
+          <?php echo pbsg_icon('stopwatch', 'pbsg-meta-icon'); ?>
+          <strong id="pbsgSummaryDuration">—</strong>
+        </span>
+        <span class="pbsg-meta-sep" data-pbsg-meta-sep hidden>·</span>
+        <span class="pbsg-meta-item" id="pbsgSummaryCorrectItem" hidden>
+          <?php echo pbsg_icon('check', 'pbsg-meta-icon'); ?>
+          <strong><span id="pbsgSummaryCorrect2">0</span> / <span id="pbsgSummaryTotal2">0</span> <?php esc_html_e('correct', 'pb-split-guide'); ?></strong>
+        </span>
+        <span class="pbsg-meta-sep" data-pbsg-meta-sep hidden>·</span>
+        <span class="pbsg-meta-item is-score" id="pbsgSummaryScoreItem" hidden>
+          <?php echo pbsg_icon('chart-bar', 'pbsg-meta-icon'); ?>
+          <strong id="pbsgSummaryScore">—</strong>
+        </span>
+      </div>
+
+      <?php if ($is_logged_in): ?>
+        <div class="pbsg-summary-actions">
+          <button type="button" class="pbsg-btn-primary" id="pbsgSummaryCertDownload"><?php esc_html_e('Generate Certificate', 'pb-split-guide'); ?></button>
+          <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial"><?php esc_html_e('Close Tutorial', 'pb-split-guide'); ?></button>
+        </div>
+      <?php else: ?>
+        <div class="pbsg-summary-actions">
+          <p><?php esc_html_e('Please log in to generate your certificate.', 'pb-split-guide'); ?></p>
+          <button type="button" class="pbsg-btn-outline" id="pbsgRetakeTutorial"><?php esc_html_e('Close Tutorial', 'pb-split-guide'); ?></button>
+        </div>
+      <?php endif; ?>
+
+    </div>
   </div>
 </div>
 
@@ -504,8 +673,9 @@ window.PBSG_CERT = {
   <div class="pbsg-cert-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="pbsgCertModalTitle">
     <button type="button" class="pbsg-cert-modal-close" id="pbsgCertModalClose" aria-label="Close">×</button>
 
-    <h3 id="pbsgCertModalTitle">Generate Certificate</h3>
-    <p>Please enter your name as it should appear on the certificate.</p>
+    <div class="pbsg-cert-modal-eyebrow"><?php esc_html_e('Certificate', 'pb-split-guide'); ?></div>
+    <h3 id="pbsgCertModalTitle"><?php esc_html_e('Generate Certificate', 'pb-split-guide'); ?></h3>
+    <p class="pbsg-cert-modal-desc"><?php esc_html_e('Please enter your name as it should appear on the certificate.', 'pb-split-guide'); ?></p>
 
     <label for="pbsgCertModalName" class="pbsg-cert-label">Student Name</label>
     <input id="pbsgCertModalName" type="text" class="pbsg-cert-input" placeholder="Enter your full name" />

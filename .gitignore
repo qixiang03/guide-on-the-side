@@ -1,7 +1,6 @@
 .env
 .DS_Store
 config_services/.env
-composer.lock
 /log/nginx-stable
 /log/php-fpm-*
 .idea/
@@ -23,7 +22,8 @@ node_modules/
 build/
 .history/
 CLAUDE.local.md
-.claude/commands/*
+.claude/*
 .cursor/
 docs/superpowers/*
 .superpowers/*
+vendor

@@ -1,0 +1,163 @@
+/* ================================================================
+   PbsgModal — generic in-page confirmation modal
+   Variants: default (green), neutral (grey), destructive (red)
+   ================================================================ */
+.pbsg-modal__backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 20px;
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}
+.pbsg-modal__backdrop.is-open {
+  display: flex;
+  opacity: 1;
+}
+
+.pbsg-modal {
+  background: #fff;
+  border-radius: 10px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  font-family: "Roboto", -apple-system, sans-serif;
+  color: #333;
+  transform: scale(0.96);
+  transition: transform 200ms ease-out;
+}
+.pbsg-modal__backdrop.is-open .pbsg-modal {
+  transform: scale(1);
+}
+
+.pbsg-modal__head {
+  padding: 20px 24px 14px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  border-bottom: 1px solid #E0E0E0;
+}
+.pbsg-modal__icon {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: #F8F8F8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #517E1B;
+}
+.pbsg-modal__icon svg { width: 20px; height: 20px; }
+.pbsg-modal--neutral .pbsg-modal__icon { color: #646970; background: #F1F1F1; }
+.pbsg-modal--warn .pbsg-modal__icon { color: #B54708; background: #FFF4E5; }
+.pbsg-modal--destructive .pbsg-modal__icon { color: #B54708; background: #FFF4E5; }
+
+.pbsg-modal__heading {
+  font-size: 16px;
+  font-weight: 700;
+  color: #222;
+  line-height: 1.3;
+  margin: 2px 0 4px;
+  font-family: "Lusitana", Georgia, serif;
+}
+.pbsg-modal__subtitle {
+  font-size: 12px;
+  color: #646970;
+  margin: 0;
+}
+
+.pbsg-modal__body {
+  padding: 18px 24px 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #333;
+}
+.pbsg-modal__body-label {
+  color: #646970;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+.pbsg-modal__bullets {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 4px;
+}
+.pbsg-modal__bullets li {
+  padding: 8px 0 8px 28px;
+  position: relative;
+  font-size: 13px;
+  border-bottom: 1px solid #F1F1F1;
+}
+.pbsg-modal__bullets li:last-child { border-bottom: none; }
+.pbsg-modal__bullets li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 13px;
+  width: 14px;
+  height: 14px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23517E1B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M4.5 12.5l5 5 10-10'/></svg>");
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.pbsg-modal--neutral .pbsg-modal__bullets li::before,
+.pbsg-modal--destructive .pbsg-modal__bullets li::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23646970' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><line x1='6' y1='12' x2='18' y2='12'/></svg>");
+}
+
+.pbsg-modal__caveat {
+  margin: 12px 0 6px;
+  padding: 10px 14px;
+  background: #FFF4E5;
+  border-left: 3px solid #B54708;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #5C3400;
+  line-height: 1.5;
+}
+
+.pbsg-modal__foot {
+  padding: 14px 24px 18px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  background: #FCFCFC;
+  border-top: 1px solid #F1F1F1;
+}
+.pbsg-modal__btn-cancel {
+  background: #fff;
+  color: #333;
+  border: 1.5px solid #E0E0E0;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pbsg-modal__btn-confirm {
+  background: #517E1B;
+  color: #fff;
+  border: 1.5px solid #517E1B;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pbsg-modal--neutral .pbsg-modal__btn-confirm {
+  background: #646970;
+  border-color: #646970;
+}
+.pbsg-modal--destructive .pbsg-modal__btn-confirm {
+  background: #8C2004;
+  border-color: #8C2004;
+}
